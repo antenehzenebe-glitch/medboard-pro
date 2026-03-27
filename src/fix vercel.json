@@ -12,18 +12,3 @@
 }
 ```
 
-**Title box:** `Fix vercel.json`
-Click **"Commit changes"**
-
----
-
-**Then go to Vercel:**
-1. Click your project
-2. Click **"Settings"** → **"General"**
-3. Find **"Build Command"** → type:
-```
-npm install && npm run build
-```
-4. Find **"Output Directory"** → type:
-```
-build
