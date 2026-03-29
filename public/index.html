@@ -9,448 +9,337 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',sans-serif; background:#0a0a0f; color:#f1f5f9; }
-  button,select,input { font-family:inherit; }
-  ::-webkit-scrollbar { width:6px; }
-  ::-webkit-scrollbar-track { background:#1e293b; }
-  ::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',sans-serif; background:#0a0a0f; color:#f1f5f9; }
+button,select,input { font-family:inherit; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 
-// ── SUPABASE CONFIG ────────────────────────────
 const SUPABASE_URL = "https://vhzeeskhvkujihuvddcc.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const HU_NAVY = "#002868";
-const HU_GOLD = "#C9A84C";
+const NAVY = "#002868";
+const GOLD = "#C9A84C";
 const BG = "#0a0a0f";
 const CARD = "rgba(255,255,255,0.04)";
-const BORDER = "#1e293b";
-const SECS_PER_Q = 90;
+const BDR = "#1e293b";
+const SECS = 90;
 
-const TOPIC_GROUPS = {
+const GROUPS = {
   "🎲 Random":["Random — All Specialties","Random — Endocrinology Only","Random — ABIM IM Blueprint","Random — USMLE High-Yield"],
   "🩺 Diabetes":["Type 2 — Diagnosis & Management","Type 1 — Insulin Therapy","DKA & HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA & MODY","CGM & AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
   "🦋 Thyroid":["Hypothyroidism & Hashimoto's","Hyperthyroidism & Graves'","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
   "🫀 Adrenal":["Adrenal Insufficiency","Cushing's Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
   "🧠 Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushing's Disease"],
-  "🦴 Bone & Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Paget's Disease","Hypoparathyroidism"],
-  "🔬 Reproductive Endo":["PCOS","Male Hypogonadism","Menopause & HRT","Precocious Puberty","Turner & Klinefelter Syndrome"],
-  "🧬 NETs & MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A & MEN2B","Neuroendocrine Tumors"],
-  "🫀 Cardiology":["ACS — STEMI/NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
+  "🦴 Bone":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Paget's Disease","Hypoparathyroidism"],
+  "🔬 Reproductive":["PCOS","Male Hypogonadism","Menopause & HRT","Precocious Puberty","Turner & Klinefelter"],
+  "🫀 Cardiology":["ACS — STEMI/NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders"],
   "🫁 Pulmonology":["Asthma & COPD","Pneumonia","Pulmonary Embolism","Interstitial Lung Disease","ARDS","Sleep Apnea"],
   "🫘 Nephrology":["Acute Kidney Injury","CKD","Glomerulonephritis","Electrolyte Disorders","Acid-Base Disorders","Nephrotic Syndrome"],
-  "🫄 GI & Hepatology":["IBD — Crohn's & UC","Cirrhosis & Portal HTN","Hepatitis B & C","GI Bleeding","Acute Pancreatitis","NAFLD/NASH"],
-  "🧠 Neurology":["Ischemic Stroke","Seizures & Epilepsy","Multiple Sclerosis","Meningitis","Parkinson's Disease","Headache Disorders"],
-  "🦠 Infectious Disease":["Sepsis & Septic Shock","HIV & Opportunistic Infections","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
-  "🩸 Hematology":["Anemia — Iron, B12, Hemolytic","Sickle Cell Disease","Thrombocytopenia","DVT & Anticoagulation","Leukemia & Lymphoma","Multiple Myeloma"],
+  "🫄 GI":["IBD — Crohn's & UC","Cirrhosis","Hepatitis B & C","GI Bleeding","Acute Pancreatitis","NAFLD/NASH"],
+  "🧠 Neurology":["Ischemic Stroke","Seizures & Epilepsy","Multiple Sclerosis","Meningitis","Parkinson's Disease","Headache"],
+  "🦠 Infectious Disease":["Sepsis & Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
+  "🩸 Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT & Anticoagulation","Leukemia & Lymphoma","Multiple Myeloma"],
   "🦴 Rheumatology":["Rheumatoid Arthritis","SLE","Gout & Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
   "💊 Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
-  "📋 USMLE Step 3":["Foundations of Independent Practice","Ambulatory Medicine","Biostatistics & Epidemiology","Patient Safety","CCS Cases — Endocrinology","CCS Cases — Mixed Systems"],
-  "⚖️ Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Error Disclosure","Health Disparities","High-Value Care"],
+  "📋 Step 3":["Foundations of Independent Practice","Ambulatory Medicine","Biostatistics","Patient Safety","CCS — Endocrinology","CCS — Mixed"],
+  "⚖️ Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
 };
 
 const LEVELS = [
-  {label:"USMLE Step 1",value:"USMLE Step 1 (M2 medical students, basic science focus)"},
-  {label:"USMLE Step 2 CK",value:"USMLE Step 2 CK (M3/M4 students, clinical decision-making)"},
-  {label:"USMLE Step 3",value:"USMLE Step 3 (PGY-1/2 residents, clinical management and CCS)"},
-  {label:"ABIM Internal Medicine",value:"ABIM Internal Medicine boards (residents, broad clinical management)"},
-  {label:"ABIM Endocrinology",value:"ABIM Endocrinology & Metabolism subspecialty boards (fellows)"},
+  {l:"USMLE Step 1",v:"USMLE Step 1 (M2 basic science focus)"},
+  {l:"USMLE Step 2 CK",v:"USMLE Step 2 CK (M3/M4 clinical decision-making)"},
+  {l:"USMLE Step 3",v:"USMLE Step 3 (PGY-1/2 clinical management)"},
+  {l:"ABIM Internal Medicine",v:"ABIM Internal Medicine boards (residents)"},
+  {l:"ABIM Endocrinology",v:"ABIM Endocrinology subspecialty boards (fellows)"},
 ];
 
-const STUDY_GUIDES = [
-  {id:1,title:"ADA Standards of Medical Care in Diabetes",specialty:"Endocrinology",icon:"📊",url:"https://diabetesjournals.org/care/issue/47/Supplement_1"},
-  {id:2,title:"Endocrine Society Clinical Practice Guidelines",specialty:"Endocrinology",icon:"🔬",url:"https://www.endocrine.org/clinical-practice-guidelines"},
-  {id:3,title:"AACE Diabetes Management Guidelines",specialty:"Endocrinology",icon:"🩺",url:"https://www.aace.com/publications/guidelines"},
-  {id:4,title:"ACC/AHA Cardiovascular Guidelines",specialty:"Cardiology",icon:"🫀",url:"https://www.acc.org/guidelines"},
-  {id:5,title:"KDIGO Kidney Disease Guidelines",specialty:"Nephrology",icon:"🫘",url:"https://kdigo.org/guidelines"},
-  {id:6,title:"USPSTF Preventive Care Recommendations",specialty:"Preventive",icon:"✅",url:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
-  {id:7,title:"ESC Cardiovascular Guidelines",specialty:"Cardiology",icon:"🏥",url:"https://www.escardio.org/Guidelines"},
-  {id:8,title:"EASD Diabetes Management Guidelines",specialty:"Endocrinology",icon:"🦋",url:"https://www.easd.eu/guidelines"},
-  {id:9,title:"IDSA Infectious Disease Guidelines",specialty:"ID",icon:"🦠",url:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
-  {id:10,title:"NCCN Oncology Guidelines",specialty:"Oncology",icon:"🎗",url:"https://www.nccn.org/guidelines/guidelines-detail"},
-  {id:11,title:"ACR Rheumatology Guidelines",specialty:"Rheumatology",icon:"🦴",url:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
-  {id:12,title:"ATS/ERS Respiratory Guidelines",specialty:"Pulmonology",icon:"🫁",url:"https://www.thoracic.org/statements"},
+const GUIDES = [
+  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"📊",u:"https://diabetesjournals.org/care/issue/47/Supplement_1"},
+  {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"🔬",u:"https://www.endocrine.org/clinical-practice-guidelines"},
+  {id:3,t:"AACE Diabetes Management Guidelines",s:"Endocrinology",i:"🩺",u:"https://www.aace.com/publications/guidelines"},
+  {id:4,t:"ACC/AHA Cardiovascular Guidelines",s:"Cardiology",i:"🫀",u:"https://www.acc.org/guidelines"},
+  {id:5,t:"KDIGO Kidney Disease Guidelines",s:"Nephrology",i:"🫘",u:"https://kdigo.org/guidelines"},
+  {id:6,t:"USPSTF Preventive Care Recommendations",s:"Preventive",i:"✅",u:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
+  {id:7,t:"ESC Cardiovascular Guidelines",s:"Cardiology",i:"🏥",u:"https://www.escardio.org/Guidelines"},
+  {id:8,t:"EASD Diabetes Management Guidelines",s:"Endocrinology",i:"🦋",u:"https://www.easd.eu/guidelines"},
+  {id:9,t:"IDSA Infectious Disease Guidelines",s:"ID",i:"🦠",u:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
+  {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"🎗",u:"https://www.nccn.org/guidelines/guidelines-detail"},
+  {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"🦴",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
+  {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"🫁",u:"https://www.thoracic.org/statements"},
 ];
 
 function App() {
-  const [authView, setAuthView] = React.useState("login");
+  const [view, setView] = React.useState("login");
   const [user, setUser] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [loadingAuth, setLoadingAuth] = React.useState(true);
   const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [name, setName] = React.useState("");
-  const [authError, setAuthError] = React.useState("");
-  const [authLoading, setAuthLoading] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState("dashboard");
-  const [resetSent, setResetSent] = React.useState(false);
+  const [pw, setPw] = React.useState("");
+  const [nm, setNm] = React.useState("");
+  const [authErr, setAuthErr] = React.useState("");
+  const [authBusy, setAuthBusy] = React.useState(false);
+  const [tab, setTab] = React.useState("home");
 
-  // MCQ state
-  const [selGroup, setSelGroup] = React.useState("🎲 Random");
+  // MCQ
+  const [grp, setGrp] = React.useState("🎲 Random");
   const [topic, setTopic] = React.useState("Random — All Specialties");
-  const [level, setLevel] = React.useState(LEVELS[3]);
-  const [count, setCount] = React.useState(5);
-  const [examMode, setExamMode] = React.useState(false);
-  const [timeLeft, setTimeLeft] = React.useState(null);
-  const [timerActive, setTimerActive] = React.useState(false);
-  const [questions, setQuestions] = React.useState([]);
-  const [mcqLoading, setMcqLoading] = React.useState(false);
-  const [mcqError, setMcqError] = React.useState("");
-  const [selAnswer, setSelAnswer] = React.useState({});
-  const [revealed, setRevealed] = React.useState({});
-  const [scores, setScores] = React.useState({total:0,correct:0,sessions:0});
-  const timerRef = React.useRef(null);
+  const [lvl, setLvl] = React.useState(LEVELS[3]);
+  const [cnt, setCnt] = React.useState(5);
+  const [exam, setExam] = React.useState(false);
+  const [tLeft, setTLeft] = React.useState(null);
+  const [tActive, setTActive] = React.useState(false);
+  const [qs, setQs] = React.useState([]);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  const [sel, setSel] = React.useState({});
+  const [rev, setRev] = React.useState({});
+  const [score, setScore] = React.useState({t:0,c:0,s:0});
+  const tRef = React.useRef(null);
 
-  // DeFi state
+  // DeFi
   const [pools, setPools] = React.useState([]);
-  const [defiLoading, setDefiLoading] = React.useState(false);
-  const [defiError, setDefiError] = React.useState("");
-  const [defiChain, setDefiChain] = React.useState("All");
-  const [watchlist, setWatchlist] = React.useState([]);
+  const [dBusy, setDBusy] = React.useState(false);
+  const [dErr, setDErr] = React.useState("");
+  const [dChain, setDChain] = React.useState("All");
+  const [wl, setWl] = React.useState([]);
 
-  // ── CHECK SESSION ON LOAD ──────────────────
   React.useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    sb.auth.getSession().then(({data:{session}}) => {
       setUser(session?.user ?? null);
-      setLoading(false);
+      setLoadingAuth(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {data:{subscription}} = sb.auth.onAuthStateChange((_,session) => {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── AUTH FUNCTIONS ─────────────────────────
   const login = async () => {
-    setAuthError(""); setAuthLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError(error.message);
-    setAuthLoading(false);
+    setAuthErr(""); setAuthBusy(true);
+    const {error} = await sb.auth.signInWithPassword({email, password:pw});
+    if (error) setAuthErr(error.message);
+    setAuthBusy(false);
   };
 
   const signup = async () => {
-    setAuthError(""); setAuthLoading(true);
-    if (password.length < 8) { setAuthError("Password must be at least 8 characters"); setAuthLoading(false); return; }
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { data: { full_name: name } }
-    });
-    if (error) setAuthError(error.message);
-    else setAuthError("✅ Check your email to confirm your account, then sign in!");
-    setAuthLoading(false);
+    setAuthErr(""); setAuthBusy(true);
+    if (pw.length < 8) { setAuthErr("Password must be at least 8 characters"); setAuthBusy(false); return; }
+    const {error} = await sb.auth.signUp({email, password:pw, options:{data:{full_name:nm}}});
+    if (error) setAuthErr(error.message);
+    else setAuthErr("✅ Check your email to confirm your account!");
+    setAuthBusy(false);
   };
 
-  const googleLogin = async () => {
-    setAuthLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.href }
-    });
-    if (error) setAuthError(error.message);
-    setAuthLoading(false);
+  const gLogin = async () => {
+    await sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:window.location.href}});
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  };
+  const logout = async () => { await sb.auth.signOut(); };
 
-  const resetPassword = async () => {
-    if (!email) { setAuthError("Enter your email above first"); return; }
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) setAuthError(error.message);
-    else setResetSent(true);
-  };
+  const fmtT = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  const stopT = () => { clearInterval(tRef.current); setTActive(false); };
 
-  // ── MCQ FUNCTIONS ──────────────────────────
-  const fmtTime = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-  const stopTimer = () => { clearInterval(timerRef.current); setTimerActive(false); };
-
-  const autoRevealAll = React.useCallback((qs) => {
-    setRevealed(prev => {
-      const next = {...prev};
-      qs.forEach((_,i) => { next[i] = true; });
-      return next;
-    });
+  const revealAll = React.useCallback((questions) => {
+    setRev(p => { const n={...p}; questions.forEach((_,i) => n[i]=true); return n; });
   }, []);
 
-  const startTimer = (total, qs) => {
-    const secs = total * SECS_PER_Q;
-    setTimeLeft(secs);
-    setTimerActive(true);
-    timerRef.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) { clearInterval(timerRef.current); setTimerActive(false); autoRevealAll(qs); return 0; }
-        return t - 1;
+  const startT = (total, questions) => {
+    setTLeft(total*SECS); setTActive(true);
+    tRef.current = setInterval(() => {
+      setTLeft(t => {
+        if (t<=1) { clearInterval(tRef.current); setTActive(false); revealAll(questions); return 0; }
+        return t-1;
       });
     }, 1000);
   };
 
-  const generateMCQ = async () => {
-    stopTimer();
-    setMcqLoading(true); setMcqError(""); setQuestions([]); setSelAnswer({}); setRevealed({}); setTimeLeft(null);
-    const isRandom = topic.toLowerCase().includes("random");
-    const topicPrompt = isRandom
-      ? topic.includes("Endocrinology") ? "a randomly selected endocrinology topic"
-        : topic.includes("ABIM IM") ? "a randomly selected ABIM Internal Medicine blueprint topic"
-        : topic.includes("USMLE") ? "a randomly selected high-yield USMLE topic"
-        : "a randomly selected topic from any medical specialty"
-      : `"${topic}"`;
-
-    const prompt = `You are a senior medical educator and board examiner. Generate exactly ${count} high-quality board-style MCQ(s) on ${topicPrompt} at ${level.value} level.
-
-Use the most current guidelines from ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European medical societies. Reference top textbooks including Harrison's Principles of Internal Medicine, Williams Textbook of Endocrinology, DeGroot's Endocrinology, Braunwald's Heart Disease, and other relevant specialty textbooks. Use evidence from recent years — not limited to any single year.
-
-Each question must:
-- Be a realistic clinical vignette with patient demographics, presenting complaint, relevant labs and vitals
-- Have exactly 5 answer choices labeled A through E
-- Have one definitively correct answer
-- Include a detailed explanation (3-5 sentences) citing the specific guideline, society or textbook
-- Vary in difficulty
-${isRandom ? "- Each question must be from a DIFFERENT specialty or topic" : ""}
-
-Return ONLY a valid JSON array, no markdown:
-[{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"...citing guideline/textbook...","topic":"topic name"}]`;
-
+  // ── MCQ GENERATOR — CALLS NETLIFY FUNCTION ──
+  const generate = async () => {
+    stopT();
+    setBusy(true); setErr(""); setQs([]); setSel({}); setRev({}); setTLeft(null);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]}),
+      const res = await fetch("/.netlify/functions/generate-mcq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, level: lvl.v, count: cnt }),
       });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
-      const raw = data.content?.map(b=>b.text||"").join("").trim();
-      const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-      setQuestions(parsed);
-      setScores(s=>({...s,sessions:s.sessions+1}));
-      if (examMode) startTimer(parsed.length, parsed);
+      if (data.error) throw new Error(data.error);
+      setQs(data);
+      setScore(s => ({...s, s: s.s+1}));
+      if (exam) startT(data.length, data);
     } catch(e) {
-      setMcqError("Question generation requires a backend API key. This will be fully activated once your Netlify Function is deployed. Stay tuned — next step!");
+      setErr("Failed to generate questions: " + e.message + ". Please try again.");
     }
-    setMcqLoading(false);
+    setBusy(false);
   };
 
-  const revealAnswer = (qi) => {
-    if (!selAnswer[qi]) return;
-    const ok = selAnswer[qi] === questions[qi].correct;
-    setRevealed(p=>({...p,[qi]:true}));
-    setScores(s=>({total:s.total+1,correct:s.correct+(ok?1:0),sessions:s.sessions}));
+  const reveal = (i) => {
+    if (!sel[i]) return;
+    const ok = sel[i] === qs[i].correct;
+    setRev(p => ({...p,[i]:true}));
+    setScore(s => ({t:s.t+1, c:s.c+(ok?1:0), s:s.s}));
   };
 
   const fetchDefi = async () => {
-    setDefiLoading(true); setDefiError("");
+    setDBusy(true); setDErr("");
     try {
       const res = await fetch("https://yields.llama.fi/pools");
       const data = await res.json();
-      const CHAINS = ["Ethereum","Arbitrum","Solana","Polygon","BSC"];
-      const filtered = data.data
-        .filter(p=>p.tvlUsd>=1_000_000&&p.apy>0&&p.apy<300&&CHAINS.some(c=>p.chain?.toLowerCase().includes(c.toLowerCase())))
-        .map(p=>({id:p.pool,project:p.project,symbol:p.symbol,
-          chain:CHAINS.find(c=>p.chain?.toLowerCase().includes(c.toLowerCase()))||p.chain,
+      const CH = ["Ethereum","Arbitrum","Solana","Polygon","BSC"];
+      setPools(data.data
+        .filter(p=>p.tvlUsd>=1e6&&p.apy>0&&p.apy<300&&CH.some(c=>p.chain?.toLowerCase().includes(c.toLowerCase())))
+        .map(p=>({id:p.pool,proj:p.project,sym:p.symbol,
+          chain:CH.find(c=>p.chain?.toLowerCase().includes(c.toLowerCase()))||p.chain,
           apy:p.apy,tvl:p.tvlUsd,
           risk:p.apy>40||p.tvlUsd<1e6?"High":p.apy>15?"Medium":"Low"}))
-        .sort((a,b)=>b.apy-a.apy).slice(0,200);
-      setPools(filtered);
-    } catch(e) { setDefiError("Could not load live data. Try again."); }
-    setDefiLoading(false);
+        .sort((a,b)=>b.apy-a.apy).slice(0,200));
+    } catch(e) { setDErr("Could not load data. Try again."); }
+    setDBusy(false);
   };
 
-  const fmtAPY = n=>`${n.toFixed(2)}%`;
-  const fmtTVL = n=>n>=1e9?`$${(n/1e9).toFixed(2)}B`:n>=1e6?`$${(n/1e6).toFixed(1)}M`:`$${(n/1e3).toFixed(0)}K`;
-  const riskColor = r=>r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";
-  const chainColor = c=>({"Ethereum":"#627EEA","Arbitrum":"#28A0F0","Solana":"#9945FF","Polygon":"#8247E5","BSC":"#F3BA2F"}[c]||"#64748b");
-  const choiceColor = (qi,l)=>{
-    if(!revealed[qi]) return selAnswer[qi]===l?HU_GOLD:"transparent";
-    if(l===questions[qi].correct) return "#10b981";
-    if(selAnswer[qi]===l) return "#ef4444";
+  const fAPY = n=>`${n.toFixed(2)}%`;
+  const fTVL = n=>n>=1e9?`$${(n/1e9).toFixed(2)}B`:n>=1e6?`$${(n/1e6).toFixed(1)}M`:`$${(n/1e3).toFixed(0)}K`;
+  const rC = r=>r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";
+  const cC = c=>({"Ethereum":"#627EEA","Arbitrum":"#28A0F0","Solana":"#9945FF","Polygon":"#8247E5","BSC":"#F3BA2F"}[c]||"#64748b");
+
+  const qC = (i,l) => {
+    if (!rev[i]) return sel[i]===l?GOLD:"transparent";
+    if (l===qs[i].correct) return "#10b981";
+    if (sel[i]===l) return "#ef4444";
     return "transparent";
   };
 
-  const sessionScore = Object.entries(revealed).filter(([i])=>questions[i]&&selAnswer[i]===questions[i].correct).length;
-  const sessionTotal = Object.keys(revealed).length;
-  const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Doctor";
+  const ss = Object.entries(rev).filter(([i])=>qs[i]&&sel[i]===qs[i].correct).length;
+  const st = Object.keys(rev).length;
+  const uname = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Doctor";
 
-  const NavBtn = ({id,label,icon}) => (
-    <button onClick={()=>{setActiveTab(id);if(id==="defi"&&pools.length===0)fetchDefi();}}
+  const NB = ({id,label,icon}) => (
+    <button onClick={()=>{setTab(id);if(id==="defi"&&!pools.length)fetchDefi();}}
       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 14px",border:"none",borderRadius:8,cursor:"pointer",
-        background:activeTab===id?`rgba(201,168,76,0.12)`:"transparent",
-        borderBottom:activeTab===id?`2px solid ${HU_GOLD}`:"2px solid transparent",
-        color:activeTab===id?HU_GOLD:"#64748b",fontWeight:600,fontSize:11}}>
+        background:tab===id?`rgba(201,168,76,0.12)`:"transparent",
+        borderBottom:tab===id?`2px solid ${GOLD}`:"2px solid transparent",
+        color:tab===id?GOLD:"#64748b",fontWeight:600,fontSize:11}}>
       <span style={{fontSize:18}}>{icon}</span>{label}
     </button>
   );
 
-  // ── LOADING ────────────────────────────────
-  if (loading) return (
+  if (loadingAuth) return (
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{width:52,height:52,borderRadius:12,background:`linear-gradient(135deg,${HU_NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:HU_GOLD,margin:"0 auto 16px"}}>M</div>
-        <p style={{color:"#475569"}}>Loading MedBoard Pro...</p>
+        <div style={{width:52,height:52,borderRadius:12,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 16px"}}>M</div>
+        <p style={{color:"#475569"}}>Loading...</p>
       </div>
     </div>
   );
 
-  // ── AUTH SCREEN ────────────────────────────
   if (!user) return (
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{width:"100%",maxWidth:420}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{width:52,height:52,borderRadius:12,background:`linear-gradient(135deg,${HU_NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:HU_GOLD,margin:"0 auto 14px"}}>M</div>
-          <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#f1f5f9"}}>MedBoard <span style={{color:HU_GOLD}}>Pro</span></h1>
-          <p style={{color:"#475569",fontSize:13,marginTop:4}}>AI-Powered Medical Board Prep · Howard University</p>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{width:52,height:52,borderRadius:12,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 12px"}}>M</div>
+          <h1 style={{fontSize:22,fontWeight:800}}>MedBoard <span style={{color:GOLD}}>Pro</span></h1>
+          <p style={{color:"#475569",fontSize:13,marginTop:4}}>Howard University · Board Prep Platform</p>
         </div>
-
-        <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:20,padding:28}}>
-          <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
-            {authView==="login"?"Sign In to Your Account":"Create Your Account"}
-          </h2>
-
-          {/* Google */}
-          <button onClick={googleLogin} disabled={authLoading}
-            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-            <span style={{fontWeight:800,color:"#4285f4",fontSize:16}}>G</span> Continue with Google
+        <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:20,padding:28}}>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center"}}>{view==="login"?"Sign In":"Create Account"}</h2>
+          <button onClick={gLogin} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+            <span style={{fontWeight:800,color:"#4285f4"}}>G</span> Continue with Google
           </button>
-
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
-            <div style={{flex:1,height:1,background:BORDER}}/><span style={{color:"#334155",fontSize:12}}>or</span><div style={{flex:1,height:1,background:BORDER}}/>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+            <div style={{flex:1,height:1,background:BDR}}/><span style={{color:"#334155",fontSize:12}}>or</span><div style={{flex:1,height:1,background:BDR}}/>
           </div>
-
-          {authView==="signup"&&(
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>FULL NAME</label>
-              <input value={name} onChange={e=>setName(e.target.value)} placeholder="Dr. John Smith"
-                style={{width:"100%",background:"#1e293b",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-            </div>
-          )}
-
-          <div style={{marginBottom:14}}>
-            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>EMAIL</label>
+          {view==="signup"&&<div style={{marginBottom:12}}>
+            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>FULL NAME</label>
+            <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Dr. John Smith"
+              style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"10px 12px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+          </div>}
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>EMAIL</label>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="doctor@hospital.com"
-              style={{width:"100%",background:"#1e293b",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+              style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"10px 12px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
           </div>
-
-          <div style={{marginBottom:18}}>
-            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>PASSWORD</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Minimum 8 characters"
-              style={{width:"100%",background:"#1e293b",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>PASSWORD</label>
+            <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Minimum 8 characters"
+              style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"10px 12px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
           </div>
-
-          {authError&&(
-            <div style={{background:authError.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",border:`1px solid ${authError.startsWith("✅")?"#10b981":"#ef4444"}`,borderRadius:8,padding:"10px 13px",color:authError.startsWith("✅")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>
-              {authError}
-            </div>
-          )}
-
-          {resetSent&&(
-            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:8,padding:"10px 13px",color:"#10b981",fontSize:13,marginBottom:14}}>
-              ✅ Password reset email sent! Check your inbox.
-            </div>
-          )}
-
-          <button onClick={authView==="login"?login:signup} disabled={authLoading}
-            style={{width:"100%",background:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${HU_GOLD}`,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authLoading?0.7:1}}>
-            {authLoading?"Please wait...":authView==="login"?"Sign In →":"Create Account →"}
+          {authErr&&<div style={{background:authErr.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",border:`1px solid ${authErr.startsWith("✅")?"#10b981":"#ef4444"}`,borderRadius:8,padding:"9px 12px",color:authErr.startsWith("✅")?"#10b981":"#ef4444",fontSize:13,marginBottom:12}}>{authErr}</div>}
+          <button onClick={view==="login"?login:signup} disabled={authBusy}
+            style={{width:"100%",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12}}>
+            {authBusy?"Please wait...":view==="login"?"Sign In →":"Create Account →"}
           </button>
-
-          {authView==="login"&&(
-            <p style={{textAlign:"center",marginBottom:12}}>
-              <span onClick={resetPassword} style={{color:"#475569",fontSize:12,cursor:"pointer",textDecoration:"underline"}}>Forgot password?</span>
-            </p>
-          )}
-
-          <p style={{textAlign:"center",color:"#475569",fontSize:13,margin:0}}>
-            {authView==="login"?"Don't have an account? ":"Already have an account? "}
-            <span onClick={()=>{setAuthView(authView==="login"?"signup":"login");setAuthError("");}} style={{color:HU_GOLD,cursor:"pointer",fontWeight:600}}>
-              {authView==="login"?"Sign Up":"Sign In"}
+          <p style={{textAlign:"center",color:"#475569",fontSize:13}}>
+            {view==="login"?"No account? ":"Have account? "}
+            <span onClick={()=>{setView(view==="login"?"signup":"login");setAuthErr("");}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>
+              {view==="login"?"Sign Up":"Sign In"}
             </span>
           </p>
         </div>
-        <p style={{textAlign:"center",color:"#1e293b",fontSize:11,marginTop:16}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University</p>
       </div>
     </div>
   );
 
-  // ── MAIN DASHBOARD ─────────────────────────
   return (
     <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BORDER}`,padding:"0 4%",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,gap:8}}>
+      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 4%",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:32,height:32,borderRadius:7,background:`linear-gradient(135deg,${HU_NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:HU_GOLD}}>M</div>
-            <span style={{fontWeight:700,fontSize:16,color:"#f1f5f9"}}>MedBoard <span style={{color:HU_GOLD}}>Pro</span></span>
+            <div style={{width:30,height:30,borderRadius:7,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD}}>M</div>
+            <span style={{fontWeight:700,fontSize:15}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
           </div>
           <div style={{display:"flex",gap:2}}>
-            <NavBtn id="dashboard" label="Home" icon="🏠"/>
-            <NavBtn id="mcq" label="MCQs" icon="🎯"/>
-            <NavBtn id="guides" label="Guides" icon="📚"/>
-            <NavBtn id="progress" label="Progress" icon="📊"/>
-            <NavBtn id="defi" label="DeFi" icon="💰"/>
+            <NB id="home" label="Home" icon="🏠"/>
+            <NB id="mcq" label="MCQs" icon="🎯"/>
+            <NB id="guides" label="Guides" icon="📚"/>
+            <NB id="progress" label="Progress" icon="📊"/>
+            <NB id="defi" label="DeFi" icon="💰"/>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:12,fontWeight:600,color:"#f1f5f9"}}>{userName}</div>
+              <div style={{fontSize:12,fontWeight:600}}>{uname}</div>
               <div style={{fontSize:10,color:"#475569"}}>{user.email}</div>
             </div>
-            <button onClick={logout}
-              style={{background:"transparent",border:`1px solid ${BORDER}`,color:"#475569",padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:11}}>
-              Sign Out
-            </button>
+            <button onClick={logout} style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Out</button>
           </div>
         </div>
       </nav>
 
-      <div style={{maxWidth:1200,margin:"0 auto",padding:"24px 4%"}}>
+      <div style={{maxWidth:1200,margin:"0 auto",padding:"22px 4%"}}>
 
-        {/* HOME */}
-        {activeTab==="dashboard"&&(
+        {tab==="home"&&(
           <div>
-            <h2 style={{fontSize:22,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {userName}! 👋</h2>
-            <p style={{color:"#475569",fontSize:13,marginBottom:24}}>Howard University College of Medicine · Board Prep Dashboard</p>
-
-            <div style={{background:`rgba(201,168,76,0.08)`,border:`1px solid ${HU_GOLD}`,borderRadius:14,padding:20,marginBottom:24,display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
-              <div><div style={{fontSize:12,color:"#64748b",marginBottom:3}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>✅ Active</div></div>
-              <div><div style={{fontSize:12,color:"#64748b",marginBottom:3}}>Email</div><div style={{fontSize:13,fontWeight:600,color:"#f1f5f9"}}>{user.email}</div></div>
-              <div><div style={{fontSize:12,color:"#64748b",marginBottom:3}}>Questions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{scores.total}</div></div>
-              <div><div style={{fontSize:12,color:"#64748b",marginBottom:3}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:scores.total>0?(scores.correct/scores.total>0.7?"#10b981":"#f59e0b"):"#475569"}}>{scores.total>0?`${Math.round(scores.correct/scores.total*100)}%`:"—"}</div></div>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>Welcome, {uname}! 👋</h2>
+            <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Howard University College of Medicine · Board Prep Dashboard</p>
+            <div style={{background:`rgba(201,168,76,0.08)`,border:`1px solid ${GOLD}`,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap"}}>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>✅ Active</div></div>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Sessions</div><div style={{fontSize:16,fontWeight:800}}>{score.s}</div></div>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Questions</div><div style={{fontSize:16,fontWeight:800}}>{score.t}</div></div>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?`${Math.round(score.c/score.t*100)}%`:"—"}</div></div>
             </div>
-
-            <h3 style={{fontSize:17,fontWeight:700,marginBottom:14,color:"#f1f5f9"}}>Quick Actions</h3>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:28}}>
-              {[
-                {icon:"🎯",title:"Generate MCQs",desc:"AI board questions on demand",tab:"mcq",color:"#6366f1"},
-                {icon:"📚",title:"Study Guides",desc:"Society guidelines & resources",tab:"guides",color:"#10b981"},
-                {icon:"📊",title:"My Progress",desc:"Track your performance",tab:"progress",color:"#f59e0b"},
-                {icon:"💰",title:"DeFi Tracker",desc:"Live yield opportunities",tab:"defi",color:HU_GOLD},
-              ].map(a=>(
-                <div key={a.tab} onClick={()=>{setActiveTab(a.tab);if(a.tab==="defi"&&pools.length===0)fetchDefi();}}
-                  style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:12,padding:18,cursor:"pointer",transition:"border-color 0.2s"}}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:24}}>
+              {[{icon:"🎯",title:"Generate MCQs",tab:"mcq",color:"#6366f1"},{icon:"📚",title:"Guidelines",tab:"guides",color:"#10b981"},{icon:"📊",title:"Progress",tab:"progress",color:"#f59e0b"},{icon:"💰",title:"DeFi Tracker",tab:"defi",color:GOLD}].map(a=>(
+                <div key={a.tab} onClick={()=>{setTab(a.tab);if(a.tab==="defi"&&!pools.length)fetchDefi();}}
+                  style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:16,cursor:"pointer"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
-                  <div style={{fontSize:26,marginBottom:8}}>{a.icon}</div>
-                  <div style={{fontWeight:700,fontSize:14,color:a.color,marginBottom:3}}>{a.title}</div>
-                  <div style={{fontSize:11,color:"#475569"}}>{a.desc}</div>
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
+                  <div style={{fontSize:24,marginBottom:8}}>{a.icon}</div>
+                  <div style={{fontWeight:700,fontSize:14,color:a.color}}>{a.title}</div>
                 </div>
               ))}
             </div>
-
-            <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:12,padding:20}}>
-              <h3 style={{fontWeight:700,marginBottom:12,fontSize:15,color:"#f1f5f9"}}>📋 Training Continuum</h3>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
-                {[
-                  {exam:"USMLE Step 1",who:"M2 Students",color:"#3B82F6"},
-                  {exam:"USMLE Step 2 CK",who:"M3/M4 Students",color:"#8B5CF6"},
-                  {exam:"USMLE Step 3",who:"PGY-1/2",color:"#6366f1"},
-                  {exam:"ABIM IM Boards",who:"Residents",color:"#10b981"},
-                  {exam:"ABIM Endocrinology",who:"Fellows",color:HU_GOLD},
-                ].map(e=>(
-                  <div key={e.exam} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${e.color}44`,borderRadius:10,padding:"12px 10px",textAlign:"center"}}>
-                    <div style={{fontSize:11,fontWeight:800,color:e.color,marginBottom:3}}>{e.exam}</div>
-                    <div style={{fontSize:10,color:"#475569"}}>{e.who}</div>
+            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:18}}>
+              <h3 style={{fontWeight:700,marginBottom:12,fontSize:14}}>📋 Training Continuum</h3>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
+                {[{e:"USMLE Step 1",w:"M2",c:"#3B82F6"},{e:"USMLE Step 2",w:"M3/M4",c:"#8B5CF6"},{e:"USMLE Step 3",w:"PGY-1/2",c:"#6366f1"},{e:"ABIM IM",w:"Residents",c:"#10b981"},{e:"ABIM Endo",w:"Fellows",c:GOLD}].map(e=>(
+                  <div key={e.e} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${e.c}44`,borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:11,fontWeight:800,color:e.c}}>{e.e}</div>
+                    <div style={{fontSize:10,color:"#475569"}}>{e.w}</div>
                   </div>
                 ))}
               </div>
@@ -458,278 +347,227 @@ Return ONLY a valid JSON array, no markdown:
           </div>
         )}
 
-        {/* MCQ */}
-        {activeTab==="mcq"&&(
+        {tab==="mcq"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 AI MCQ Generator</h2>
-            <p style={{color:"#475569",marginBottom:20,fontSize:13}}>Random or topic-specific · Study mode or timed exam mode · 500+ topics · 5 board levels</p>
-
-            <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:14,padding:20,marginBottom:20}}>
-              <div style={{display:"flex",gap:10,marginBottom:18}}>
-                <button onClick={()=>setExamMode(false)}
-                  style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${!examMode?"#10b981":BORDER}`,background:!examMode?"rgba(16,185,129,0.1)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                  📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback</span>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>🎯 AI MCQ Generator</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Random or topic-specific · Study or Exam mode · 5 board levels</p>
+            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,marginBottom:18}}>
+              <div style={{display:"flex",gap:10,marginBottom:16}}>
+                <button onClick={()=>setExam(false)} style={{flex:1,padding:"11px",borderRadius:9,border:`2px solid ${!exam?"#10b981":BDR}`,background:!exam?"rgba(16,185,129,0.1)":"transparent",color:!exam?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                  📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400}}>Untimed · Instant feedback</span>
                 </button>
-                <button onClick={()=>setExamMode(true)}
-                  style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${examMode?"#ef4444":BORDER}`,background:examMode?"rgba(239,68,68,0.1)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                  ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit</span>
+                <button onClick={()=>setExam(true)} style={{flex:1,padding:"11px",borderRadius:9,border:`2px solid ${exam?"#ef4444":BDR}`,background:exam?"rgba(239,68,68,0.1)":"transparent",color:exam?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                  ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400}}>90 sec/question · Auto-submit</span>
                 </button>
               </div>
-
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:14,marginBottom:14}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:14}}>
                 <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>SPECIALTY</label>
-                  <select value={selGroup} onChange={e=>{setSelGroup(e.target.value);setTopic(TOPIC_GROUPS[e.target.value][0]);}}
-                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"9px",borderRadius:7,fontSize:13}}>
-                    {Object.keys(TOPIC_GROUPS).map(g=><option key={g} value={g}>{g}</option>)}
+                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>SPECIALTY</label>
+                  <select value={grp} onChange={e=>{setGrp(e.target.value);setTopic(GROUPS[e.target.value][0]);}}
+                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                    {Object.keys(GROUPS).map(g=><option key={g}>{g}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>TOPIC</label>
+                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>TOPIC</label>
                   <select value={topic} onChange={e=>setTopic(e.target.value)}
-                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"9px",borderRadius:7,fontSize:13}}>
-                    {TOPIC_GROUPS[selGroup].map(t=><option key={t} value={t}>{t}</option>)}
+                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                    {GROUPS[grp].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>BOARD LEVEL</label>
-                  <select value={level.label} onChange={e=>setLevel(LEVELS.find(l=>l.label===e.target.value))}
-                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BORDER}`,color:"#f1f5f9",padding:"9px",borderRadius:7,fontSize:13}}>
-                    {LEVELS.map(l=><option key={l.label} value={l.label}>{l.label}</option>)}
+                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>BOARD LEVEL</label>
+                  <select value={lvl.l} onChange={e=>setLvl(LEVELS.find(x=>x.l===e.target.value))}
+                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                    {LEVELS.map(x=><option key={x.l}>{x.l}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>QUESTIONS (×5)</label>
+                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>QUESTIONS (×5)</label>
                   <div style={{display:"flex",gap:5}}>
                     {[5,10,15,20].map(n=>(
-                      <button key={n} onClick={()=>setCount(n)}
-                        style={{flex:1,padding:"9px 0",borderRadius:7,border:`1px solid ${count===n?HU_GOLD:BORDER}`,background:count===n?`rgba(201,168,76,0.15)`:"transparent",color:count===n?HU_GOLD:"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                      <button key={n} onClick={()=>setCnt(n)}
+                        style={{flex:1,padding:"8px 0",borderRadius:7,border:`1px solid ${cnt===n?GOLD:BDR}`,background:cnt===n?`rgba(201,168,76,0.15)`:"transparent",color:cnt===n?GOLD:"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
                         {n}
                       </button>
                     ))}
                   </div>
-                  {examMode&&<p style={{fontSize:11,color:"#ef4444",marginTop:5}}>⏱️ {count*1.5} min total</p>}
+                  {exam&&<p style={{fontSize:11,color:"#ef4444",marginTop:4}}>⏱️ {cnt*1.5} min total</p>}
                 </div>
               </div>
-
-              <button onClick={generateMCQ} disabled={mcqLoading}
-                style={{width:"100%",background:mcqLoading?"#334155":examMode?`linear-gradient(135deg,#7f1d1d,#b91c1c)`:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${examMode?"#ef4444":HU_GOLD}`,color:mcqLoading?"#64748b":"#fff",padding:"13px",borderRadius:9,cursor:mcqLoading?"not-allowed":"pointer",fontWeight:700,fontSize:14}}>
-                {mcqLoading?"⏳ Generating board-quality questions...":examMode?`⏱️ Start Exam — ${count} Questions (${count*1.5} min)`:`⚡ Start Study Session — ${count} Questions`}
+              <button onClick={generate} disabled={busy}
+                style={{width:"100%",background:busy?"#334155":exam?`linear-gradient(135deg,#7f1d1d,#b91c1c)`:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${exam?"#ef4444":GOLD}`,color:busy?"#64748b":"#fff",padding:"12px",borderRadius:9,cursor:busy?"not-allowed":"pointer",fontWeight:700,fontSize:14}}>
+                {busy?"⏳ Generating questions...":exam?`⏱️ Start Exam — ${cnt} Questions (${cnt*1.5} min)`:`⚡ Start Study Session — ${cnt} Questions`}
               </button>
             </div>
 
-            {mcqError&&(
-              <div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:10,padding:14,color:"#ef4444",marginBottom:16}}>
-                {mcqError}
-              </div>
-            )}
+            {err&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14}}>{err}</div>}
 
-            {/* Timer */}
-            {examMode&&questions.length>0&&(
-              <div style={{background:CARD,border:`1px solid ${timerActive?"#ef4444":BORDER}`,borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-                <div style={{fontSize:26,fontWeight:800,color:timeLeft<60?"#ef4444":timeLeft<180?"#f59e0b":"#10b981",fontFamily:"monospace"}}>
-                  ⏱️ {timeLeft!==null?fmtTime(timeLeft):"--:--"}
-                </div>
-                <div style={{flex:1,minWidth:200}}>
-                  <div style={{height:8,background:"#1e293b",borderRadius:4,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:timeLeft!==null?`${(timeLeft/(count*SECS_PER_Q))*100}%`:"100%",background:timeLeft<60?"#ef4444":timeLeft<180?"#f59e0b":"#10b981",borderRadius:4,transition:"width 1s linear"}}/>
+            {exam&&qs.length>0&&(
+              <div style={{background:CARD,border:`1px solid ${tActive?"#ef4444":BDR}`,borderRadius:11,padding:"13px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                <div style={{fontSize:24,fontWeight:800,color:tLeft<60?"#ef4444":tLeft<180?"#f59e0b":"#10b981",fontFamily:"monospace"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</div>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{height:7,background:"#1e293b",borderRadius:4,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:tLeft!==null?`${(tLeft/(cnt*SECS))*100}%`:"100%",background:tLeft<60?"#ef4444":tLeft<180?"#f59e0b":"#10b981",borderRadius:4,transition:"width 1s linear"}}/>
                   </div>
                 </div>
-                <div style={{fontSize:13,color:"#64748b"}}>{sessionTotal}/{questions.length} answered</div>
-                {timerActive&&<button onClick={()=>{stopTimer();autoRevealAll(questions);}} style={{background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:600}}>End Exam</button>}
-                {!timerActive&&timeLeft===0&&<span style={{color:"#ef4444",fontWeight:700,fontSize:13}}>⏰ Time's up!</span>}
+                <span style={{fontSize:12,color:"#64748b"}}>{st}/{qs.length} answered</span>
+                {tActive&&<button onClick={()=>{stopT();revealAll(qs);}} style={{background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>End Exam</button>}
+                {!tActive&&tLeft===0&&<span style={{color:"#ef4444",fontWeight:700,fontSize:13}}>⏰ Time's up!</span>}
               </div>
             )}
 
-            {sessionTotal>0&&(
-              <div style={{background:"rgba(201,168,76,0.1)",border:`1px solid ${HU_GOLD}`,borderRadius:10,padding:"11px 18px",marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontSize:16}}>📊</span>
-                <span style={{fontWeight:700,color:HU_GOLD}}>Score: {sessionScore}/{sessionTotal}</span>
-                <span style={{color:"#64748b",fontSize:13}}>({Math.round(sessionScore/sessionTotal*100)}%)</span>
-                <span style={{color:"#475569",fontSize:12}}>{questions.length-sessionTotal} remaining</span>
-              </div>
-            )}
+            {st>0&&<div style={{background:"rgba(201,168,76,0.1)",border:`1px solid ${GOLD}`,borderRadius:9,padding:"10px 16px",marginBottom:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+              <span>📊</span><span style={{fontWeight:700,color:GOLD}}>Score: {ss}/{st}</span>
+              <span style={{color:"#64748b",fontSize:13}}>({Math.round(ss/st*100)}%)</span>
+              <span style={{color:"#475569",fontSize:12}}>{qs.length-st} remaining</span>
+            </div>}
 
-            {questions.map((q,qi)=>(
-              <div key={qi} style={{background:CARD,border:`1px solid ${revealed[qi]?(selAnswer[qi]===q.correct?"#10b981":"#ef4444"):BORDER}`,borderRadius:14,padding:24,marginBottom:18}}>
-                <div style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:14,flexWrap:"wrap"}}>
-                  <span style={{background:HU_NAVY,border:`1px solid ${HU_GOLD}`,color:HU_GOLD,borderRadius:5,padding:"2px 9px",fontSize:11,fontWeight:700,flexShrink:0}}>Q{qi+1}</span>
-                  {q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
-                  <p style={{margin:0,lineHeight:1.8,fontSize:14,color:"#e2e8f0",flex:1,minWidth:200}}>{q.stem}</p>
+            {qs.map((q,i)=>(
+              <div key={i} style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:22,marginBottom:16}}>
+                <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:13,flexWrap:"wrap"}}>
+                  <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:700,flexShrink:0}}>Q{i+1}</span>
+                  {q.topic&&<span style={{background:"rgba(99,102,241,0.15)",color:"#818cf8",borderRadius:20,padding:"2px 9px",fontSize:11}}>{q.topic}</span>}
+                  <p style={{margin:0,lineHeight:1.8,fontSize:14,color:"#e2e8f0",flex:1}}>{q.stem}</p>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
-                  {Object.entries(q.choices).map(([letter,text])=>(
-                    <button key={letter} onClick={()=>{if(!revealed[qi])setSelAnswer(p=>({...p,[qi]:letter}));}}
-                      style={{textAlign:"left",padding:"11px 14px",borderRadius:9,cursor:revealed[qi]?"default":"pointer",
-                        border:`1px solid ${choiceColor(qi,letter)==="transparent"?BORDER:choiceColor(qi,letter)}`,
-                        background:choiceColor(qi,letter)==="transparent"?"rgba(255,255,255,0.02)":`${choiceColor(qi,letter)}22`,
-                        color:revealed[qi]&&letter===q.correct?"#10b981":revealed[qi]&&selAnswer[qi]===letter?"#ef4444":"#cbd5e1",
-                        fontWeight:selAnswer[qi]===letter?700:400,fontSize:13}}>
-                      <span style={{fontWeight:800,marginRight:9}}>{letter}.</span>{text}
-                      {revealed[qi]&&letter===q.correct&&" ✓"}
-                      {revealed[qi]&&selAnswer[qi]===letter&&letter!==q.correct&&" ✗"}
+                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:13}}>
+                  {Object.entries(q.choices).map(([l,t])=>(
+                    <button key={l} onClick={()=>{if(!rev[i])setSel(p=>({...p,[i]:l}));}}
+                      style={{textAlign:"left",padding:"10px 13px",borderRadius:8,cursor:rev[i]?"default":"pointer",
+                        border:`1px solid ${qC(i,l)==="transparent"?BDR:qC(i,l)}`,
+                        background:qC(i,l)==="transparent"?"rgba(255,255,255,0.02)":`${qC(i,l)}22`,
+                        color:rev[i]&&l===q.correct?"#10b981":rev[i]&&sel[i]===l?"#ef4444":"#cbd5e1",
+                        fontWeight:sel[i]===l?700:400,fontSize:13}}>
+                      <span style={{fontWeight:800,marginRight:8}}>{l}.</span>{t}
+                      {rev[i]&&l===q.correct&&" ✓"}{rev[i]&&sel[i]===l&&l!==q.correct&&" ✗"}
                     </button>
                   ))}
                 </div>
-                {!revealed[qi]?(
-                  <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                    <button onClick={()=>revealAnswer(qi)} disabled={!selAnswer[qi]}
-                      style={{background:selAnswer[qi]?`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${selAnswer[qi]?HU_GOLD:BORDER}`,color:selAnswer[qi]?"#fff":"#475569",padding:"9px 22px",borderRadius:7,cursor:selAnswer[qi]?"pointer":"not-allowed",fontWeight:600,fontSize:13}}>
-                      {examMode?"Submit & Next →":"Submit Answer"}
+                {!rev[i]?(
+                  <div style={{display:"flex",gap:9,alignItems:"center"}}>
+                    <button onClick={()=>reveal(i)} disabled={!sel[i]}
+                      style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"8px 20px",borderRadius:7,cursor:sel[i]?"pointer":"not-allowed",fontWeight:600,fontSize:13}}>
+                      {exam?"Submit & Next →":"Submit Answer"}
                     </button>
-                    {!selAnswer[qi]&&<span style={{fontSize:12,color:"#334155"}}>Select an answer first</span>}
+                    {!sel[i]&&<span style={{fontSize:12,color:"#334155"}}>Select an answer first</span>}
                   </div>
                 ):(
-                  <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BORDER}`,borderRadius:9,padding:14}}>
-                    <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:HU_GOLD}}>📖 Explanation</p>
+                  <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:8,padding:13}}>
+                    <p style={{margin:"0 0 5px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
                     <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:13}}>{q.explanation}</p>
                   </div>
                 )}
               </div>
             ))}
 
-            {questions.length>0&&sessionTotal===questions.length&&(
-              <div style={{background:"rgba(201,168,76,0.08)",border:`2px solid ${HU_GOLD}`,borderRadius:14,padding:24,textAlign:"center",marginTop:8}}>
-                <div style={{fontSize:40,marginBottom:12}}>🎓</div>
-                <h3 style={{fontWeight:800,fontSize:18,marginBottom:8,color:"#f1f5f9"}}>Session Complete!</h3>
-                <p style={{color:HU_GOLD,fontSize:22,fontWeight:800,marginBottom:4}}>{sessionScore}/{questions.length} Correct</p>
-                <p style={{color:"#64748b",fontSize:14,marginBottom:20}}>
-                  {sessionScore/questions.length>=0.8?"🏆 Excellent performance!":sessionScore/questions.length>=0.6?"📈 Good — review missed questions":"💪 Keep practicing — review explanations above"}
-                </p>
-                <button onClick={generateMCQ}
-                  style={{background:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${HU_GOLD}`,color:"#fff",padding:"12px 28px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                  🔄 New Session
-                </button>
+            {qs.length>0&&st===qs.length&&(
+              <div style={{background:"rgba(201,168,76,0.08)",border:`2px solid ${GOLD}`,borderRadius:13,padding:22,textAlign:"center"}}>
+                <div style={{fontSize:38,marginBottom:10}}>🎓</div>
+                <h3 style={{fontWeight:800,fontSize:18,marginBottom:6}}>Session Complete!</h3>
+                <p style={{color:GOLD,fontSize:20,fontWeight:800,marginBottom:4}}>{ss}/{qs.length} Correct</p>
+                <p style={{color:"#64748b",fontSize:14,marginBottom:18}}>{ss/qs.length>=0.8?"🏆 Excellent!":ss/qs.length>=0.6?"📈 Good — review missed questions":"💪 Keep practicing!"}</p>
+                <button onClick={generate} style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"11px 26px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:14}}>🔄 New Session</button>
               </div>
             )}
           </div>
         )}
 
-        {/* GUIDES */}
-        {activeTab==="guides"&&(
+        {tab==="guides"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>📚 Guidelines & Resources</h2>
-            <p style={{color:"#475569",marginBottom:20,fontSize:13}}>Direct links to official society guidelines — always current, always free</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
-              {STUDY_GUIDES.map(g=>(
-                <div key={g.id} style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10,transition:"border-color 0.2s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=HU_GOLD}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
-                  <div style={{fontSize:28}}>{g.icon}</div>
-                  <div style={{fontWeight:700,fontSize:14,lineHeight:1.4,color:"#f1f5f9"}}>{g.title}</div>
-                  <span style={{background:`rgba(201,168,76,0.1)`,border:`1px solid ${HU_GOLD}44`,color:HU_GOLD,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.specialty}</span>
-                  <a href={g.url} target="_blank" rel="noopener noreferrer"
-                    style={{background:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${HU_GOLD}`,color:"#fff",padding:"9px",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12,marginTop:"auto",textAlign:"center",textDecoration:"none",display:"block"}}>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>📚 Guidelines & Resources</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Official society guidelines — always current, always free</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:13}}>
+              {GUIDES.map(g=>(
+                <div key={g.id} style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:18,display:"flex",flexDirection:"column",gap:9}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
+                  <div style={{fontSize:26}}>{g.i}</div>
+                  <div style={{fontWeight:700,fontSize:13,lineHeight:1.4}}>{g.t}</div>
+                  <span style={{background:`rgba(201,168,76,0.1)`,border:`1px solid ${GOLD}44`,color:GOLD,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.s}</span>
+                  <a href={g.u} target="_blank" rel="noopener noreferrer"
+                    style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"8px",borderRadius:7,fontWeight:600,fontSize:12,textAlign:"center",textDecoration:"none",marginTop:"auto"}}>
                     🔗 Open Official Guidelines
                   </a>
                 </div>
               ))}
             </div>
-            <div style={{background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:10,padding:14,marginTop:16}}>
-              <p style={{color:"#818cf8",fontSize:12,margin:0}}>📌 All links go directly to the official society websites. Guidelines are free to access and always up to date.</p>
-            </div>
           </div>
         )}
 
-        {/* PROGRESS */}
-        {activeTab==="progress"&&(
+        {tab==="progress"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>📊 Your Progress</h2>
-            <p style={{color:"#475569",marginBottom:20,fontSize:13}}>Track your board prep performance across all sessions</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:24}}>
-              {[
-                {label:"Sessions",value:scores.sessions,icon:"📝",color:"#6366f1"},
-                {label:"Questions",value:scores.total,icon:"❓",color:"#3b82f6"},
-                {label:"Correct",value:scores.correct,icon:"✅",color:"#10b981"},
-                {label:"Accuracy",value:scores.total>0?`${Math.round(scores.correct/scores.total*100)}%`:"—",icon:"🎯",color:HU_GOLD},
-              ].map(s=>(
-                <div key={s.label} style={{background:CARD,border:`1px solid ${s.color}44`,borderRadius:12,padding:18,textAlign:"center"}}>
-                  <div style={{fontSize:26,marginBottom:8}}>{s.icon}</div>
-                  <div style={{fontSize:24,fontWeight:800,color:s.color}}>{s.value}</div>
-                  <div style={{fontSize:11,color:"#475569",marginTop:4}}>{s.label}</div>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>📊 Your Progress</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Track your board prep performance</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:22}}>
+              {[{l:"Sessions",v:score.s,i:"📝",c:"#6366f1"},{l:"Questions",v:score.t,i:"❓",c:"#3b82f6"},{l:"Correct",v:score.c,i:"✅",c:"#10b981"},{l:"Accuracy",v:score.t>0?`${Math.round(score.c/score.t*100)}%`:"—",i:"🎯",c:GOLD}].map(s=>(
+                <div key={s.l} style={{background:CARD,border:`1px solid ${s.c}44`,borderRadius:11,padding:16,textAlign:"center"}}>
+                  <div style={{fontSize:24,marginBottom:7}}>{s.i}</div>
+                  <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
+                  <div style={{fontSize:11,color:"#475569",marginTop:3}}>{s.l}</div>
                 </div>
               ))}
             </div>
-            {scores.total===0?(
-              <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:12,padding:36,textAlign:"center"}}>
-                <div style={{fontSize:44,marginBottom:12}}>🎯</div>
-                <h3 style={{fontWeight:700,marginBottom:8,color:"#f1f5f9"}}>No questions answered yet</h3>
-                <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Start the MCQ generator to track your progress!</p>
-                <button onClick={()=>setActiveTab("mcq")}
-                  style={{background:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${HU_GOLD}`,color:"#fff",padding:"11px 24px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                  Generate Questions →
-                </button>
+            {score.t===0?(
+              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:11,padding:32,textAlign:"center"}}>
+                <div style={{fontSize:40,marginBottom:10}}>🎯</div>
+                <p style={{color:"#475569",fontSize:13,marginBottom:14}}>No questions answered yet. Start the MCQ generator!</p>
+                <button onClick={()=>setTab("mcq")} style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>Generate Questions →</button>
               </div>
             ):(
-              <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:12,padding:22}}>
-                <h3 style={{fontWeight:700,marginBottom:14,fontSize:15,color:"#f1f5f9"}}>Performance Summary</h3>
-                <div style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <span style={{fontSize:13,color:"#94a3b8"}}>Overall accuracy</span>
-                    <span style={{fontSize:13,fontWeight:700,color:HU_GOLD}}>{Math.round(scores.correct/scores.total*100)}%</span>
-                  </div>
-                  <div style={{height:9,background:"#1e293b",borderRadius:5,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${Math.round(scores.correct/scores.total*100)}%`,background:`linear-gradient(90deg,${HU_NAVY},${HU_GOLD})`,borderRadius:5,transition:"width 0.4s"}}/>
-                  </div>
+              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:11,padding:20}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:13,color:"#94a3b8"}}>Overall accuracy</span>
+                  <span style={{fontSize:13,fontWeight:700,color:GOLD}}>{Math.round(score.c/score.t*100)}%</span>
                 </div>
-                <p style={{color:"#475569",fontSize:13}}>
-                  {scores.correct/scores.total>=0.8?"🏆 Excellent! You are well prepared for boards.":scores.correct/scores.total>=0.6?"📈 Good progress! Keep practicing weak areas.":"💪 Keep going! Consistent practice leads to board success."}
-                </p>
+                <div style={{height:8,background:"#1e293b",borderRadius:4,overflow:"hidden",marginBottom:12}}>
+                  <div style={{height:"100%",width:`${Math.round(score.c/score.t*100)}%`,background:`linear-gradient(90deg,${NAVY},${GOLD})`,borderRadius:4}}/>
+                </div>
+                <p style={{color:"#475569",fontSize:13}}>{score.c/score.t>=0.8?"🏆 Excellent! Well prepared for boards.":score.c/score.t>=0.6?"📈 Good progress! Keep practicing.":"💪 Keep going! Consistency is key."}</p>
               </div>
             )}
           </div>
         )}
 
-        {/* DEFI */}
-        {activeTab==="defi"&&(
+        {tab==="defi"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>💰 DeFi Yield Tracker</h2>
-            <p style={{color:"#475569",marginBottom:14,fontSize:13}}>Live yields across Ethereum, Solana, Arbitrum, Polygon & BNB — powered by DeFiLlama</p>
-            <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:9,padding:"9px 14px",marginBottom:16,fontSize:12,color:"#fca5a5"}}>
-              ⚠️ Educational tool only. DeFi carries real risk. Not financial advice.
-            </div>
-            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4}}>💰 DeFi Yield Tracker</h2>
+            <p style={{color:"#475569",marginBottom:12,fontSize:13}}>Live yields — powered by DeFiLlama</p>
+            <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"8px 13px",marginBottom:14,fontSize:12,color:"#fca5a5"}}>⚠️ Educational only. Not financial advice.</div>
+            <div style={{display:"flex",gap:7,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
               {["All","Ethereum","Arbitrum","Solana","Polygon","BSC"].map(c=>(
-                <button key={c} onClick={()=>setDefiChain(c)}
-                  style={{padding:"6px 14px",border:`1px solid ${defiChain===c?HU_GOLD:BORDER}`,borderRadius:20,cursor:"pointer",background:defiChain===c?`rgba(201,168,76,0.15)`:"transparent",color:defiChain===c?HU_GOLD:"#64748b",fontSize:12,fontWeight:600}}>
-                  {c}
-                </button>
+                <button key={c} onClick={()=>setDChain(c)} style={{padding:"5px 12px",border:`1px solid ${dChain===c?GOLD:BDR}`,borderRadius:20,cursor:"pointer",background:dChain===c?`rgba(201,168,76,0.15)`:"transparent",color:dChain===c?GOLD:"#64748b",fontSize:12,fontWeight:600}}>{c}</button>
               ))}
-              <button onClick={fetchDefi}
-                style={{marginLeft:"auto",background:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${HU_GOLD}`,color:"#fff",padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:600}}>
-                🔄 Refresh
-              </button>
+              <button onClick={fetchDefi} style={{marginLeft:"auto",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"5px 12px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:600}}>🔄 Refresh</button>
             </div>
-            {defiLoading&&<div style={{textAlign:"center",padding:"36px",color:"#475569"}}>⏳ Fetching live yield data...</div>}
-            {defiError&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:14,color:"#ef4444"}}>{defiError}</div>}
-            {!defiLoading&&!defiError&&pools.length===0&&(
-              <div style={{textAlign:"center",padding:"36px",color:"#475569"}}>
-                <div style={{fontSize:36,marginBottom:10}}>💰</div>
-                <p style={{marginBottom:12}}>Click Refresh to load live yield data</p>
-                <button onClick={fetchDefi} style={{background:`linear-gradient(135deg,${HU_NAVY},#1a4a9a)`,border:`1px solid ${HU_GOLD}`,color:"#fff",padding:"11px 22px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>Load Live Data</button>
+            {dBusy&&<div style={{textAlign:"center",padding:"32px",color:"#475569"}}>⏳ Fetching live yield data...</div>}
+            {dErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:8,padding:13,color:"#ef4444"}}>{dErr}</div>}
+            {!dBusy&&!dErr&&!pools.length&&(
+              <div style={{textAlign:"center",padding:"32px",color:"#475569"}}>
+                <div style={{fontSize:32,marginBottom:8}}>💰</div>
+                <button onClick={fetchDefi} style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 20px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Load Live Data</button>
               </div>
             )}
-            {!defiLoading&&pools.filter(p=>defiChain==="All"||p.chain===defiChain).slice(0,50).map(p=>(
-              <div key={p.id} style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:11,padding:"13px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:9,transition:"border-color 0.2s"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=HU_GOLD}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
-                <div style={{width:9,height:9,borderRadius:"50%",background:chainColor(p.chain),flexShrink:0}}/>
-                <div style={{flex:2,minWidth:130}}>
-                  <div style={{fontWeight:700,fontSize:13,color:"#f1f5f9"}}>{p.symbol}</div>
-                  <div style={{fontSize:10,color:"#475569"}}>{p.project} · {p.chain}</div>
+            {!dBusy&&pools.filter(p=>dChain==="All"||p.chain===dChain).slice(0,50).map(p=>(
+              <div key={p.id} style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:10,padding:"12px 15px",display:"flex",alignItems:"center",gap:11,flexWrap:"wrap",marginBottom:8}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:cC(p.chain),flexShrink:0}}/>
+                <div style={{flex:2,minWidth:120}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{p.sym}</div>
+                  <div style={{fontSize:10,color:"#475569"}}>{p.proj} · {p.chain}</div>
                 </div>
-                <div style={{textAlign:"center",minWidth:65}}>
-                  <div style={{fontSize:16,fontWeight:800,color:p.apy>20?"#f59e0b":"#10b981"}}>{fmtAPY(p.apy)}</div>
+                <div style={{textAlign:"center",minWidth:60}}>
+                  <div style={{fontSize:15,fontWeight:800,color:p.apy>20?"#f59e0b":"#10b981"}}>{fAPY(p.apy)}</div>
                   <div style={{fontSize:9,color:"#475569"}}>APY</div>
                 </div>
-                <div style={{textAlign:"center",minWidth:65}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#94a3b8"}}>{fmtTVL(p.tvl)}</div>
+                <div style={{textAlign:"center",minWidth:60}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#94a3b8"}}>{fTVL(p.tvl)}</div>
                   <div style={{fontSize:9,color:"#475569"}}>TVL</div>
                 </div>
-                <span style={{background:`${riskColor(p.risk)}22`,border:`1px solid ${riskColor(p.risk)}`,color:riskColor(p.risk),borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>{p.risk}</span>
-                <button onClick={()=>setWatchlist(w=>w.includes(p.id)?w.filter(x=>x!==p.id):[...w,p.id])}
-                  style={{background:"transparent",border:`1px solid ${watchlist.includes(p.id)?HU_GOLD:BORDER}`,color:watchlist.includes(p.id)?HU_GOLD:"#475569",borderRadius:7,padding:"4px 9px",cursor:"pointer",fontSize:13}}>
-                  {watchlist.includes(p.id)?"⭐":"☆"}
+                <span style={{background:`${rC(p.risk)}22`,border:`1px solid ${rC(p.risk)}`,color:rC(p.risk),borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>{p.risk}</span>
+                <button onClick={()=>setWl(w=>w.includes(p.id)?w.filter(x=>x!==p.id):[...w,p.id])}
+                  style={{background:"transparent",border:`1px solid ${wl.includes(p.id)?GOLD:BDR}`,color:wl.includes(p.id)?GOLD:"#475569",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:12}}>
+                  {wl.includes(p.id)?"⭐":"☆"}
                 </button>
               </div>
             ))}
@@ -737,8 +575,8 @@ Return ONLY a valid JSON array, no markdown:
         )}
 
       </div>
-      <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:`1px solid ${BORDER}`}}>
-        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine · antenehzenebe@gmail.com
+      <div style={{textAlign:"center",padding:"14px",color:"#1e293b",fontSize:11,borderTop:`1px solid ${BDR}`}}>
+        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University · antenehzenebe@gmail.com
       </div>
     </div>
   );
