@@ -251,6 +251,7 @@ function App(){
   const rC=r=>r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";
   const cC=c=>({"Ethereum":"#627EEA","Arbitrum":"#28A0F0","Solana":"#9945FF","Polygon":"#8247E5","BSC":"#F3BA2F"}[c]||"#64748b");
   const qColor=(i,l)=>{
+    if(!qs[i])return"transparent";
     if(!rev[i])return sel[i]===l?GOLD:"transparent";
     if(l===qs[i].correct)return"#10b981";
     if(sel[i]===l)return"#ef4444";
@@ -698,34 +699,37 @@ function App(){
 
             {/* Single question */}
             {qs.length>0&&qs[0]&&!busy&&(()=>{
+              try{
               const q=qs[0];
               const i=0;
+              const answered=!!rev[i];
+              const correct=answered&&sel[i]===q.correct;
               return(
                 <div style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
                   <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
                     <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {score.t+1}</span>
-                    {rev[i]&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
-                    {rev[i]&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:sel[i]===q.correct?"#10b981":"#ef4444"}}>{sel[i]===q.correct?"✓ Correct":"✗ Incorrect"}</span>}
+                    {answered&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
+                    {answered&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:correct?"#10b981":"#ef4444"}}>{correct?"✓ Correct":"✗ Incorrect"}</span>}
                   </div>
 
                   <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
 
                   <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
                     {Object.entries(q.choices).map(([l,t])=>(
-                      <button key={l} onClick={()=>{if(!rev[i])setSel(p=>({...p,[i]:l}));}}
-                        style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:rev[i]?"default":"pointer",
+                      <button key={l} onClick={()=>{if(!answered)setSel(p=>({...p,[i]:l}));}}
+                        style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:answered?"default":"pointer",
                           border:`1px solid ${qColor(i,l)==="transparent"?BDR:qColor(i,l)}`,
                           background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":`${qColor(i,l)}22`,
-                          color:rev[i]&&l===q.correct?"#10b981":rev[i]&&sel[i]===l?"#ef4444":"#cbd5e1",
+                          color:answered&&l===q.correct?"#10b981":answered&&sel[i]===l?"#ef4444":"#cbd5e1",
                           fontWeight:sel[i]===l?700:400,fontSize:14,transition:"all 0.2s"}}>
                         <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
-                        {rev[i]&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}>✓ Correct answer</span>}
-                        {rev[i]&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}>✗ Your answer</span>}
+                        {answered&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}>✓ Correct answer</span>}
+                        {answered&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}>✗ Your answer</span>}
                       </button>
                     ))}
                   </div>
 
-                  {rev[i]&&(
+                  {answered&&(
                     <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:9,padding:16,marginBottom:16}}>
                       <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
                       <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
@@ -733,7 +737,7 @@ function App(){
                   )}
 
                   <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                    {!rev[i]?(
+                    {!answered?(
                       <>
                         <button onClick={()=>reveal(i)} disabled={!sel[i]}
                           style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
@@ -742,14 +746,14 @@ function App(){
                         {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}
                       </>
                     ):(
-                      <button onClick={nextQuestion}
+                      <button onClick={nextQuestion} disabled={busy}
                         style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                        Next Question →
+                        {busy?"⏳ Loading...":"Next Question →"}
                       </button>
                     )}
                   </div>
                 </div>
-              );
+              );}catch(e){return <div style={{color:"#ef4444",padding:20}}>Error displaying question. Please click End Session and try again.</div>;}
             })()}
           </div>
         )}
