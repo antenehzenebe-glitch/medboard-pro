@@ -1,11 +1,18 @@
 exports.handler = async (event) => {
-  // Only allow POST requests
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
   try {
     const { topic, level, count } = JSON.parse(event.body);
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "API key not configured" })
+      };
+    }
 
     const isRandom = topic.toLowerCase().includes("random");
     const topicPrompt = isRandom
@@ -15,36 +22,38 @@ exports.handler = async (event) => {
         : "a randomly selected topic from any medical specialty"
       : `"${topic}"`;
 
-    const prompt = `You are a senior medical educator and board examiner. Generate exactly ${count} high-quality board-style MCQ(s) on ${topicPrompt} at ${level} level.
+    const prompt = `You are a senior medical educator. Generate exactly ${count} board-style MCQ(s) on ${topicPrompt} at ${level} level. Use current guidelines from ADA, Endocrine Society, ACC/AHA, ESC and major medical societies. Reference Harrison's, Williams Textbook of Endocrinology and relevant textbooks.
 
-Use the most current guidelines from ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European medical societies. Reference top textbooks including Harrison's Principles of Internal Medicine, Williams Textbook of Endocrinology, DeGroot's Endocrinology, Braunwald's Heart Disease, and other relevant specialty textbooks. Use evidence from recent years.
+Each question must have a clinical vignette, 5 choices (A-E), one correct answer, and a detailed explanation citing the guideline or textbook.
+${isRandom ? "Each question must be from a DIFFERENT specialty." : ""}
 
-Each question must:
-- Be a realistic clinical vignette with patient demographics, presenting complaint, relevant labs and vitals
-- Have exactly 5 answer choices labeled A through E
-- Have one definitively correct answer
-- Include a detailed explanation (3-5 sentences) citing the specific guideline, society or textbook
-- Vary in difficulty
-${isRandom ? "- Each question must be from a DIFFERENT specialty or topic" : ""}
-
-Return ONLY a valid JSON array, no markdown:
-[{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"...citing guideline/textbook...","topic":"topic name"}]`;
+Return ONLY a valid JSON array:
+[{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"...","topic":"..."}]`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-6",
         max_tokens: 4000,
         messages: [{ role: "user", content: prompt }]
       })
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Anthropic API error:", JSON.stringify(data));
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Anthropic API error: " + (data.error?.message || "Unknown") })
+      };
+    }
+
     const raw = data.content?.map(b => b.text || "").join("").trim();
     const clean = raw.replace(/```json|```/g, "").trim();
     const questions = JSON.parse(clean);
@@ -59,6 +68,7 @@ Return ONLY a valid JSON array, no markdown:
     };
 
   } catch (error) {
+    console.error("Function error:", error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
