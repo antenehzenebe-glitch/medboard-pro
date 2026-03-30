@@ -22,13 +22,13 @@ exports.handler = async (event) => {
         : "a randomly selected topic from any medical specialty"
       : `"${topic}"`;
 
-    const prompt = `You are a senior medical educator. Generate exactly ${count} board-style MCQ(s) on ${topicPrompt} at ${level} level. Use current guidelines from ADA, Endocrine Society, ACC/AHA, ESC and major medical societies. Reference Harrison's, Williams Textbook of Endocrinology and relevant textbooks.
+    // Limit to max 5 questions per call to avoid timeout
+    const safeCount = Math.min(count || 5, 5);
 
-Each question must have a clinical vignette, 5 choices (A-E), one correct answer, and a detailed explanation citing the guideline or textbook.
-${isRandom ? "Each question must be from a DIFFERENT specialty." : ""}
+    const prompt = `Generate exactly ${safeCount} board-style medical MCQ(s) on ${topicPrompt} at ${level} level. Use current ADA, Endocrine Society, ACC/AHA guidelines and Harrison's, Williams Textbook of Endocrinology.
 
-Return ONLY a valid JSON array:
-[{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"...","topic":"..."}]`;
+Return ONLY a valid JSON array, no markdown:
+[{"stem":"clinical vignette...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"explanation citing guideline...","topic":"topic name"}]`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -38,8 +38,8 @@ Return ONLY a valid JSON array:
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        claude-sonnet-4-5: "claude-opus-4-6",
-        max_tokens: 4000,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 2000,
         messages: [{ role: "user", content: prompt }]
       })
     });
@@ -47,10 +47,10 @@ Return ONLY a valid JSON array:
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Anthropic API error:", JSON.stringify(data));
+      console.error("Anthropic error:", JSON.stringify(data));
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: "Anthropic API error: " + (data.error?.message || "Unknown") })
+        body: JSON.stringify({ error: data.error?.message || "Anthropic API error" })
       };
     }
 
@@ -68,7 +68,7 @@ Return ONLY a valid JSON array:
     };
 
   } catch (error) {
-    console.error("Function error:", error.message);
+    console.error("Error:", error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
