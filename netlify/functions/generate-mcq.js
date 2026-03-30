@@ -1,68 +1,235 @@
-The Netlify deploy errored, with the following guidance provided:
+// No external dependencies - uses Node 22 built-in fetch
 
-**Diagnosis**
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-- [Line 58](#L58) reports that the Netlify Functions bundler cannot load `@anthropic-ai/sdk` when packaging `netlify/functions/generate-mcq.js`.  
-- [Lines 60-62](#L60-L62) confirm the module is missing from the deployed dependency tree, which means Netlify can’t bundle the function.
+async function callClaude(prompt) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error("Anthropic API error " + response.status + ": " + err);
+  }
+  const data = await response.json();
+  return data.content[0].text;
+}
 
-**Solution**
+// ABIM INTERNAL MEDICINE BLUEPRINT
+const ABIM_IM_BLUEPRINT = [
+  { weight: 14, category: "Cardiovascular Disease", topics: ["Coronary artery disease and ACS (STEMI, NSTEMI, UA)", "Heart failure (HFrEF, HFpEF) - diagnosis and management", "Atrial fibrillation and flutter - rate vs rhythm control", "Valvular heart disease (aortic stenosis, mitral regurgitation)", "Hypertension - diagnosis, staging, pharmacotherapy", "Dyslipidemia and statin therapy", "Pulmonary hypertension", "Peripheral artery disease", "Aortic aneurysm and dissection", "Cardiac arrhythmias (SVT, VT, heart blocks)", "Pericarditis and myocarditis", "Infective endocarditis - Duke criteria, management"] },
+  { weight: 9, category: "Pulmonary Disease", topics: ["COPD - GOLD staging, pharmacotherapy, exacerbations", "Asthma - step therapy, severe exacerbation management", "Community-acquired pneumonia - severity scoring, antibiotics", "Hospital-acquired and ventilator-associated pneumonia", "Pulmonary embolism - diagnosis, anticoagulation, thrombolysis", "Interstitial lung disease - IPF, sarcoidosis, hypersensitivity pneumonitis", "Obstructive sleep apnea", "Pleural effusion - Light's criteria, transudates vs exudates", "ARDS - Berlin criteria, lung-protective ventilation", "Lung cancer - screening, staging, treatment", "Pneumothorax"] },
+  { weight: 9, category: "Endocrinology, Diabetes, and Metabolism", topics: ["Type 2 diabetes - ADA treatment algorithm, GLP-1 RA, SGLT2i", "Type 1 diabetes - insulin regimens, diabetic ketoacidosis", "Hypothyroidism - diagnosis, levothyroxine dosing", "Hyperthyroidism and Graves disease - RAI, thionamides", "Adrenal insufficiency - primary vs secondary, steroid dosing", "Cushing syndrome - diagnosis, dexamethasone suppression test", "Primary aldosteronism - screening, subtype differentiation", "Pheochromocytoma - biochemical diagnosis, perioperative management", "Osteoporosis - FRAX, bisphosphonates, denosumab", "Hypercalcemia - primary hyperparathyroidism, malignancy", "Pituitary adenomas - prolactinoma, acromegaly", "Metabolic syndrome and obesity management"] },
+  { weight: 9, category: "Gastroenterology", topics: ["Inflammatory bowel disease - Crohn's vs UC, biologics", "Cirrhosis - Child-Pugh, MELD score, complications", "GI bleeding - upper vs lower, endoscopy timing", "Hepatitis B - serology interpretation, antiviral therapy", "Hepatitis C - DAA therapy, cure rates", "Acute pancreatitis - Ranson criteria, management", "NAFLD and NASH - diagnosis, lifestyle, emerging therapies", "Colorectal cancer - screening, Lynch syndrome", "Peptic ulcer disease - H. pylori eradication", "Celiac disease - serology, gluten-free diet", "Acute liver failure - etiology, management"] },
+  { weight: 9, category: "Infectious Disease", topics: ["Sepsis and septic shock - Surviving Sepsis bundle", "HIV - ART initiation, OI prophylaxis, drug interactions", "Tuberculosis - latent vs active, treatment regimens", "Infective endocarditis - organisms, Duke criteria, surgery indications", "Urinary tract infections - uncomplicated, complicated, catheter-associated", "Skin and soft tissue infections - cellulitis, necrotizing fasciitis", "Pneumonia organisms - typical, atypical, aspiration", "C. difficile - diagnosis, fidaxomicin, fecal transplant", "Antibiotic stewardship - beta-lactams, vancomycin, aminoglycosides", "COVID-19 - antivirals, immunomodulators, post-COVID", "Meningitis - empiric antibiotics, LP interpretation"] },
+  { weight: 9, category: "Rheumatology and Orthopedics", topics: ["Rheumatoid arthritis - DMARDs, biologics, treat-to-target", "Systemic lupus erythematosus - ACR criteria, organ involvement", "Gout - acute management, urate-lowering therapy targets", "Pseudogout - calcium pyrophosphate deposition", "Giant cell arteritis - ESR, temporal artery biopsy, steroids", "Polymyalgia rheumatica - clinical features, steroid response", "Ankylosing spondylitis - HLA-B27, NSAIDs, anti-TNF", "Systemic sclerosis - limited vs diffuse, ILD, PAH", "Vasculitis - GPA, EGPA, polyarteritis nodosa", "Antiphospholipid syndrome - thrombosis, anticoagulation", "Septic arthritis - joint aspiration, empiric antibiotics"] },
+  { weight: 6, category: "Hematology", topics: ["Iron deficiency anemia - diagnosis, IV iron, transfusion thresholds", "B12 and folate deficiency - neurologic manifestations", "Hemolytic anemia - Coombs test, causes, management", "Thrombocytopenia - ITP, TTP, HIT", "Sickle cell disease - vaso-occlusive crisis, hydroxyurea", "DVT and PE - DOAC selection, duration of anticoagulation", "Heparin-induced thrombocytopenia - 4T score, argatroban", "Myelodysplastic syndrome - IPSS-R scoring", "Polycythemia vera - JAK2 mutation, phlebotomy", "Disseminated intravascular coagulation - causes, labs, management"] },
+  { weight: 6, category: "Nephrology and Urology", topics: ["Acute kidney injury - KDIGO staging, prerenal vs intrinsic vs postrenal", "CKD - staging, slowing progression, SGLT2i in CKD", "Glomerulonephritis - nephritic vs nephrotic syndrome", "Hyponatremia - SIADH vs hypovolemic, correction rate", "Hyperkalemia - EKG changes, acute management", "Metabolic acidosis - anion gap, delta-delta ratio", "Metabolic alkalosis - causes, chloride-responsive vs resistant", "Nephrotic syndrome - minimal change, membranous, FSGS", "Renal replacement therapy - hemodialysis vs peritoneal", "Nephrolithiasis - stone types, prevention"] },
+  { weight: 6, category: "Medical Oncology", topics: ["Lung cancer - NSCLC vs SCLC, targeted therapies, immunotherapy", "Breast cancer - hormone receptor status, HER2, treatment", "Colorectal cancer - staging, FOLFOX, bevacizumab", "Prostate cancer - PSA, Gleason score, ADT", "Lymphoma - Hodgkin vs non-Hodgkin, CHOP, R-CHOP", "Leukemia - AML, CML, CLL, TKI therapy", "Multiple myeloma - CRAB criteria, proteasome inhibitors", "Paraneoplastic syndromes - SIADH, hypercalcemia, Eaton-Lambert", "Oncologic emergencies - SVC syndrome, tumor lysis, spinal cord compression", "Immunotherapy toxicities - checkpoint inhibitor adverse effects"] },
+  { weight: 4, category: "Neurology", topics: ["Ischemic stroke - tPA eligibility, thrombectomy window, secondary prevention", "Hemorrhagic stroke - ICH, subarachnoid hemorrhage", "Seizures and epilepsy - first-line AEDs, status epilepticus", "Multiple sclerosis - relapsing-remitting, disease-modifying therapy", "Parkinson disease - dopaminergic therapy, motor fluctuations", "Dementia - Alzheimer's, vascular, Lewy body differentiation", "Headache - migraine prophylaxis, cluster headache", "Myasthenia gravis - Tensilon test, thymectomy", "Guillain-Barre syndrome - IVIG, plasmapheresis", "Meningitis and encephalitis"] },
+  { weight: 4, category: "Psychiatry", topics: ["Major depressive disorder - SSRI selection, treatment-resistant depression", "Bipolar disorder - mood stabilizers, lithium toxicity", "Schizophrenia - antipsychotics, metabolic side effects", "Anxiety disorders - GAD, panic disorder, PTSD pharmacotherapy", "Alcohol use disorder - CIWA, thiamine, naltrexone", "Opioid use disorder - buprenorphine, methadone, naloxone", "Delirium - causes, prevention, non-pharmacologic management", "Somatoform and functional disorders"] },
+  { weight: 3, category: "Dermatology", topics: ["Cellulitis vs erysipelas - treatment, MRSA coverage", "Psoriasis - topical vs systemic, biologics", "Melanoma - ABCDE criteria, staging, immunotherapy", "Drug hypersensitivity reactions - SJS, TEN, DRESS", "Acne vulgaris - isotretinoin, antibiotic stewardship", "Skin manifestations of systemic disease"] },
+  { weight: 3, category: "Obstetrics and Gynecology", topics: ["Preeclampsia - diagnostic criteria, magnesium, delivery timing", "Gestational diabetes - screening, insulin vs metformin", "Ectopic pregnancy - risk factors, methotrexate criteria", "Cervical cancer screening - Pap smear intervals, HPV co-testing", "Menopause and HRT - indications, contraindications", "Polycystic ovary syndrome - diagnosis, metformin, clomiphene"] },
+  { weight: 3, category: "Geriatric Syndromes", topics: ["Falls prevention - Beers criteria, polypharmacy", "Delirium in elderly - hyperactive vs hypoactive", "Frailty - assessment, sarcopenia", "Urinary incontinence - stress, urge, overflow types", "Pressure ulcers - staging, prevention", "Dementia management - behavioral symptoms, caregiver support"] },
+  { weight: 2, category: "Allergy and Immunology", topics: ["Anaphylaxis - epinephrine dosing, biphasic reactions", "Common variable immunodeficiency - recurrent sinopulmonary infections", "Hereditary angioedema - C1 esterase inhibitor deficiency", "Drug allergy - penicillin cross-reactivity, desensitization", "Allergic rhinitis - step therapy"] },
+  { weight: 2, category: "Miscellaneous and High-Value Care", topics: ["Preventive medicine - cancer screening guidelines, USPSTF recommendations", "Biostatistics - sensitivity, specificity, PPV, NPV, NNT", "Medical ethics - informed consent, capacity, advance directives", "Patient safety - medication errors, handoff communication", "Health disparities - social determinants of health"] },
+  { weight: 1, category: "Ophthalmology", topics: ["Diabetic retinopathy - screening intervals, anti-VEGF", "Glaucoma - open-angle vs angle-closure", "Giant cell arteritis and anterior ischemic optic neuropathy", "Hypertensive retinopathy"] },
+  { weight: 1, category: "Otolaryngology", topics: ["Sinusitis - viral vs bacterial, antibiotic indications", "Hearing loss - conductive vs sensorineural", "Obstructive sleep apnea - polysomnography, CPAP"] }
+];
 
-Add the missing dependency to your site’s root `package.json` and redeploy:
+// ABIM ENDOCRINOLOGY SUBSPECIALTY BLUEPRINT
+const ABIM_ENDO_BLUEPRINT = [
+  { weight: 24, category: "Diabetes Mellitus and Hypoglycemia", topics: ["ADA 2025 Standards of Care - glycemic targets, individualization", "Type 2 diabetes pharmacotherapy - GLP-1 RA, SGLT2i, DPP-4i, TZD, sulfonylureas", "Tirzepatide (GIP/GLP-1) - mechanism, weight loss, CV outcomes", "Type 1 diabetes - MDI vs insulin pump, closed-loop AID systems", "CGM - time in range, ambulatory glucose profile interpretation", "Diabetic ketoacidosis - diagnosis, fluids, insulin protocol", "Hyperosmolar hyperglycemic state - key differences from DKA", "Hypoglycemia - unawareness, prevention, glucagon use", "Inpatient glycemic management - basal-bolus insulin", "Microvascular complications - nephropathy, retinopathy, neuropathy", "Macrovascular complications - ASCVD risk reduction, GLP-1 RA and SGLT2i CVOT data", "MODY and LADA - genetic testing, clinical differentiation", "Gestational diabetes - HAPO trial, postpartum screening", "Bariatric surgery - metabolic outcomes, hypoglycemia post-surgery"] },
+  { weight: 15, category: "Thyroid Disorders", topics: ["Hypothyroidism - primary vs central, TSH interpretation, levothyroxine dosing", "Hashimoto thyroiditis - TPO antibodies, subclinical hypothyroidism management", "Hyperthyroidism - Graves disease, toxic multinodular goiter, toxic adenoma", "Thyroid storm - Burch-Wartofsky score, PTU vs methimazole, beta-blockade", "Thyroid nodule evaluation - ATA ultrasound risk stratification, FNA indications", "Thyroid cancer - papillary, follicular, medullary, anaplastic - staging, RAI, TSH suppression", "Thyroiditis - subacute, postpartum, silent, Riedel", "Thyroid disease in pregnancy - TSH targets, fetal considerations", "Amiodarone-induced thyroid disease - type 1 vs type 2", "Central hypothyroidism - isolated vs pan-hypopituitarism"] },
+  { weight: 15, category: "Calcium and Bone Disorders", topics: ["Hypercalcemia - etiology (PTH vs PTHrP vs vitamin D mediated), acute management", "Primary hyperparathyroidism - surgical criteria, pre-op localization", "Hypoparathyroidism - post-surgical, autoimmune, Chvostek and Trousseau signs", "Osteoporosis - DXA interpretation, FRAX, bisphosphonates, denosumab, romosozumab, teriparatide", "Vitamin D deficiency - 25-OH vs 1,25-OH, supplementation protocols", "Paget's disease of bone - ALP, bisphosphonate therapy", "Hypocalcemia - causes, acute IV calcium, chronic management", "FGF23 disorders - X-linked hypophosphatemia, tumor-induced osteomalacia"] },
+  { weight: 12, category: "Lipids, Obesity, and Nutrition", topics: ["Dyslipidemia - ACC/AHA risk calculator, statin intensity, LDL targets by risk category", "PCSK9 inhibitors - evolocumab, alirocumab - indications and CVOT evidence", "Familial hypercholesterolemia - diagnostic criteria, aggressive therapy", "Hypertriglyceridemia - fibrates, omega-3, pancreatitis risk", "Obesity management - BMI classification, GLP-1 RA for weight loss", "Bariatric surgery - types, metabolic outcomes, nutritional deficiencies", "Metabolic syndrome - IDF vs ATP III criteria, treatment"] },
+  { weight: 10, category: "Adrenal Disorders", topics: ["Primary adrenal insufficiency (Addison's) - autoimmune, biochemical diagnosis, stress dosing", "Secondary adrenal insufficiency - ACTH stimulation test, glucocorticoid-induced", "Adrenal crisis - recognition, IV hydrocortisone, prevention", "Cushing syndrome - endogenous vs exogenous, UFC, late-night salivary cortisol, LDDST", "Cushing disease vs ectopic ACTH - HDDST, IPSS, bilateral adrenalectomy", "Primary aldosteronism - PAC/PRA ratio, CT, adrenal vein sampling, adrenalectomy vs spironolactone", "Pheochromocytoma - biochemical diagnosis (metanephrines), pre-op alpha then beta-blockade", "Adrenal incidentaloma - imaging characterization, hormonal workup", "Congenital adrenal hyperplasia - 21-hydroxylase deficiency, 17-OHP"] },
+  { weight: 10, category: "Pituitary Disorders", topics: ["Pituitary adenoma classification - micro vs macro, functioning vs nonfunctional", "Prolactinoma - dopamine agonists (cabergoline vs bromocriptine), pregnancy management", "Acromegaly - IGF-1, OGTT GH suppression, somatostatin analogs, pegvisomant", "Cushing disease - ACTH-dependent, petrosal sinus sampling, transsphenoidal surgery", "Central diabetes insipidus - water deprivation test, desmopressin", "SIADH - euvolemic hyponatremia, fluid restriction, vaptans", "Hypopituitarism - panhypopituitarism, replacement priorities (cortisol first)", "Pituitary apoplexy - hemorrhage, visual field defects, emergency management"] },
+  { weight: 7, category: "Female Reproduction", topics: ["PCOS - Rotterdam criteria, metabolic complications, OCP, metformin, letrozole", "Menopause - FSH, vasomotor symptoms, HRT indications and contraindications", "Premature ovarian insufficiency - etiology, hormone replacement, fertility", "Amenorrhea - primary vs secondary, workup algorithm", "Hyperprolactinemia - differential (drugs, pituitary, hypothyroidism)", "Turner syndrome - 45,X, short stature, cardiac screening, estrogen replacement"] },
+  { weight: 7, category: "Male Reproduction", topics: ["Male hypogonadism - primary vs secondary, testosterone therapy indications", "Klinefelter syndrome - 47,XXY, testosterone replacement, fertility", "Male infertility - azoospermia, FSH/LH/testosterone interpretation", "Testosterone therapy - formulations, monitoring, contraindications", "Delayed puberty vs constitutional growth delay"] }
+];
 
-1. In the project root, verify whether `@anthropic-ai/sdk` is already declared in `package.json`. If it isn’t, add it to the `"dependencies"` section:
-   ```json
-   {
-     "dependencies": {
-       "@anthropic-ai/sdk": "^0.x.x"
-     }
-   }
-   ```
-   Use the latest compatible version from npm.
+// USMLE STEP 1 BLUEPRINT
+const USMLE_STEP1_BLUEPRINT = [
+  { weight: 16, category: "Reproductive and Endocrine Systems", topics: ["Hypothalamic-pituitary-gonadal axis - feedback loops", "Menstrual cycle physiology - follicular, ovulation, luteal phase", "Thyroid hormone synthesis - steps, iodination, coupling", "Adrenal cortex hormones - zona glomerulosa, fasciculata, reticularis", "Insulin and glucagon - fed vs fasted state physiology", "Type 1 diabetes - autoimmune destruction, HLA-DR3/DR4", "Congenital adrenal hyperplasia - enzyme deficiencies", "Androgen insensitivity syndrome", "5-alpha reductase deficiency", "GnRH, LH, FSH - pulsatility and feedback"] },
+  { weight: 13, category: "Behavioral Health and Nervous Systems", topics: ["Neurotransmitters - dopamine, serotonin, GABA, glutamate", "Antidepressants - mechanism of SSRIs, SNRIs, TCAs, MAOIs", "Antipsychotics - D2 blockade, EPS, tardive dyskinesia", "Mood stabilizers - lithium mechanism and toxicity", "Opioid pharmacology - mu receptor, tolerance, withdrawal", "Autonomic pharmacology - alpha, beta agonists and antagonists", "CNS tumors - glioblastoma, meningioma, medulloblastoma", "Stroke syndromes - MCA, PCA, PICA territories", "Neurodegenerative diseases - Parkinson, Huntington, ALS pathology"] },
+  { weight: 13, category: "Respiratory and Renal Systems", topics: ["Pulmonary function tests - obstructive vs restrictive patterns", "Hypoxemia mechanisms - V/Q mismatch, shunt, diffusion impairment", "Acid-base disorders - metabolic vs respiratory, compensation", "Renal tubular physiology - PCT, loop, DCT transport", "Glomerular filtration - GFR determinants, filtration fraction", "Diuretics - mechanism by segment, electrolyte effects", "RAAS - angiotensin II effects, aldosterone", "Nephritic vs nephrotic syndrome - pathologic types"] },
+  { weight: 11, category: "Cardiovascular System", topics: ["Cardiac action potential - pacemaker vs ventricular cell", "Frank-Starling law - preload, afterload, contractility", "Antiarrhythmics - Vaughan-Williams classification", "Atherosclerosis - foam cells, fatty streaks, fibrous plaque", "Myocardial infarction - biomarkers, ECG changes by territory", "Congenital heart defects - VSD, ASD, PDA, TOF", "Cardiac drugs - digoxin mechanism and toxicity"] },
+  { weight: 10, category: "Blood and Immune Systems", topics: ["Hematopoiesis - cell lineages, growth factors", "Anemia classification - microcytic, normocytic, macrocytic", "Clotting cascade - intrinsic vs extrinsic pathway", "Hypersensitivity reactions - Type I-IV mechanisms", "Immunodeficiencies - B vs T cell, combined", "Complement system - classical vs alternative pathway"] },
+  { weight: 10, category: "Musculoskeletal and Skin", topics: ["Bone metabolism - osteoblasts vs osteoclasts, RANK-RANKL", "Rheumatoid arthritis pathogenesis - pannus, anti-CCP antibodies", "SLE - ANA, anti-dsDNA, anti-Smith antibodies", "Crystal arthropathies - monosodium urate vs calcium pyrophosphate", "Muscular dystrophies - Duchenne, Becker, dystrophin"] },
+  { weight: 9, category: "Gastrointestinal System", topics: ["GI hormones - gastrin, secretin, CCK, GIP, motilin", "Liver metabolism - glycolysis, gluconeogenesis, urea cycle", "Bilirubin metabolism - prehepatic, hepatic, posthepatic jaundice", "H. pylori - virulence factors, peptic ulcer disease", "Hepatitis viruses - A, B, C, D, E - transmission, serologies"] },
+  { weight: 5, category: "Biostatistics and Epidemiology", topics: ["Sensitivity and specificity - ROC curve", "PPV and NPV - prevalence effect", "Bias types - selection, information, confounding", "Study designs - RCT, cohort, case-control, cross-sectional", "Number needed to treat and number needed to harm"] },
+  { weight: 2, category: "Human Development", topics: ["Embryology - germ layers, organ development", "Teratogens - thalidomide, isotretinoin, alcohol", "Fetal circulation - ductus arteriosus, foramen ovale"] }
+];
 
-2. Install the dependency locally (e.g., `npm install` or `yarn install`) so that `package-lock.json`/`yarn.lock` is updated, then commit the changes.
+// USMLE STEP 2 BLUEPRINT
+const USMLE_STEP2_BLUEPRINT = [
+  { weight: 13, category: "Renal, Urinary and Reproductive Systems", topics: ["Acute kidney injury - prerenal vs intrinsic, management", "CKD complications - anemia, hyperkalemia, metabolic acidosis", "Glomerulonephritis - post-strep, IgA nephropathy, MPGN", "Hyponatremia - SIADH, correction", "UTI - uncomplicated, pyelonephritis, catheter-associated", "Ovarian cancer - CA-125, BRCA mutation", "Testicular cancer - germ cell vs non-germ cell"] },
+  { weight: 12, category: "Cardiovascular System", topics: ["Chest pain evaluation - ACS rule-out, HEART score", "STEMI management - door-to-balloon, thrombolytics", "Heart failure management - GDMT, diuresis", "Atrial fibrillation - CHA2DS2-VASc score, anticoagulation", "Hypertensive urgency vs emergency", "Aortic stenosis - valve area, TAVR vs SAVR criteria", "Syncope evaluation - cardiac vs neurally mediated"] },
+  { weight: 13, category: "Legal, Ethical Issues and Patient Safety", topics: ["Informed consent - exceptions, capacity assessment", "Confidentiality breaches - duty to warn, mandatory reporting", "End-of-life care - withdrawal of care, futility", "Medical errors - disclosure", "Advance directives - DNR, POLST", "Health disparities - implicit bias"] },
+  { weight: 10, category: "Behavioral Health", topics: ["Suicide risk assessment", "Major depression - PHQ-9, SSRI initiation", "Bipolar disorder - mood stabilizer selection", "Schizophrenia - positive vs negative symptoms", "Substance use disorders - CAGE questionnaire", "Eating disorders - refeeding syndrome"] },
+  { weight: 10, category: "Nervous System and Special Senses", topics: ["Stroke - NIHSS, tPA eligibility, thrombectomy window", "Seizure - first unprovoked seizure workup, AED selection", "Headache - migraine vs tension vs cluster", "Multiple sclerosis - McDonald criteria", "Vertigo - BPPV (Dix-Hallpike), central vs peripheral", "Neuropathy - diabetic, B12 deficiency, Guillain-Barre"] },
+  { weight: 9, category: "Musculoskeletal and Skin", topics: ["Low back pain - red flags, imaging indications", "Gout - acute management, allopurinol timing", "Cellulitis - MRSA risk, antibiotic selection", "Melanoma - biopsy technique, sentinel lymph node", "Psoriasis - PASI scoring, biologics"] },
+  { weight: 8, category: "Respiratory System", topics: ["Pneumonia - PORT/PSI score, outpatient vs inpatient antibiotics", "COPD exacerbation - bronchodilators, steroids, antibiotics, NIV", "Asthma exacerbation - SABA, ipratropium, magnesium", "Pulmonary embolism - Wells score, CTPA, anticoagulation", "Lung cancer - screening (LDCT), staging, targeted therapy"] },
+  { weight: 7, category: "Pregnancy, Childbirth and Puerperium", topics: ["Preeclampsia - BP criteria, proteinuria, management", "Gestational diabetes - GCT, OGTT, insulin vs metformin", "Placenta previa vs abruptio placentae", "Postpartum hemorrhage - causes, oxytocin", "Ectopic pregnancy - transvaginal US, beta-hCG, methotrexate criteria"] },
+  { weight: 7, category: "Endocrine System", topics: ["Diabetes management - A1c targets, insulin adjustment", "Thyroid nodule - ultrasound features, FNA indications", "Adrenal insufficiency - stress dosing, sick day rules", "Cushing syndrome - screening tests, causes", "Calcium disorders - hypercalcemia workup, hypoparathyroidism"] },
+  { weight: 6, category: "Gastrointestinal System", topics: ["Upper GI bleeding - Rockall score, endoscopy timing", "Acute pancreatitis - BISAP score, fluid resuscitation", "Cirrhosis complications - SBP, hepatorenal syndrome", "IBD management - 5-ASA, steroids, biologics"] },
+  { weight: 5, category: "Biostatistics and Epidemiology", topics: ["Clinical trial interpretation - intention-to-treat, NNT, ARR", "Screening principles - lead time bias, length bias", "Diagnostic test characteristics - LR+, LR-, pre-test probability"] }
+];
 
-3. Push the commit and trigger a new Netlify build.
+// USMLE STEP 3 BLUEPRINT
+const USMLE_STEP3_BLUEPRINT = [
+  { weight: 13, category: "Biostatistics and Population Health", topics: ["Evidence-based medicine - meta-analysis, systematic review interpretation", "Screening test statistics - sensitivity, specificity, predictive values", "Clinical decision making - pre-test probability, Bayes theorem", "Study design selection - RCT vs observational, bias", "Absolute vs relative risk reduction - NNT calculation", "Quality improvement - PDSA cycle"] },
+  { weight: 11, category: "Cardiovascular System", topics: ["Outpatient heart failure management - GDMT titration, LVEF monitoring", "Secondary prevention post-MI - aspirin, statin, beta-blocker, ACEi", "Hypertension management - drug selection by comorbidity", "Atrial fibrillation - long-term anticoagulation, rate vs rhythm strategy", "Peripheral vascular disease - ABI, claudication, revascularization"] },
+  { weight: 10, category: "Nervous System and Special Senses", topics: ["Outpatient stroke follow-up - secondary prevention", "Epilepsy management - drug selection by seizure type, driving restrictions", "Parkinson disease - motor fluctuations, non-motor features", "Dementia - Alzheimer's vs vascular vs Lewy body", "Headache management - migraine prophylaxis"] },
+  { weight: 9, category: "Communication and Ethics", topics: ["Informed consent - decision-making capacity, surrogate decision makers", "Advance care planning - DNR, POLST, goals of care conversations", "Breaking bad news - SPIKES protocol", "Medical errors - disclosure, apology, root cause analysis", "End-of-life care - palliative vs hospice, symptom management"] },
+  { weight: 9, category: "Respiratory System", topics: ["COPD - LABA/LAMA combinations, roflumilast, oxygen therapy criteria", "Asthma - step-up therapy, biologics (dupilumab, omalizumab)", "Obstructive sleep apnea - CPAP adherence, cardiovascular consequences", "Idiopathic pulmonary fibrosis - antifibrotic therapy, lung transplant criteria"] },
+  { weight: 8, category: "Immune, Blood and Multisystem", topics: ["HIV - opportunistic infection prophylaxis thresholds, ART regimens", "Autoimmune disease flares - lupus, RA, vasculitis", "Coagulation disorders - long-term anticoagulation decisions", "Lymphoma - maintenance therapy, surveillance imaging"] },
+  { weight: 7, category: "Pregnancy and Female Reproductive", topics: ["Preconception counseling - folic acid, medication safety", "Antenatal care - screening timeline, glucose challenge test", "Postpartum care - contraception, depression screening", "Abnormal uterine bleeding - PALM-COEIN classification"] },
+  { weight: 6, category: "Gastrointestinal System", topics: ["Surveillance colonoscopy - adenoma follow-up intervals", "Hepatitis C - DAA therapy, cirrhosis surveillance", "Cirrhosis - HCC surveillance, SBP prophylaxis", "IBD - maintenance therapy, dysplasia surveillance"] },
+  { weight: 6, category: "Renal and Urinary", topics: ["CKD management - BP targets, RAAS blockade, SGLT2i in CKD", "BPH - alpha-blockers, 5-alpha reductase inhibitors", "Nephrolithiasis - metabolic workup, dietary modifications"] },
+  { weight: 6, category: "Behavioral Health", topics: ["Outpatient depression management - augmentation strategies", "Anxiety disorders - CBT, medication management, benzodiazepine risks", "Substance use - motivational interviewing, medication-assisted treatment", "ADHD in adults - stimulant therapy, non-stimulant alternatives"] },
+  { weight: 5, category: "Musculoskeletal System", topics: ["Osteoarthritis - non-pharmacologic, NSAID risks, intra-articular injections", "RA monitoring - DAS28, methotrexate toxicity screening", "Gout prophylaxis - allopurinol titration, febuxostat", "Osteoporosis - DEXA surveillance, medication holidays"] },
+  { weight: 5, category: "Endocrine System", topics: ["Diabetes - A1c targets by age/comorbidity, deprescribing in elderly", "Thyroid nodule - long-term surveillance, recurrence after treatment", "Adrenal incidentaloma - follow-up imaging, annual biochemical testing", "Metabolic syndrome - lifestyle intervention, pharmacotherapy"] },
+  { weight: 5, category: "Skin and Subcutaneous Tissue", topics: ["Skin cancer surveillance - melanoma follow-up", "Chronic wound management - pressure ulcer staging, debridement", "Psoriasis - biologic selection, monitoring"] }
+];
 
-The relevant error logs are:
+// WEIGHTED RANDOM SELECTION
+function weightedRandomCategory(blueprint) {
+  const total = blueprint.reduce(function(sum, b) { return sum + b.weight; }, 0);
+  let rand = Math.random() * total;
+  for (var i = 0; i < blueprint.length; i++) {
+    rand -= blueprint[i].weight;
+    if (rand <= 0) return blueprint[i];
+  }
+  return blueprint[blueprint.length - 1];
+}
 
-Line 35:   deployId: 69cae425f76c970008d5c62b
-Line 36: [36m[1m​[22m[39m
-Line 37: [36m[1m❯ Current directory[22m[39m
-Line 38:   /opt/build/repo
-Line 39: [36m[1m​[22m[39m
-Line 40: [36m[1m❯ Config file[22m[39m
-Line 41:   No config file was defined: using default values.
-Line 42: [36m[1m​[22m[39m
-Line 43: [36m[1m❯ Context[22m[39m
-Line 44:   production
-Line 45: Failed during stage 'building site': Build script returned non-zero exit code: 2
-Line 46: [96m[1m​[22m[39m
-Line 47: [96m[1mFunctions bundling                                            [22m[39m
-Line 48: [96m[1m────────────────────────────────────────────────────────────────[22m[39m
-Line 49: ​
-Line 50: Packaging Functions from [36mnetlify/functions[39m directory:
-Line 51:  - generate-mcq.js
-Line 52: ​
-Line 53: [91m[1m​[22m[39m
-Line 54: [91m[1mDependencies installation error                               [22m[39m
-Line 55: [91m[1m────────────────────────────────────────────────────────────────[22m[39m
-Line 56: ​
-Line 57:   [31m[1mError message[22m[39m
-Line 58:   A Netlify Function failed to require one of its dependencies.
-Line 59:   Please make sure it is present in the site's top-level "package.json".
-​
-Line 60:   In file "/opt/build/repo/netlify/functions/generate-mcq.js"
-Line 61:   Cannot find module '@anthropic-ai/sdk'
-Line 62:   Require stack:
-Line 63:   - /opt/buildhome/node-deps/node_modules/@netlify/zip-it-and-ship-it/dist/runtimes/node/bundlers/zisi/resolve.js
-Line 64: ​
-Line 65:   [31m[1mResolved config[22m[39m
-Line 66:   build:
-Line 67:     environment:
-Line 68:       - ANTHROPIC_API_KEY
-Line 69:     publish: /opt/build/repo/public
-Line 70:     publishOrigin: ui
-Line 71:   functionsDirectory: /opt/build/repo/netlify/functions
-Line 72: Build failed due to a user error: Build script returned non-zero exit code: 2
-Line 73: Failing build: Failed to build site
-Line 74: Finished processing build request in 8.259s
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getBlueprintCategory(level, requestedTopic) {
+  const isRandom = requestedTopic.toLowerCase().includes("random");
+  if (!isRandom) {
+    return { forcedTopic: requestedTopic };
+  }
+  if (level.includes("ABIM Endocrinology")) {
+    return { blueprintCat: weightedRandomCategory(ABIM_ENDO_BLUEPRINT) };
+  }
+  if (level.includes("ABIM Internal Medicine")) {
+    return { blueprintCat: weightedRandomCategory(ABIM_IM_BLUEPRINT) };
+  }
+  if (level.includes("Step 1")) {
+    return { blueprintCat: weightedRandomCategory(USMLE_STEP1_BLUEPRINT) };
+  }
+  if (level.includes("Step 2")) {
+    return { blueprintCat: weightedRandomCategory(USMLE_STEP2_BLUEPRINT) };
+  }
+  if (level.includes("Step 3")) {
+    return { blueprintCat: weightedRandomCategory(USMLE_STEP3_BLUEPRINT) };
+  }
+  return { blueprintCat: weightedRandomCategory(ABIM_IM_BLUEPRINT) };
+}
+
+function buildPrompt(level, requestedTopic) {
+  var result = getBlueprintCategory(level, requestedTopic);
+  var specificTopic, topicInstruction;
+
+  if (result.forcedTopic) {
+    specificTopic = result.forcedTopic;
+    topicInstruction = "The topic is: \"" + specificTopic + "\". Generate a question specifically about this topic.";
+  } else {
+    var cat = result.blueprintCat;
+    specificTopic = pickRandom(cat.topics);
+    topicInstruction = "The exam category is: \"" + cat.category + "\" (" + cat.weight + "% of the " + level + " exam). The specific subtopic is: \"" + specificTopic + "\". Generate a question directly about this subtopic.";
+  }
+
+  var levelNote = "";
+  if (level.includes("Step 1")) {
+    levelNote = "Focus on basic science mechanisms: pathophysiology, pharmacology, biochemistry. Questions test understanding of WHY, not just WHAT.";
+  } else if (level.includes("Step 2")) {
+    levelNote = "Focus on clinical decision making: diagnosis, next best step, management. Use clinical vignettes with vitals, labs, and physical exam findings.";
+  } else if (level.includes("Step 3")) {
+    levelNote = "Focus on management of established diagnoses, outpatient follow-up, population health, biostatistics, and ethics.";
+  } else if (level.includes("ABIM Internal Medicine")) {
+    levelNote = "Focus on diagnosis and management following current ACC/AHA, ADA, IDSA, ACR, KDIGO, and USPSTF guidelines. Include guideline-specific thresholds.";
+  } else if (level.includes("ABIM Endocrinology")) {
+    levelNote = "Focus on endocrinology subspecialty content per the ABIM Endocrinology Blueprint. Reference ADA 2025, Endocrine Society, and AACE guidelines. Fellowship-level nuance required.";
+  }
+
+  return "You are an expert medical board exam question writer for " + level + ".\n\n" +
+    topicInstruction + "\n\n" +
+    "EXAM LEVEL: " + levelNote + "\n\n" +
+    "RULES:\n" +
+    "1. Generate exactly one high-quality clinical vignette MCQ.\n" +
+    "2. The stem must be 3-6 sentences with a realistic patient presentation including age, sex, symptoms, vital signs, and relevant labs or imaging.\n" +
+    "3. Provide exactly 5 answer choices labeled A through E.\n" +
+    "4. Only one answer is correct. Others must be plausible distractors.\n" +
+    "5. The correct answer must be evidence-based and cite the specific guideline.\n" +
+    "6. The explanation must be 4-8 sentences covering why the correct answer is right and why each wrong answer is incorrect.\n" +
+    "7. Do NOT reveal the topic in the question stem - only in the explanation.\n" +
+    "8. The topic field should name the specific clinical concept tested.\n\n" +
+    "Return ONLY this JSON with no markdown and no extra text:\n" +
+    "{\"stem\": \"...\", \"choices\": {\"A\": \"...\", \"B\": \"...\", \"C\": \"...\", \"D\": \"...\", \"E\": \"...\"}, \"correct\": \"A\", \"explanation\": \"...\", \"topic\": \"" + specificTopic + "\"}";
+}
+
+exports.handler = async function(event) {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
+  }
+
+  var topic, level;
+  try {
+    var body = JSON.parse(event.body);
+    topic = body.topic;
+    level = body.level;
+    if (!topic || !level) throw new Error("Missing topic or level");
+  } catch (e) {
+    return { statusCode: 400, body: JSON.stringify({ error: "Invalid request body" }) };
+  }
+
+  try {
+    var prompt = buildPrompt(level, topic);
+    var raw = await callClaude(prompt);
+
+    var cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+
+    var parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      console.error("JSON parse error:", cleaned);
+      return { statusCode: 500, body: JSON.stringify({ error: "AI returned invalid JSON. Please try again." }) };
+    }
+
+    var required = ["stem", "choices", "correct", "explanation", "topic"];
+    for (var i = 0; i < required.length; i++) {
+      if (!parsed[required[i]]) {
+        return { statusCode: 500, body: JSON.stringify({ error: "Missing field: " + required[i] }) };
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([parsed])
+    };
+
+  } catch (e) {
+    console.error("Error:", e);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Failed to generate question. Please try again." })
+    };
+  }
+};
