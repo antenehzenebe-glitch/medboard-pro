@@ -142,7 +142,7 @@ function App(){
     sb.auth.getSession().then(({data:{session}})=>{
       if(session?.user){setUser(session.user);setScreen("app");}
       setAuthLoading(false);
-    });
+    }).catch(()=>setAuthLoading(false));
     const {data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>{
       if(session?.user){setUser(session.user);setScreen("app");}
       else{setUser(null);}
@@ -150,12 +150,11 @@ function App(){
     return()=>subscription.unsubscribe();
   },[]);
 
-  // After successful auth go directly to app
   const login=async()=>{
     setAuthErr("");setAuthBusy(true);
     const{error}=await sb.auth.signInWithPassword({email,password:pw});
     if(error){setAuthErr(error.message);}
-    else{setScreen("app");setTab("mcq");} // Go straight to MCQs
+    else{setScreen("app");setTab("mcq");}
     setAuthBusy(false);
   };
 
@@ -175,7 +174,7 @@ function App(){
   const logout=async()=>{
     await sb.auth.signOut();
     setUser(null);setScreen("landing");
-    setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});
+    setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});setQNum(0);
   };
 
   const getPrice=p=>p.period==="year"?p.price:annual?Math.round(p.price*0.8):p.price;
@@ -213,13 +212,19 @@ function App(){
       const data=await res.json();
       if(!Array.isArray(data))throw new Error("Invalid response format");
       setQs(data);
-    setCurrentQ(0);
+      setCurrentQ(0);
       setScore(s=>({...s,s:s.s+1}));
       if(examMode)startT(data.length,data);
     }catch(e){
       setMcqErr("Failed to generate questions: "+e.message+". Please try again.");
     }
     setBusy(false);
+  };
+
+  // ✅ FIX 1: nextQuestion is now properly defined
+  const nextQuestion=()=>{
+    setQNum(n=>n+1);
+    generate();
   };
 
   const reveal=i=>{
@@ -665,7 +670,7 @@ function App(){
                   </div>
                 </div>
 
-                <button onClick={()=>generate(false)} disabled={busy}
+                <button onClick={generate} disabled={busy}
                   style={{width:"100%",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"14px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:15}}>
                   {examMode?"⏱️ Start Exam Mode →":"⚡ Start Practicing →"}
                 </button>
@@ -681,18 +686,19 @@ function App(){
               </div>
             )}
 
-            {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>qs.length>0?nextQuestion():generate(true)} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
+            {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>qs.length>0?nextQuestion():generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
 
-            {/* Session stats bar */}
-            {sessionCount>0&&qs.length>0&&(
+            {/* ✅ FIX 2: sessionCount replaced with score.t — no more undefined variable crash */}
+            {score.t>0&&qs.length>0&&(
               <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                 <span style={{fontSize:12,color:"#64748b"}}>Questions answered:</span>
                 <span style={{fontWeight:800,color:GOLD,fontSize:15}}>{score.t}</span>
                 {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
                 {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
-                <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);setSessionCount(0);setScore({t:0,c:0,s:0});}}
-                  style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:11,marginLeft:"auto"}}
-                  onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);setQNum(0);setScore({t:0,c:0,s:0});}}>
+                {/* ✅ FIX 3: Single onClick, no duplicate, no setSessionCount */}
+                <button
+                  onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);setQNum(0);setScore({t:0,c:0,s:0});}}
+                  style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:11,marginLeft:"auto"}}>
                   ✕ End Session
                 </button>
               </div>
@@ -708,7 +714,7 @@ function App(){
               return(
                 <div style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
                   <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                    <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum}</span>
+                    <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum+1}</span>
                     {answered&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
                     {answered&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:correct?"#10b981":"#ef4444"}}>{correct?"✓ Correct":"✗ Incorrect"}</span>}
                   </div>
@@ -730,6 +736,7 @@ function App(){
                     ))}
                   </div>
 
+                  {/* ✅ Explanation — now shows correctly because nextQuestion is defined */}
                   {answered&&(
                     <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:9,padding:16,marginBottom:16}}>
                       <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
