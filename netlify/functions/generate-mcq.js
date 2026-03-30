@@ -11,13 +11,3 @@ exports.handler = async (event) => {
     })
   };
 };
-```
-
-5. Commit message: `Test function`
-6. Wait for Netlify to deploy
-
----
-
-Then go to this URL in your browser:
-```
-https://app-medboardpro-az.netlify.app/.netlify/functions/generate-mcq
