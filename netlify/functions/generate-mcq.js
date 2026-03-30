@@ -19,18 +19,17 @@ exports.handler = async (event) => {
         : "random medical topics — each question a different specialty"
       : `"${topic}"`;
 
-    // Generate in batches of max 3 for speed
-    const safeCount = Math.min(count, 3);
+    const safeCount = Math.min(count, 5);
 
     const prompt = `Generate exactly ${safeCount} USMLE/ABIM board-style MCQ(s) on ${topicPrompt} at ${level} level.
 
 Rules:
-- Short clinical vignette (2-3 sentences max)
-- 5 choices A-E
-- One correct answer
+- Short clinical vignette (2-3 sentences)
+- 5 choices A-E, one correct
 - Brief explanation (2 sentences) citing one guideline or textbook
+- No topic hints in the stem
 
-Return ONLY JSON array, no markdown:
+Return ONLY a JSON array, no markdown, no backticks:
 [{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"...","topic":"..."}]`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -42,7 +41,7 @@ Return ONLY JSON array, no markdown:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
+        max_tokens: 3000,
         messages: [{ role: "user", content: prompt }]
       })
     });
