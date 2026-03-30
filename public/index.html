@@ -708,9 +708,234 @@ function App(){
                     ))}
                   </>
                 )}
+
+                <div style={{height:1,background:BDR,margin:"12px 0"}}/>
+                {(()=>{
+                  const [labTab,setLabTab]=React.useState("labs");
+                  const [openCat,setOpenCat]=React.useState(null);
+                  const LAB_DATA=[
+                    {cat:"Chemistry",color:"#3B82F6",labs:[
+                      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},
+                      {n:"Chloride",v:"98-106 mEq/L"},{n:"Bicarbonate",v:"22-29 mEq/L"},
+                      {n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
+                      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose (fasting)",v:"70-99 mg/dL"},
+                      {n:"Calcium (total)",v:"8.5-10.5 mg/dL"},{n:"Calcium (ionized)",v:"1.12-1.32 mmol/L"},
+                      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},
+                      {n:"Albumin",v:"3.5-5.0 g/dL"},{n:"Total protein",v:"6.0-8.3 g/dL"},
+                      {n:"Total bilirubin",v:"0.1-1.2 mg/dL"},{n:"Direct bilirubin",v:"0.0-0.3 mg/dL"},
+                      {n:"ALT",v:"7-56 U/L"},{n:"AST",v:"10-40 U/L"},
+                      {n:"Alkaline phosphatase",v:"44-147 U/L"},{n:"GGT",v:"9-48 U/L"},
+                      {n:"LDH",v:"140-280 U/L"},{n:"Amylase",v:"30-110 U/L"},
+                      {n:"Lipase",v:"10-140 U/L"},{n:"CK total",v:"30-200 U/L"},
+                      {n:"Troponin I",v:"<0.04 ng/mL"},{n:"Troponin T (hs)",v:"<14 ng/L"},
+                      {n:"BNP",v:"<100 pg/mL"},{n:"NT-proBNP",v:"<125 pg/mL"},
+                      {n:"CRP",v:"<1.0 mg/L"},{n:"ESR (male)",v:"0-15 mm/hr"},
+                      {n:"ESR (female)",v:"0-20 mm/hr"},{n:"Procalcitonin",v:"<0.1 ng/mL"},
+                      {n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Ammonia",v:"15-45 umol/L"},
+                      {n:"Serum osmolality",v:"275-295 mOsm/kg"},{n:"Anion gap",v:"8-12 mEq/L"},
+                      {n:"Iron (male)",v:"60-170 ug/dL"},{n:"TIBC",v:"240-450 ug/dL"},
+                      {n:"Transferrin sat.",v:"20-50%"},{n:"Ferritin (male)",v:"24-336 ng/mL"},
+                      {n:"Ferritin (female)",v:"11-307 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
+                      {n:"Folate (serum)",v:"2.7-17.0 ng/mL"},{n:"Homocysteine",v:"4-15 umol/L"},
+                      {n:"Uric acid (male)",v:"3.5-7.2 mg/dL"},{n:"Uric acid (female)",v:"2.6-6.0 mg/dL"},
+                    ]},
+                    {cat:"Hematology",color:"#EF4444",labs:[
+                      {n:"WBC",v:"4,500-11,000/uL"},{n:"Hgb (male)",v:"13.5-17.5 g/dL"},
+                      {n:"Hgb (female)",v:"12.0-15.5 g/dL"},{n:"Hct (male)",v:"41-53%"},
+                      {n:"Hct (female)",v:"36-46%"},{n:"MCV",v:"80-100 fL"},
+                      {n:"MCH",v:"27-33 pg"},{n:"MCHC",v:"32-36 g/dL"},
+                      {n:"RDW",v:"11.5-14.5%"},{n:"Platelets",v:"150,000-400,000/uL"},
+                      {n:"Reticulocytes",v:"0.5-1.5%"},{n:"Neutrophils",v:"50-70%"},
+                      {n:"Lymphocytes",v:"20-40%"},{n:"Monocytes",v:"2-8%"},
+                      {n:"Eosinophils",v:"1-4%"},{n:"PT",v:"11-13.5 sec"},
+                      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},
+                      {n:"D-dimer",v:"<0.5 ug/mL"},{n:"Fibrinogen",v:"200-400 mg/dL"},
+                      {n:"Haptoglobin",v:"30-200 mg/dL"},{n:"Direct Coombs",v:"Negative"},
+                    ]},
+                    {cat:"Hem-Onc",color:"#8B5CF6",labs:[
+                      {n:"Beta-2 microglobulin",v:"<2.4 mg/L"},{n:"PSA (total)",v:"<4.0 ng/mL"},
+                      {n:"CEA",v:"<3.0 ng/mL"},{n:"CA-125",v:"<35 U/mL"},
+                      {n:"CA 19-9",v:"<37 U/mL"},{n:"CA 15-3",v:"<30 U/mL"},
+                      {n:"AFP",v:"<10 ng/mL"},{n:"Beta-hCG",v:"<5 mIU/mL"},
+                      {n:"Chromogranin A",v:"<94 ng/mL"},{n:"5-HIAA (24hr urine)",v:"2-9 mg/day"},
+                      {n:"Serum kappa light chain",v:"3.3-19.4 mg/L"},
+                      {n:"Serum lambda light chain",v:"5.7-26.3 mg/L"},
+                      {n:"Kappa:lambda ratio",v:"0.26-1.65"},{n:"SPEP",v:"No M spike"},
+                      {n:"Bone marrow blasts (normal)",v:"<5%"},{n:"JAK2 V617F",v:"Negative"},
+                      {n:"BCR-ABL (CML)",v:"Negative"},{n:"Erythropoietin",v:"4-24 mIU/mL"},
+                      {n:"Reticulocyte production index",v:">2 = adequate response"},
+                    ]},
+                    {cat:"Endocrinology",color:"#C9A84C",labs:[
+                      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},
+                      {n:"Free T3",v:"2.3-4.2 pg/mL"},{n:"Total T4",v:"5.0-12.0 ug/dL"},
+                      {n:"TPO antibodies",v:"<35 IU/mL"},{n:"Thyroglobulin",v:"2-35 ng/mL"},
+                      {n:"HbA1c (normal)",v:"<5.7%"},{n:"HbA1c (prediabetes)",v:"5.7-6.4%"},
+                      {n:"HbA1c (DM target)",v:"<7.0% general / <8.0% elderly"},
+                      {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
+                      {n:"Cortisol AM (8am)",v:"6-23 ug/dL"},{n:"Cortisol PM",v:"2-11 ug/dL"},
+                      {n:"Midnight cortisol",v:"<1.8 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},
+                      {n:"UFC (24hr)",v:"<50 ug/24hr"},{n:"Late-night salivary cortisol",v:"<0.13 ug/dL"},
+                      {n:"LDDST (post 1mg dex)",v:"<1.8 ug/dL"},{n:"ARR (Aldo/Renin)",v:">30 = suspicious PA"},
+                      {n:"Aldosterone (upright)",v:"4-31 ng/dL"},{n:"Renin (upright)",v:"0.6-4.3 ng/mL/hr"},
+                      {n:"Plasma metanephrines",v:"<0.5 nmol/L"},{n:"Plasma normetanephrines",v:"<0.9 nmol/L"},
+                      {n:"17-OH Progesterone",v:"<200 ng/dL (follicular)"},{n:"DHEA-S (male)",v:"80-560 ug/dL"},
+                      {n:"DHEA-S (female)",v:"35-430 ug/dL"},{n:"PTH (intact)",v:"10-65 pg/mL"},
+                      {n:"PTH-rP",v:"<2.0 pmol/L"},{n:"25-OH Vit D",v:"30-100 ng/mL"},
+                      {n:"1,25-OH Vit D",v:"18-72 pg/mL"},{n:"P1NP (bone formation)",v:"20-76 ug/L"},
+                      {n:"CTX (bone resorption)",v:"<573 pg/mL"},{n:"Prolactin (male)",v:"2-18 ng/mL"},
+                      {n:"Prolactin (female)",v:"2-29 ng/mL"},{n:"IGF-1 (20-40yr)",v:"115-355 ng/mL"},
+                      {n:"GH (fasting)",v:"<5 ng/mL"},{n:"GH nadir (OGTT)",v:"<0.4 ng/mL"},
+                      {n:"LH (male)",v:"1.7-8.6 IU/L"},{n:"FSH (male)",v:"1.5-12.4 IU/L"},
+                      {n:"Testosterone (male)",v:"300-1000 ng/dL"},{n:"Free testosterone",v:"50-210 pg/mL"},
+                      {n:"Testosterone (female)",v:"15-70 ng/dL"},{n:"Estradiol (postmeno)",v:"<10-20 pg/mL"},
+                      {n:"AMH (reproductive age)",v:"1.0-3.5 ng/mL"},
+                    ]},
+                    {cat:"Lipidology",color:"#10B981",labs:[
+                      {n:"Total cholesterol",v:"<200 mg/dL (desirable)"},{n:"LDL-C optimal",v:"<100 mg/dL"},
+                      {n:"LDL-C high risk target",v:"<70 mg/dL"},{n:"LDL-C extreme risk",v:"<55 mg/dL"},
+                      {n:"HDL-C (male)",v:">40 mg/dL"},{n:"HDL-C (female)",v:">50 mg/dL"},
+                      {n:"HDL-C protective",v:">60 mg/dL"},{n:"Triglycerides normal",v:"<150 mg/dL"},
+                      {n:"TG borderline",v:"150-199 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},
+                      {n:"TG very high (pancreatitis risk)",v:">=500 mg/dL"},
+                      {n:"Non-HDL cholesterol target",v:"<130 mg/dL"},{n:"VLDL",v:"2-30 mg/dL"},
+                      {n:"Apo B",v:"<90 mg/dL"},{n:"Apo B (high risk target)",v:"<80 mg/dL"},
+                      {n:"Apo A-I",v:"120-180 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL (<75 nmol/L)"},
+                      {n:"Lp(a) high risk",v:">50 mg/dL (>125 nmol/L)"},
+                      {n:"hs-CRP (low CV risk)",v:"<1.0 mg/L"},{n:"hs-CRP (high CV risk)",v:">3.0 mg/L"},
+                      {n:"Omega-3 index (target)",v:">8%"},
+                    ]},
+                    {cat:"Rheumatology",color:"#F59E0B",labs:[
+                      {n:"ANA (screening)",v:"<1:40 (negative)"},{n:"Anti-dsDNA",v:"<30 IU/mL"},
+                      {n:"Anti-Smith",v:"Negative (specific SLE)"},{n:"Anti-Ro/SSA",v:"Negative"},
+                      {n:"Anti-La/SSB",v:"Negative"},{n:"Anti-Scl-70",v:"Negative (diffuse SSc)"},
+                      {n:"Anti-centromere",v:"Negative (limited SSc)"},{n:"Anti-Jo-1",v:"Negative (myositis)"},
+                      {n:"RF (IgM)",v:"<14 IU/mL"},{n:"Anti-CCP",v:"<20 U/mL"},
+                      {n:"c-ANCA/PR3",v:"Negative (GPA)"},{n:"p-ANCA/MPO",v:"Negative (MPA/EGPA)"},
+                      {n:"Anti-GBM",v:"Negative"},{n:"C3 complement",v:"90-180 mg/dL"},
+                      {n:"C4 complement",v:"16-47 mg/dL"},{n:"CH50",v:"41-90 U/mL"},
+                      {n:"Antiphospholipid Ab",v:"<20 GPL"},{n:"Anti-beta2-GP1",v:"<20 U/mL"},
+                      {n:"Lupus anticoagulant",v:"Negative"},{n:"HLA-B27",v:"Negative"},
+                      {n:"Uric acid (gout treatment target)",v:"<6.0 mg/dL"},
+                      {n:"Synovial WBC (non-inflam)",v:"<2,000/uL"},
+                      {n:"Synovial WBC (inflammatory)",v:"2,000-50,000/uL"},
+                      {n:"Synovial WBC (septic)",v:">50,000/uL"},
+                      {n:"CPK (myositis)",v:">10x ULN"},{n:"Aldolase",v:"1.0-7.5 U/L"},
+                    ]},
+                    {cat:"Urology",color:"#6366F1",labs:[
+                      {n:"PSA (total)",v:"<4.0 ng/mL"},{n:"PSA (40-49yr)",v:"<2.5 ng/mL"},
+                      {n:"PSA (50-59yr)",v:"<3.5 ng/mL"},{n:"Free PSA ratio",v:">25% (lower PCa risk)"},
+                      {n:"Urine Alb/Cr ratio (normal)",v:"<30 mg/g"},
+                      {n:"Microalbuminuria",v:"30-300 mg/g"},
+                      {n:"Macroalbuminuria",v:">300 mg/g"},{n:"Urine protein/Cr normal",v:"<0.2"},
+                      {n:"Nephrotic range proteinuria",v:">3.5 g/day"},{n:"Urine pH",v:"4.5-8.0"},
+                      {n:"Specific gravity",v:"1.005-1.030"},{n:"FENa",v:"<1% prerenal / >2% intrinsic"},
+                      {n:"FEUrea",v:"<35% prerenal"},{n:"24hr urine Ca",v:"100-300 mg/day"},
+                      {n:"24hr urine oxalate",v:"<40 mg/day"},{n:"24hr urine uric acid",v:"<800 mg/day"},
+                      {n:"24hr urine citrate",v:">320 mg/day"},{n:"Urine osmolality",v:"50-1200 mOsm/kg"},
+                      {n:"Semen volume",v:">1.5 mL"},{n:"Sperm concentration",v:">16M/mL"},
+                      {n:"Sperm motility",v:">42%"},{n:"Sperm morphology (Kruger)",v:">4% normal"},
+                    ]},
+                    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
+                      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},
+                      {n:"PaO2",v:"75-100 mmHg"},{n:"HCO3",v:"22-26 mEq/L"},
+                      {n:"O2 saturation",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
+                      {n:"Anion gap",v:"8-12 mEq/L"},{n:"Delta-delta ratio",v:"1-2 = pure AGMA"},
+                      {n:"A-a gradient (normal)",v:"Age/4 + 4 mmHg"},
+                      {n:"P/F ratio normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
+                      {n:"P/F moderate ARDS",v:"100-200"},{n:"P/F severe ARDS",v:"<100"},
+                    ]},
+                    {cat:"CSF",color:"#14B8A6",labs:[
+                      {n:"Opening pressure",v:"70-180 mmH2O"},{n:"WBC",v:"0-5 cells/uL"},
+                      {n:"Protein",v:"15-45 mg/dL"},{n:"Glucose",v:"45-80 mg/dL"},
+                      {n:"CSF:serum glucose",v:">0.6"},{n:"Bacterial: WBC",v:">1000/uL PMN"},
+                      {n:"Viral: WBC",v:"10-500/uL lymphocytes"},
+                      {n:"IgG index",v:"<0.7"},{n:"Oligoclonal bands",v:"Negative"},
+                    ]},
+                  ];
+
+                  const CALCS=[
+                    {n:"Anion Gap",f:"Na - (Cl + HCO3)",v:"Normal 8-12 mEq/L",note:"Corrected AG = AG + 2.5 x (4 - albumin)"},
+                    {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL",note:"Add 0.8 mg/dL per 1 g/dL drop in albumin below 4"},
+                    {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose - 100) / 100]",v:"Normal 136-145 mEq/L",note:"For hyperglycemia; add 2.4 mEq/L per 100 mg/dL glucose >100"},
+                    {n:"CrCl (Cockcroft-Gault)",f:"[(140-age) x wt(kg)] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese patients"},
+                    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics - use FEUrea instead"},
+                    {n:"FEUrea",f:"(uUrea x pCr) / (pUrea x uCr) x 100",v:"<35% prerenal",note:"More reliable than FENa when diuretics are used"},
+                    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 suggests toxic alcohols (methanol, ethylene glycol, isopropanol)"},
+                    {n:"Winter's Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 (+/-2)",v:"Validates resp compensation for met acidosis",note:"PaCO2 lower than expected = concurrent resp alkalosis"},
+                    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal <Age/4 + 4 mmHg",note:"Elevated in V/Q mismatch, shunt, diffusion impairment"},
+                    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = concurrent non-AG acidosis; >2 = concurrent met alkalosis"},
+                    {n:"MELD Score",f:"3.78 x ln(bili) + 11.2 x ln(INR) + 9.57 x ln(Cr) + 6.43",v:"Score 6-40+; >=15 consider transplant",note:"Predicts 90-day mortality in cirrhosis"},
+                    {n:"Child-Pugh Score",f:"Bili + Albumin + INR + Ascites + Encephalopathy",v:"A(5-6) compensated / B(7-9) / C(10-15) decompensated",note:"Class C ~35% 1-year survival"},
+                    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke/TIA(x2)+Vasc+Age65-74+Female",v:"0=low / 1=consider / >=2 anticoagulate",note:"DOAC preferred over warfarin in non-valvular AF"},
+                    {n:"HAS-BLED",f:"HTN+Abnl renal/liver+Stroke+Bleed hx+Labile INR+Elderly+Drugs",v:">=3 = high bleeding risk",note:"High score does NOT contraindicate anticoagulation"},
+                    {n:"HEART Score",f:"History+ECG+Age+Risk factors+Troponin (each 0-2 pts)",v:"0-3 low / 4-6 mod / 7-10 high",note:"Low score: safe for early discharge; high: early intervention"},
+                    {n:"Wells Score (PE)",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high",note:"Low + neg D-dimer rules out PE; high = CTPA"},
+                    {n:"Wells Score (DVT)",f:"Cancer+Paralysis+Bedridden+Tenderness+Swelling+Calf>3cm+Edema+Collateral+Prior DVT - Alt dx(2)",v:"<2 low / >=2 high",note:"High = proceed to compression ultrasound"},
+                    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpatient / 2 admit / >=3 ICU consider",note:"Score 3+ = >14% 30-day mortality"},
+                    {n:"BISAP (Pancreatitis)",f:"BUN>25+Mental status+SIRS+Age>60+Pleural effusion",v:"0-2 low / >=3 high risk organ failure",note:"Score >=3: 5-20% mortality"},
+                    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 point increase = organ dysfunction",note:"Septic shock: SOFA>=2 + vasopressors + lactate>2"},
+                    {n:"qSOFA",f:"RR>=22(1)+Altered mentation(1)+SBP<=100(1)",v:">=2 = high risk of poor outcome",note:"Bedside sepsis screening tool outside ICU"},
+                    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Secondary osteoporosis+Alcohol+BMD",v:"10-yr fracture risk (%)",note:"Treat: hip Fx risk >=3% or major Fx >=20%"},
+                    {n:"Corrected QTc",f:"QT / sqrt(RR interval in seconds)",v:"Normal <440ms male / <460ms female",note:">500ms = high risk Torsades de Pointes"},
+                    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9 / Overweight 25-29.9 / Obese >=30",note:"Severe obesity >=40; Class III >=40"},
+                    {n:"Ideal Body Weight (male)",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Reference for drug dosing",note:"Female: 45.5 kg + 2.3 kg per inch over 5 feet"},
+                    {n:"ABCD2 Score (TIA)",f:"Age>=60+BP>=140/90+Clinical features+Duration+DM",v:"0-3 low / 4-5 mod / 6-7 high",note:"High score: 2-day stroke risk ~8%"},
+                    {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal; ARDS mild 200-300 / mod 100-200 / severe <100",note:"FiO2 on room air = 0.21"},
+                  ];
+
+                  return(
+                    <div>
+                      <div style={{display:"flex",gap:4,marginBottom:10}}>
+                        <button onClick={()=>setLabTab("labs")} style={{flex:1,padding:"5px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#64748b",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                          {labTab==="labs"?"🔬 Labs":"🔬 Labs"}
+                        </button>
+                        <button onClick={()=>setLabTab("calcs")} style={{flex:1,padding:"5px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#64748b",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                          {labTab==="calcs"?"🧮 Calcs":"🧮 Calcs"}
+                        </button>
+                      </div>
+
+                      {labTab==="labs"&&(
+                        <div>
+                          {LAB_DATA.map(section=>(
+                            <div key={section.cat} style={{marginBottom:4}}>
+                              <button onClick={()=>setOpenCat(openCat===section.cat?null:section.cat)}
+                                style={{width:"100%",textAlign:"left",padding:"5px 8px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#94a3b8",fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                                <span>{section.cat}</span><span style={{fontSize:9}}>{openCat===section.cat?"hide":"show"}</span>
+                              </button>
+                              {openCat===section.cat&&(
+                                <div style={{padding:"4px 0",maxHeight:260,overflowY:"auto"}}>
+                                  {section.labs.map(lab=>(
+                                    <div key={lab.n} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                                      <span style={{fontSize:10,color:"#64748b",flex:1,lineHeight:1.4}}>{lab.n}</span>
+                                      <span style={{fontSize:10,color:"#94a3b8",fontWeight:600,textAlign:"right",marginLeft:4,lineHeight:1.4}}>{lab.v}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {labTab==="calcs"&&(
+                        <div style={{maxHeight:460,overflowY:"auto"}}>
+                          {CALCS.map(c=>(
+                            <div key={c.n} style={{marginBottom:7,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:7,padding:"6px 8px"}}>
+                              <p style={{fontSize:10,fontWeight:800,color:GOLD,marginBottom:2}}>{c.n}</p>
+                              <p style={{fontSize:9,color:"#94a3b8",marginBottom:2,lineHeight:1.4}}>{c.f}</p>
+                              <p style={{fontSize:9,color:"#10b981",marginBottom:c.note?2:0,lineHeight:1.3}}>{c.v}</p>
+                              {c.note&&<p style={{fontSize:9,color:"#475569",lineHeight:1.3}}>{c.note}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
               </div>
 
-              {/* RIGHT — main content */}
+              {/* RIGHT — main content */}}
               <div style={{flex:1,minWidth:0}}>
 
             {/* Setup panel — only show when no active question */}
