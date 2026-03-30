@@ -316,9 +316,9 @@ function App(){
               style={{background:"transparent",border:`1px solid #334155`,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
               Subscriber Sign In
             </button>
-            <button onClick={()=>window.location.href=PAYMENT_LINKS.resident}
+            <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
               style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
-              Start Free Trial →
+              View Plans →
             </button>
           </div>
         </div>
@@ -340,7 +340,7 @@ function App(){
           Built by <strong style={{color:"#e2e8f0"}}>Dr. Anteneh Zenebe, MD, FACE</strong> — Assistant Clinical Professor & Associate Program Director, Howard University College of Medicine
         </p>
         <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:14}}>
-          <button onClick={()=>window.location.href=PAYMENT_LINKS.resident}
+          <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
             style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16,boxShadow:`0 0 30px rgba(201,168,76,0.2)`}}>
             Start 14-Day Free Trial →
           </button>
@@ -614,7 +614,7 @@ function App(){
               <div style={{fontSize:12,fontWeight:600,color:"#f1f5f9"}}>{uname}</div>
               <div style={{fontSize:10,color:"#475569"}}>{user?.email}</div>
             </div>
-            <button onClick={logout} style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Sign Out</button>
+            <button onClick={logout} style={{background:"transparent",border:`1px solid ${BDR}`,color:"#94a3b8",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Sign Out</button>
           </div>
         </div>
       </nav>
@@ -665,6 +665,46 @@ function App(){
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 AI MCQ Generator</h2>
             <p style={{color:"#475569",marginBottom:18,fontSize:13}}>One question at a time · Unlimited questions · Study or timed exam mode</p>
 
+            {/* Two-column layout: sidebar + main content */}
+            <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
+
+              {/* LEFT SIDEBAR — always visible */}
+              <div style={{width:220,flexShrink:0,background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:16,position:"sticky",top:70}}>
+                <p style={{fontSize:11,fontWeight:700,color:"#64748b",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
+                {LEVELS.map(x=>(
+                  <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
+                    style={{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:7,border:`1px solid ${lvl.l===x.l?GOLD:BDR}`,background:lvl.l===x.l?`rgba(201,168,76,0.1)`:"transparent",color:lvl.l===x.l?GOLD:"#64748b",fontSize:12,fontWeight:lvl.l===x.l?700:400,cursor:"pointer",marginBottom:5,transition:"all 0.2s"}}>
+                    {x.l}
+                  </button>
+                ))}
+
+                <div style={{height:1,background:BDR,margin:"14px 0"}}/>
+
+                <p style={{fontSize:11,fontWeight:700,color:"#64748b",marginBottom:10,letterSpacing:1}}>SPECIALTY</p>
+                {Object.keys(GROUPS).map(g=>(
+                  <button key={g} onClick={()=>{setGrp(g);setTopic(GROUPS[g][0]);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
+                    style={{width:"100%",textAlign:"left",padding:"6px 10px",borderRadius:7,border:`1px solid ${grp===g?GOLD:BDR}`,background:grp===g?`rgba(201,168,76,0.08)`:"transparent",color:grp===g?GOLD:"#64748b",fontSize:11,fontWeight:grp===g?700:400,cursor:"pointer",marginBottom:4,transition:"all 0.2s"}}>
+                    {g}
+                  </button>
+                ))}
+
+                {grp&&GROUPS[grp].length>1&&(
+                  <>
+                    <div style={{height:1,background:BDR,margin:"10px 0"}}/>
+                    <p style={{fontSize:11,fontWeight:700,color:"#64748b",marginBottom:8,letterSpacing:1}}>TOPIC</p>
+                    {GROUPS[grp].map(t=>(
+                      <button key={t} onClick={()=>{setTopic(t);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
+                        style={{width:"100%",textAlign:"left",padding:"5px 10px",borderRadius:6,border:"none",background:topic===t?`rgba(201,168,76,0.08)`:"transparent",color:topic===t?GOLD:"#475569",fontSize:11,fontWeight:topic===t?700:400,cursor:"pointer",marginBottom:2,transition:"all 0.2s"}}>
+                        {t}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              {/* RIGHT — main content */}
+              <div style={{flex:1,minWidth:0}}>
+
             {/* Setup panel — only show when no active question */}
             {qs.length===0&&!busy&&(
               <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,marginBottom:18}}>
@@ -679,28 +719,9 @@ function App(){
                   </button>
                 </div>
 
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:14}}>
-                  <div>
-                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>SPECIALTY</label>
-                    <select value={grp} onChange={e=>{setGrp(e.target.value);setTopic(GROUPS[e.target.value][0]);}}
-                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                      {Object.keys(GROUPS).map(g=><option key={g}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>TOPIC</label>
-                    <select value={topic} onChange={e=>setTopic(e.target.value)}
-                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                      {GROUPS[grp].map(t=><option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>BOARD LEVEL</label>
-                    <select value={lvl.l} onChange={e=>setLvl(LEVELS.find(x=>x.l===e.target.value))}
-                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                      {LEVELS.map(x=><option key={x.l}>{x.l}</option>)}
-                    </select>
-                  </div>
+                <div style={{background:"rgba(201,168,76,0.06)",border:`1px solid ${GOLD}44`,borderRadius:9,padding:"10px 14px",marginBottom:14}}>
+                  <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>📌 Selected: <span style={{color:"#f1f5f9"}}>{grp} → {topic}</span></p>
+                  <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Board level: {lvl.l} · Change selections in the left panel</p>
                 </div>
 
                 <button onClick={generate} disabled={busy}
@@ -731,7 +752,7 @@ function App(){
                 {/* ✅ FIX 3: Single onClick, no duplicate, no setSessionCount */}
                 <button
                   onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);setQNum(0);setScore({t:0,c:0,s:0});}}
-                  style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:11,marginLeft:"auto"}}>
+                  style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700,marginLeft:"auto"}}>
                   ✕ End Session
                 </button>
               </div>
@@ -796,6 +817,8 @@ function App(){
                 </div>
               );}catch(e){return <div style={{color:"#ef4444",padding:20}}>Error displaying question. Please click End Session and try again.</div>;}
             })()}
+              </div>{/* end right column */}
+            </div>{/* end two-column layout */}
           </div>
         )}
 
