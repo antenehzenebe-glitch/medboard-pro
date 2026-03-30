@@ -5,6 +5,5 @@
 [functions]
   node_bundler = "esbuild"
 
-[[functions]]
-  path = "/api/generate-mcq"
-  timeout = 30
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
