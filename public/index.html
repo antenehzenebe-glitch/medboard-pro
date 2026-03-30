@@ -117,6 +117,7 @@ function App(){
   const [topic,setTopic]=React.useState("Random — All Specialties");
   const [lvl,setLvl]=React.useState(LEVELS[3]);
   const [cnt,setCnt]=React.useState(5);
+  const [currentQ,setCurrentQ]=React.useState(0);
   const [examMode,setExamMode]=React.useState(false);
   const [tLeft,setTLeft]=React.useState(null);
   const [tActive,setTActive]=React.useState(false);
@@ -211,6 +212,7 @@ function App(){
       const data=await res.json();
       if(!Array.isArray(data))throw new Error("Invalid response format");
       setQs(data);
+    setCurrentQ(0);
       setScore(s=>({...s,s:s.s+1}));
       if(examMode)startT(data.length,data);
     }catch(e){
@@ -622,139 +624,168 @@ function App(){
         {tab==="mcq"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 AI MCQ Generator</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Random or topic-specific · Study mode or timed exam · 5 board levels · Multiples of 5</p>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Random or topic-specific · Study mode or timed exam · 5 board levels · One question at a time</p>
 
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,marginBottom:18}}>
-              {/* Mode selector */}
-              <div style={{display:"flex",gap:10,marginBottom:16}}>
-                <button onClick={()=>setExamMode(false)}
-                  style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${!examMode?"#10b981":BDR}`,background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                  📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback after each answer</span>
-                </button>
-                <button onClick={()=>setExamMode(true)}
-                  style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${examMode?"#ef4444":BDR}`,background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                  ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit on timeout</span>
-                </button>
-              </div>
+            {/* Setup panel — only show when no questions loaded */}
+            {qs.length===0&&(
+              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,marginBottom:18}}>
+                {/* Mode selector */}
+                <div style={{display:"flex",gap:10,marginBottom:16}}>
+                  <button onClick={()=>setExamMode(false)}
+                    style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${!examMode?"#10b981":BDR}`,background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
+                    📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback after each answer</span>
+                  </button>
+                  <button onClick={()=>setExamMode(true)}
+                    style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${examMode?"#ef4444":BDR}`,background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
+                    ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit on timeout</span>
+                  </button>
+                </div>
 
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:14}}>
-                <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>SPECIALTY</label>
-                  <select value={grp} onChange={e=>{setGrp(e.target.value);setTopic(GROUPS[e.target.value][0]);}}
-                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                    {Object.keys(GROUPS).map(g=><option key={g}>{g}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>TOPIC</label>
-                  <select value={topic} onChange={e=>setTopic(e.target.value)}
-                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                    {GROUPS[grp].map(t=><option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>BOARD LEVEL</label>
-                  <select value={lvl.l} onChange={e=>setLvl(LEVELS.find(x=>x.l===e.target.value))}
-                    style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                    {LEVELS.map(x=><option key={x.l}>{x.l}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>QUESTIONS (×5)</label>
-                  <div style={{display:"flex",gap:5}}>
-                    {[5,10,15,20].map(n=>(
-                      <button key={n} onClick={()=>setCnt(n)}
-                        style={{flex:1,padding:"8px 0",borderRadius:7,border:`1px solid ${cnt===n?GOLD:BDR}`,background:cnt===n?`rgba(201,168,76,0.15)`:"transparent",color:cnt===n?GOLD:"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                        {n}
-                      </button>
-                    ))}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:14}}>
+                  <div>
+                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>SPECIALTY</label>
+                    <select value={grp} onChange={e=>{setGrp(e.target.value);setTopic(GROUPS[e.target.value][0]);}}
+                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                      {Object.keys(GROUPS).map(g=><option key={g}>{g}</option>)}
+                    </select>
                   </div>
-                  {examMode&&<p style={{fontSize:11,color:"#ef4444",marginTop:4}}>⏱️ {cnt*1.5} min total exam time</p>}
+                  <div>
+                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>TOPIC</label>
+                    <select value={topic} onChange={e=>setTopic(e.target.value)}
+                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                      {GROUPS[grp].map(t=><option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>BOARD LEVEL</label>
+                    <select value={lvl.l} onChange={e=>setLvl(LEVELS.find(x=>x.l===e.target.value))}
+                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                      {LEVELS.map(x=><option key={x.l}>{x.l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>SESSION LENGTH</label>
+                    <select value={cnt} onChange={e=>setCnt(Number(e.target.value))}
+                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
+                      <option value={5}>5 questions</option>
+                      <option value={10}>10 questions</option>
+                      <option value={15}>15 questions</option>
+                      <option value={20}>20 questions</option>
+                    </select>
+                    {examMode&&<p style={{fontSize:11,color:"#ef4444",marginTop:4}}>⏱️ {cnt*1.5} min total</p>}
+                  </div>
                 </div>
-              </div>
 
-              <button onClick={generate} disabled={busy}
-                style={{width:"100%",background:busy?"#334155":examMode?`linear-gradient(135deg,#7f1d1d,#b91c1c)`:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${examMode?"#ef4444":GOLD}`,color:busy?"#64748b":"#fff",padding:"13px",borderRadius:9,cursor:busy?"not-allowed":"pointer",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
-                {busy?"⏳ Generating questions... (~8 seconds)":examMode?`⏱️ Start Exam — ${cnt} Questions · ${cnt*1.5} Minutes`:`⚡ Start Study Session — ${cnt} Questions`}
-              </button>
-            </div>
+                <button onClick={generate} disabled={busy}
+                  style={{width:"100%",background:busy?"#334155":examMode?`linear-gradient(135deg,#7f1d1d,#b91c1c)`:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${examMode?"#ef4444":GOLD}`,color:busy?"#64748b":"#fff",padding:"13px",borderRadius:9,cursor:busy?"not-allowed":"pointer",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
+                  {busy?"⏳ Generating questions... (~8 seconds)":examMode?`⏱️ Start Exam — ${cnt} Questions · ${cnt*1.5} Minutes`:`⚡ Start Study Session — ${cnt} Questions`}
+                </button>
+              </div>
+            )}
 
             {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}</div>}
 
-            {/* Timer bar */}
-            {examMode&&qs.length>0&&(
-              <div style={{background:CARD,border:`1px solid ${tActive?"#ef4444":BDR}`,borderRadius:11,padding:"13px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                <div style={{fontSize:24,fontWeight:800,color:tLeft<60?"#ef4444":tLeft<180?"#f59e0b":"#10b981",fontFamily:"monospace"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</div>
-                <div style={{flex:1,minWidth:180}}>
-                  <div style={{height:7,background:"#1e293b",borderRadius:4,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:tLeft!==null?`${(tLeft/(cnt*SECS))*100}%`:"100%",background:tLeft<60?"#ef4444":tLeft<180?"#f59e0b":"#10b981",borderRadius:4,transition:"width 1s linear"}}/>
+            {/* Progress bar when questions loaded */}
+            {qs.length>0&&(
+              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:"#64748b"}}>Question</span>
+                <span style={{fontWeight:800,color:GOLD,fontSize:16}}>{currentQ+1} of {qs.length}</span>
+                <div style={{flex:1,minWidth:150}}>
+                  <div style={{height:6,background:"#1e293b",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${((currentQ+1)/qs.length)*100}%`,background:`linear-gradient(90deg,${NAVY},${GOLD})`,borderRadius:3,transition:"width 0.3s"}}/>
                   </div>
                 </div>
-                <span style={{fontSize:12,color:"#64748b"}}>{st}/{qs.length} answered</span>
-                {tActive&&<button onClick={()=>{stopT();revealAll(qs);}} style={{background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:600}}>End Exam Early</button>}
-                {!tActive&&tLeft===0&&<span style={{color:"#ef4444",fontWeight:700,fontSize:13}}>⏰ Time's up! Review your answers below.</span>}
+                {st>0&&<span style={{fontSize:13,color:ss/st>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{ss}/{st} correct ({Math.round(ss/st*100)}%)</span>}
+                {/* Timer for exam mode */}
+                {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
+                <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);}}
+                  style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>
+                  ✕ End Session
+                </button>
               </div>
             )}
 
-            {/* Score tracker */}
-            {st>0&&(
-              <div style={{background:"rgba(201,168,76,0.08)",border:`1px solid ${GOLD}`,borderRadius:9,padding:"10px 16px",marginBottom:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:16}}>📊</span>
-                <span style={{fontWeight:700,color:GOLD,fontSize:15}}>Score: {ss}/{st}</span>
-                <span style={{color:"#64748b",fontSize:13}}>({Math.round(ss/st*100)}%)</span>
-                <span style={{color:"#475569",fontSize:12}}>· {qs.length-st} question{qs.length-st!==1?"s":""} remaining</span>
-              </div>
-            )}
+            {/* Single question display */}
+            {qs.length>0&&currentQ<qs.length&&(()=>{
+              const q=qs[currentQ];
+              const i=currentQ;
+              return(
+                <div style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                    <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"2px 10px",fontSize:12,fontWeight:700}}>Q{i+1}</span>
+                    <span style={{fontSize:12,color:"#334155"}}>of {qs.length}</span>
+                    {rev[i]&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
+                    {rev[i]&&<span style={{marginLeft:"auto",fontSize:13,fontWeight:700,color:sel[i]===q.correct?"#10b981":"#ef4444"}}>{sel[i]===q.correct?"✓ Correct":"✗ Incorrect"}</span>}
+                  </div>
 
-            {/* Questions */}
-            {qs.map((q,i)=>(
-              <div key={i} style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:22,marginBottom:16,transition:"border-color 0.3s"}}>
-                <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:13,flexWrap:"wrap"}}>
-                  <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:700,flexShrink:0,marginTop:2}}>Q{i+1}</span>
-                  {q.topic&&rev[i]&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 9px",fontSize:11,flexShrink:0}}>{q.topic}</span>}
-                  <p style={{margin:0,lineHeight:1.8,fontSize:14,color:"#e2e8f0",flex:1,minWidth:200}}>{q.stem}</p>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:13}}>
-                  {Object.entries(q.choices).map(([l,t])=>(
-                    <button key={l} onClick={()=>{if(!rev[i])setSel(p=>({...p,[i]:l}));}}
-                      style={{textAlign:"left",padding:"11px 14px",borderRadius:9,cursor:rev[i]?"default":"pointer",
-                        border:`1px solid ${qColor(i,l)==="transparent"?BDR:qColor(i,l)}`,
-                        background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":`${qColor(i,l)}22`,
-                        color:rev[i]&&l===q.correct?"#10b981":rev[i]&&sel[i]===l?"#ef4444":"#cbd5e1",
-                        fontWeight:sel[i]===l?700:400,fontSize:13,transition:"all 0.2s"}}>
-                      <span style={{fontWeight:800,marginRight:9}}>{l}.</span>{t}
-                      {rev[i]&&l===q.correct&&<span style={{marginLeft:8,color:"#10b981"}}>✓ Correct</span>}
-                      {rev[i]&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,color:"#ef4444"}}>✗ Incorrect</span>}
-                    </button>
-                  ))}
-                </div>
-                {!rev[i]?(
-                  <div style={{display:"flex",gap:9,alignItems:"center"}}>
-                    <button onClick={()=>reveal(i)} disabled={!sel[i]}
-                      style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"9px 22px",borderRadius:7,cursor:sel[i]?"pointer":"not-allowed",fontWeight:600,fontSize:13,transition:"all 0.2s"}}>
-                      {examMode?"Submit & Next →":"Submit Answer"}
-                    </button>
-                    {!sel[i]&&<span style={{fontSize:12,color:"#334155"}}>Select an answer above first</span>}
+                  <p style={{margin:"0 0 20px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
+
+                  <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+                    {Object.entries(q.choices).map(([l,t])=>(
+                      <button key={l} onClick={()=>{if(!rev[i])setSel(p=>({...p,[i]:l}));}}
+                        style={{textAlign:"left",padding:"12px 16px",borderRadius:9,cursor:rev[i]?"default":"pointer",
+                          border:`1px solid ${qColor(i,l)==="transparent"?BDR:qColor(i,l)}`,
+                          background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":`${qColor(i,l)}22`,
+                          color:rev[i]&&l===q.correct?"#10b981":rev[i]&&sel[i]===l?"#ef4444":"#cbd5e1",
+                          fontWeight:sel[i]===l?700:400,fontSize:14,transition:"all 0.2s"}}>
+                        <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
+                        {rev[i]&&l===q.correct&&<span style={{marginLeft:8,fontSize:12}}>✓</span>}
+                        {rev[i]&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12}}>✗</span>}
+                      </button>
+                    ))}
                   </div>
-                ):(
-                  <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:9,padding:14,marginTop:4}}>
-                    <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
-                    <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:13}}>{q.explanation}</p>
+
+                  {/* Explanation — shown after answer */}
+                  {rev[i]&&(
+                    <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:9,padding:16,marginBottom:16}}>
+                      <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
+                      <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                    {!rev[i]?(
+                      <>
+                        <button onClick={()=>reveal(i)} disabled={!sel[i]}
+                          style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"10px 28px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
+                          Submit Answer
+                        </button>
+                        {!sel[i]&&<span style={{fontSize:12,color:"#334155"}}>Select an answer first</span>}
+                      </>
+                    ):(
+                      currentQ<qs.length-1?(
+                        <button onClick={()=>setCurrentQ(currentQ+1)}
+                          style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 28px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                          Next Question →
+                        </button>
+                      ):(
+                        <button onClick={()=>{
+                          setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);stopT();
+                        }}
+                          style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 28px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                          🔄 Start New Session
+                        </button>
+                      )
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })()}
 
             {/* Session complete */}
-            {qs.length>0&&st===qs.length&&(
-              <div style={{background:"rgba(201,168,76,0.08)",border:`2px solid ${GOLD}`,borderRadius:14,padding:28,textAlign:"center",marginTop:4}}>
+            {qs.length>0&&currentQ>=qs.length&&(
+              <div style={{background:"rgba(201,168,76,0.08)",border:`2px solid ${GOLD}`,borderRadius:14,padding:28,textAlign:"center"}}>
                 <div style={{fontSize:44,marginBottom:12}}>🎓</div>
                 <h3 style={{fontWeight:800,fontSize:20,marginBottom:8,color:"#f1f5f9"}}>Session Complete!</h3>
                 <p style={{color:GOLD,fontSize:24,fontWeight:800,marginBottom:6}}>{ss}/{qs.length} Correct · {Math.round(ss/qs.length*100)}%</p>
                 <p style={{color:"#64748b",fontSize:14,marginBottom:22}}>
-                  {ss/qs.length>=0.8?"🏆 Excellent performance! You are well prepared.":ss/qs.length>=0.6?"📈 Good progress — review the missed questions above.":"💪 Keep practicing — consistency leads to board success."}
+                  {ss/qs.length>=0.8?"🏆 Excellent! You are well prepared.":ss/qs.length>=0.6?"📈 Good — review the missed questions.":"💪 Keep practicing — consistency leads to success."}
                 </p>
-                <button onClick={generate} style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"12px 32px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:14}}>🔄 Start New Session</button>
+                <button onClick={generate}
+                  style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"12px 32px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                  🔄 Start New Session
+                </button>
               </div>
             )}
           </div>
