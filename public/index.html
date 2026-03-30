@@ -106,7 +106,7 @@ function App(){
   const [nm,setNm]=React.useState("");
   const [authErr,setAuthErr]=React.useState("");
   const [authBusy,setAuthBusy]=React.useState(false);
-  const [tab,setTab]=React.useState("home");
+  const [tab,setTab]=React.useState("mcq");
   const [annual,setAnnual]=React.useState(false);
   const [openFaq,setOpenFaq]=React.useState(null);
   const [waitEmail,setWaitEmail]=React.useState("");
@@ -148,10 +148,12 @@ function App(){
     return()=>subscription.unsubscribe();
   },[]);
 
+  // After successful auth go directly to app
   const login=async()=>{
     setAuthErr("");setAuthBusy(true);
     const{error}=await sb.auth.signInWithPassword({email,password:pw});
     if(error){setAuthErr(error.message);}
+    else{setScreen("app");setTab("mcq");} // Go straight to MCQs
     setAuthBusy(false);
   };
 
@@ -673,7 +675,7 @@ function App(){
 
               <button onClick={generate} disabled={busy}
                 style={{width:"100%",background:busy?"#334155":examMode?`linear-gradient(135deg,#7f1d1d,#b91c1c)`:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${examMode?"#ef4444":GOLD}`,color:busy?"#64748b":"#fff",padding:"13px",borderRadius:9,cursor:busy?"not-allowed":"pointer",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
-                {busy?"⏳ Generating board-quality questions...":examMode?`⏱️ Start Exam — ${cnt} Questions · ${cnt*1.5} Minutes`:`⚡ Start Study Session — ${cnt} Questions`}
+                {busy?"⏳ Generating questions... (~8 seconds)":examMode?`⏱️ Start Exam — ${cnt} Questions · ${cnt*1.5} Minutes`:`⚡ Start Study Session — ${cnt} Questions`}
               </button>
             </div>
 
