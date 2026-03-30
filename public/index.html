@@ -281,8 +281,8 @@ function App(){
       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 12px",border:"none",borderRadius:8,cursor:"pointer",
         background:tab===id?`rgba(201,168,76,0.12)`:"transparent",
         borderBottom:tab===id?`2px solid ${GOLD}`:"2px solid transparent",
-        color:tab===id?GOLD:"#64748b",fontWeight:600,fontSize:11,transition:"all 0.2s",minWidth:52}}>
-      <span style={{fontSize:18}}>{icon}</span>{label}
+        color:tab===id?GOLD:"#94a3b8",fontWeight:700,fontSize:13,transition:"all 0.2s",minWidth:60}}>
+      <span style={{fontSize:20}}>{icon}</span>{label}
     </button>
   );
 
@@ -370,7 +370,7 @@ function App(){
           <p style={{textAlign:"center",color:"#475569",marginBottom:48,fontSize:15}}>From M2 shelf exams to subspecialty boards — one platform covers the full training continuum</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:20}}>
             {[
-              {icon:"🎯",title:"AI MCQ Generator",desc:"500+ topics. Fresh clinical vignettes generated on demand. Each question cites specific guidelines and textbooks. Questions never repeat."},
+              {icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 & 3. Fresh clinical vignettes generated on demand. Each question cites specific guidelines and textbooks. Questions never repeat."},
               {icon:"⏱️",title:"Study & Exam Modes",desc:"Study mode gives instant feedback after each answer. Exam mode runs 90 seconds per question with a live countdown timer — just like the real boards."},
               {icon:"🎲",title:"Random or Targeted",desc:"Generate questions on a specific topic or let the AI pick randomly across all specialties — perfect for simulating the real board exam experience."},
               {icon:"🔬",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US & European societies. Always the most current evidence."},
@@ -635,7 +635,7 @@ function App(){
             </div>
             <h3 style={{fontSize:16,fontWeight:700,marginBottom:14,color:"#f1f5f9"}}>Quick Actions</h3>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:24}}>
-              {[{icon:"🎯",title:"Generate MCQs",desc:"AI board questions on demand",tab:"mcq",color:"#6366f1"},{icon:"📚",title:"Guidelines",desc:"Official society resources",tab:"guides",color:"#10b981"},{icon:"📊",title:"My Progress",desc:"Track performance",tab:"progress",color:"#f59e0b"},{icon:"💰",title:"DeFi Tracker",desc:"Live yield opportunities",tab:"defi",color:GOLD}].map(a=>(
+              {[{icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned board questions",tab:"mcq",color:"#6366f1"},{icon:"📚",title:"Guidelines",desc:"Official society resources",tab:"guides",color:"#10b981"},{icon:"📊",title:"My Progress",desc:"Track performance",tab:"progress",color:"#f59e0b"},{icon:"💰",title:"DeFi Tracker",desc:"Live yield opportunities",tab:"defi",color:GOLD}].map(a=>(
                 <div key={a.tab} onClick={()=>{setTab(a.tab);if(a.tab==="defi"&&!pools.length)fetchDefi();}}
                   style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:16,cursor:"pointer",transition:"border-color 0.2s"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
@@ -662,8 +662,8 @@ function App(){
 
         {tab==="mcq"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 AI MCQ Generator</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>One question at a time · Unlimited questions · Study or timed exam mode</p>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 MCQ Bank</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Unlimited · Study or timed exam mode</p>
 
             {/* Two-column layout: sidebar + main content */}
             <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
