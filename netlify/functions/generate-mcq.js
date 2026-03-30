@@ -13,16 +13,25 @@ exports.handler = async (event) => {
 
     const isRandom = topic.toLowerCase().includes("random");
     const topicPrompt = isRandom
-      ? topic.includes("Endocrinology") ? "a randomly selected endocrinology topic"
-        : topic.includes("ABIM") ? "a randomly selected ABIM Internal Medicine topic"
-        : topic.includes("USMLE") ? "a randomly selected USMLE high-yield topic"
-        : "a randomly selected medical topic — make each question a different specialty"
+      ? topic.includes("Endocrinology") ? "a random endocrinology topic"
+        : topic.includes("ABIM") ? "a random ABIM Internal Medicine topic"
+        : topic.includes("USMLE") ? "a random USMLE high-yield topic"
+        : "random medical topics — each question a different specialty"
       : `"${topic}"`;
 
-    const prompt = `Generate exactly ${count} board-style medical MCQ(s) on ${topicPrompt} at ${level} level. Use current ADA, Endocrine Society, ACC/AHA guidelines and Harrison's Principles of Internal Medicine, Williams Textbook of Endocrinology as references.
+    // Generate in batches of max 3 for speed
+    const safeCount = Math.min(count, 3);
 
-Return ONLY a valid JSON array. No text before or after. No markdown. No backticks:
-[{"stem":"A 45-year-old woman presents with...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"The correct answer is B because... per [guideline].","topic":"Topic Name"}]`;
+    const prompt = `Generate exactly ${safeCount} USMLE/ABIM board-style MCQ(s) on ${topicPrompt} at ${level} level.
+
+Rules:
+- Short clinical vignette (2-3 sentences max)
+- 5 choices A-E
+- One correct answer
+- Brief explanation (2 sentences) citing one guideline or textbook
+
+Return ONLY JSON array, no markdown:
+[{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"B","explanation":"...","topic":"..."}]`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -33,7 +42,7 @@ Return ONLY a valid JSON array. No text before or after. No markdown. No backtic
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
+        max_tokens: 2048,
         messages: [{ role: "user", content: prompt }]
       })
     });
@@ -43,25 +52,16 @@ Return ONLY a valid JSON array. No text before or after. No markdown. No backtic
     if (!response.ok) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: data.error?.message || "Anthropic API error" })
+        body: JSON.stringify({ error: data.error?.message || "API error" })
       };
     }
 
-    // Safely extract text
     const textContent = data.content && data.content[0] && data.content[0].text;
     if (!textContent) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "Empty response from AI" })
-      };
+      return { statusCode: 500, body: JSON.stringify({ error: "Empty response" }) };
     }
 
-    // Clean and parse
-    const clean = textContent
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
+    const clean = textContent.replace(/```json/g,"").replace(/```/g,"").trim();
     const questions = JSON.parse(clean);
 
     return {
