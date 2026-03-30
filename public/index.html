@@ -116,8 +116,9 @@ function App(){
   const [grp,setGrp]=React.useState("🎲 Random");
   const [topic,setTopic]=React.useState("Random — All Specialties");
   const [lvl,setLvl]=React.useState(LEVELS[3]);
-  const [cnt,setCnt]=React.useState(5);
+  const [cnt,setCnt]=React.useState(1);
   const [currentQ,setCurrentQ]=React.useState(0);
+  const [sessionCount,setSessionCount]=React.useState(0);
   const [examMode,setExamMode]=React.useState(false);
   const [tLeft,setTLeft]=React.useState(null);
   const [tActive,setTActive]=React.useState(false);
@@ -620,24 +621,22 @@ function App(){
           </div>
         )}
 
-        {/* MCQ */}
         {tab==="mcq"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 AI MCQ Generator</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Random or topic-specific · Study mode or timed exam · 5 board levels · One question at a time</p>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>One question at a time · Unlimited questions · Study or timed exam mode</p>
 
-            {/* Setup panel — only show when no questions loaded */}
-            {qs.length===0&&(
+            {/* Setup panel — only show when no active question */}
+            {qs.length===0&&!busy&&(
               <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,marginBottom:18}}>
-                {/* Mode selector */}
                 <div style={{display:"flex",gap:10,marginBottom:16}}>
                   <button onClick={()=>setExamMode(false)}
                     style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${!examMode?"#10b981":BDR}`,background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                    📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback after each answer</span>
+                    📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback</span>
                   </button>
                   <button onClick={()=>setExamMode(true)}
                     style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${examMode?"#ef4444":BDR}`,background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                    ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit on timeout</span>
+                    ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit</span>
                   </button>
                 </div>
 
@@ -663,79 +662,69 @@ function App(){
                       {LEVELS.map(x=><option key={x.l}>{x.l}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:4}}>SESSION LENGTH</label>
-                    <select value={cnt} onChange={e=>setCnt(Number(e.target.value))}
-                      style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"8px",borderRadius:7,fontSize:13}}>
-                      <option value={5}>5 questions</option>
-                      <option value={10}>10 questions</option>
-                      <option value={15}>15 questions</option>
-                      <option value={20}>20 questions</option>
-                    </select>
-                    {examMode&&<p style={{fontSize:11,color:"#ef4444",marginTop:4}}>⏱️ {cnt*1.5} min total</p>}
-                  </div>
                 </div>
 
-                <button onClick={generate} disabled={busy}
-                  style={{width:"100%",background:busy?"#334155":examMode?`linear-gradient(135deg,#7f1d1d,#b91c1c)`:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${examMode?"#ef4444":GOLD}`,color:busy?"#64748b":"#fff",padding:"13px",borderRadius:9,cursor:busy?"not-allowed":"pointer",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
-                  {busy?"⏳ Generating questions... (~8 seconds)":examMode?`⏱️ Start Exam — ${cnt} Questions · ${cnt*1.5} Minutes`:`⚡ Start Study Session — ${cnt} Questions`}
+                <button onClick={()=>generate(false)} disabled={busy}
+                  style={{width:"100%",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"14px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:15}}>
+                  {examMode?"⏱️ Start Exam Mode →":"⚡ Start Practicing →"}
                 </button>
               </div>
             )}
 
-            {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}</div>}
+            {/* Loading state */}
+            {busy&&(
+              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:40,textAlign:"center",marginBottom:18}}>
+                <div style={{fontSize:36,marginBottom:16}}>⏳</div>
+                <p style={{color:"#64748b",fontSize:15,marginBottom:8}}>Generating your question...</p>
+                <p style={{color:"#334155",fontSize:13}}>Powered by AI · ~5 seconds</p>
+              </div>
+            )}
 
-            {/* Progress bar when questions loaded */}
-            {qs.length>0&&(
-              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontSize:13,color:"#64748b"}}>Question</span>
-                <span style={{fontWeight:800,color:GOLD,fontSize:16}}>{currentQ+1} of {qs.length}</span>
-                <div style={{flex:1,minWidth:150}}>
-                  <div style={{height:6,background:"#1e293b",borderRadius:3,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${((currentQ+1)/qs.length)*100}%`,background:`linear-gradient(90deg,${NAVY},${GOLD})`,borderRadius:3,transition:"width 0.3s"}}/>
-                  </div>
-                </div>
-                {st>0&&<span style={{fontSize:13,color:ss/st>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{ss}/{st} correct ({Math.round(ss/st*100)}%)</span>}
-                {/* Timer for exam mode */}
-                {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
-                <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);}}
-                  style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>
+            {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>qs.length>0?nextQuestion():generate(true)} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
+
+            {/* Session stats bar */}
+            {sessionCount>0&&qs.length>0&&(
+              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                <span style={{fontSize:12,color:"#64748b"}}>Questions answered:</span>
+                <span style={{fontWeight:800,color:GOLD,fontSize:15}}>{score.t}</span>
+                {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
+                {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
+                <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);setSessionCount(0);setScore({t:0,c:0,s:0});}}
+                  style={{background:"transparent",border:`1px solid ${BDR}`,color:"#475569",padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:11,marginLeft:"auto"}}>
                   ✕ End Session
                 </button>
               </div>
             )}
 
-            {/* Single question display */}
-            {qs.length>0&&currentQ<qs.length&&(()=>{
-              const q=qs[currentQ];
-              const i=currentQ;
+            {/* Single question */}
+            {qs.length>0&&!busy&&(()=>{
+              const q=qs[0];
+              const i=0;
               return(
                 <div style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
                   <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                    <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"2px 10px",fontSize:12,fontWeight:700}}>Q{i+1}</span>
-                    <span style={{fontSize:12,color:"#334155"}}>of {qs.length}</span>
+                    <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {score.t+1}</span>
                     {rev[i]&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
-                    {rev[i]&&<span style={{marginLeft:"auto",fontSize:13,fontWeight:700,color:sel[i]===q.correct?"#10b981":"#ef4444"}}>{sel[i]===q.correct?"✓ Correct":"✗ Incorrect"}</span>}
+                    {rev[i]&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:sel[i]===q.correct?"#10b981":"#ef4444"}}>{sel[i]===q.correct?"✓ Correct":"✗ Incorrect"}</span>}
                   </div>
 
-                  <p style={{margin:"0 0 20px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
+                  <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
 
-                  <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
                     {Object.entries(q.choices).map(([l,t])=>(
                       <button key={l} onClick={()=>{if(!rev[i])setSel(p=>({...p,[i]:l}));}}
-                        style={{textAlign:"left",padding:"12px 16px",borderRadius:9,cursor:rev[i]?"default":"pointer",
+                        style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:rev[i]?"default":"pointer",
                           border:`1px solid ${qColor(i,l)==="transparent"?BDR:qColor(i,l)}`,
                           background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":`${qColor(i,l)}22`,
                           color:rev[i]&&l===q.correct?"#10b981":rev[i]&&sel[i]===l?"#ef4444":"#cbd5e1",
                           fontWeight:sel[i]===l?700:400,fontSize:14,transition:"all 0.2s"}}>
                         <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
-                        {rev[i]&&l===q.correct&&<span style={{marginLeft:8,fontSize:12}}>✓</span>}
-                        {rev[i]&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12}}>✗</span>}
+                        {rev[i]&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}>✓ Correct answer</span>}
+                        {rev[i]&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}>✗ Your answer</span>}
                       </button>
                     ))}
                   </div>
 
-                  {/* Explanation — shown after answer */}
                   {rev[i]&&(
                     <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:9,padding:16,marginBottom:16}}>
                       <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
@@ -743,51 +732,25 @@ function App(){
                     </div>
                   )}
 
-                  {/* Action buttons */}
                   <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                     {!rev[i]?(
                       <>
                         <button onClick={()=>reveal(i)} disabled={!sel[i]}
-                          style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"10px 28px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
+                          style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
                           Submit Answer
                         </button>
-                        {!sel[i]&&<span style={{fontSize:12,color:"#334155"}}>Select an answer first</span>}
+                        {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}
                       </>
                     ):(
-                      currentQ<qs.length-1?(
-                        <button onClick={()=>setCurrentQ(currentQ+1)}
-                          style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 28px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                          Next Question →
-                        </button>
-                      ):(
-                        <button onClick={()=>{
-                          setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);stopT();
-                        }}
-                          style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 28px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                          🔄 Start New Session
-                        </button>
-                      )
+                      <button onClick={nextQuestion}
+                        style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                        Next Question →
+                      </button>
                     )}
                   </div>
                 </div>
               );
             })()}
-
-            {/* Session complete */}
-            {qs.length>0&&currentQ>=qs.length&&(
-              <div style={{background:"rgba(201,168,76,0.08)",border:`2px solid ${GOLD}`,borderRadius:14,padding:28,textAlign:"center"}}>
-                <div style={{fontSize:44,marginBottom:12}}>🎓</div>
-                <h3 style={{fontWeight:800,fontSize:20,marginBottom:8,color:"#f1f5f9"}}>Session Complete!</h3>
-                <p style={{color:GOLD,fontSize:24,fontWeight:800,marginBottom:6}}>{ss}/{qs.length} Correct · {Math.round(ss/qs.length*100)}%</p>
-                <p style={{color:"#64748b",fontSize:14,marginBottom:22}}>
-                  {ss/qs.length>=0.8?"🏆 Excellent! You are well prepared.":ss/qs.length>=0.6?"📈 Good — review the missed questions.":"💪 Keep practicing — consistency leads to success."}
-                </p>
-                <button onClick={generate}
-                  style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"12px 32px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                  🔄 Start New Session
-                </button>
-              </div>
-            )}
           </div>
         )}
 
