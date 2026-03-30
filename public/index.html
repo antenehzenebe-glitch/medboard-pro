@@ -111,6 +111,7 @@ function App(){
   const [openFaq,setOpenFaq]=React.useState(null);
   const [waitEmail,setWaitEmail]=React.useState("");
   const [waitDone,setWaitDone]=React.useState(false);
+  const [fromStripe,setFromStripe]=React.useState(false);
 
   // MCQ
   const [grp,setGrp]=React.useState("🎲 Random");
@@ -139,6 +140,14 @@ function App(){
 
   // Auth session
   React.useEffect(()=>{
+    // ✅ Detect Stripe redirect (?subscribed=true)
+    const params=new URLSearchParams(window.location.search);
+    if(params.get("subscribed")==="true"){
+      setFromStripe(true);
+      setAuthView("signup");
+      setScreen("auth");
+      window.history.replaceState({},"","/");
+    }
     sb.auth.getSession().then(({data:{session}})=>{
       if(session?.user){setUser(session.user);setScreen("app");}
       setAuthLoading(false);
@@ -302,10 +311,16 @@ function App(){
                 onMouseEnter={e=>e.target.style.color="#f1f5f9"} onMouseLeave={e=>e.target.style.color="#94a3b8"}>{l}</a>
             ))}
           </div>
-          <button onClick={()=>setScreen("auth")}
-            style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
-            Sign In / Start Trial
-          </button>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button onClick={()=>{setAuthView("login");setScreen("auth");}}
+              style={{background:"transparent",border:`1px solid #334155`,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
+              Subscriber Sign In
+            </button>
+            <button onClick={()=>window.location.href=PAYMENT_LINKS.resident}
+              style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
+              Start Free Trial →
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -325,16 +340,17 @@ function App(){
           Built by <strong style={{color:"#e2e8f0"}}>Dr. Anteneh Zenebe, MD, FACE</strong> — Assistant Clinical Professor & Associate Program Director, Howard University College of Medicine
         </p>
         <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:14}}>
-          <button onClick={()=>setScreen("auth")}
+          <button onClick={()=>window.location.href=PAYMENT_LINKS.resident}
             style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16,boxShadow:`0 0 30px rgba(201,168,76,0.2)`}}>
             Start 14-Day Free Trial →
           </button>
           <button onClick={()=>{setAuthView("login");setScreen("auth");}}
             style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:16}}>
-            Sign In
+            Subscriber Sign In
           </button>
         </div>
-        <p style={{color:"#475569",fontSize:13,marginBottom:56}}>Credit card required · No charge until Day 15 · Cancel anytime before trial ends</p>
+        <p style={{color:"#475569",fontSize:13,marginBottom:8}}>Credit card required · No charge until Day 15 · Cancel anytime before trial ends</p>
+        <p style={{color:"#334155",fontSize:12,marginBottom:56}}>After payment, you will be redirected to create your account and access the platform immediately.</p>
 
         {/* Continuum */}
         <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
@@ -413,7 +429,7 @@ function App(){
             <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:16,padding:28,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",minHeight:180}}>
               <div style={{fontSize:32,marginBottom:12}}>✍️</div>
               <p style={{color:"#475569",fontSize:14,lineHeight:1.6}}>Be among the first to review MedBoard Pro. Early access users get 3 months free.</p>
-              <button onClick={()=>setScreen("auth")} style={{marginTop:16,background:"transparent",border:"1px solid #8b5cf6",color:"#8b5cf6",padding:"8px 18px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Join Early Access →</button>
+              <button onClick={()=>window.location.href=PAYMENT_LINKS.student} style={{marginTop:16,background:"transparent",border:"1px solid #8b5cf6",color:"#8b5cf6",padding:"8px 18px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Join Early Access →</button>
             </div>
           </div>
         </div>
@@ -449,7 +465,7 @@ function App(){
                 </ul>
                 <button onClick={()=>window.location.href=PAYMENT_LINKS[plan.key]}
                   style={{width:"100%",background:plan.badge==="MOST POPULAR"?"linear-gradient(135deg,#6366f1,#8b5cf6)":"transparent",border:plan.badge==="MOST POPULAR"?"none":`2px solid ${plan.color}`,color:plan.badge==="MOST POPULAR"?"#fff":plan.color,padding:14,borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                  Start 14-Day Free Trial
+                  Start 14-Day Free Trial → Pay Now
                 </button>
               </div>
             ))}
@@ -511,7 +527,17 @@ function App(){
           <p style={{color:"#475569",fontSize:13,marginTop:4}}>Howard University · Board Prep Platform</p>
         </div>
         <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:20,padding:28}}>
-          <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>{authView==="login"?"Sign In to Your Account":"Create Your Account"}</h2>
+          {/* ✅ Stripe success banner */}
+          {fromStripe&&(
+            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:10,padding:"12px 16px",marginBottom:20,textAlign:"center"}}>
+              <div style={{fontSize:20,marginBottom:4}}>🎉</div>
+              <p style={{color:"#10b981",fontWeight:700,fontSize:14,marginBottom:4}}>Payment confirmed! Welcome to MedBoard Pro.</p>
+              <p style={{color:"#64748b",fontSize:12}}>Create your account below to access your 14-day free trial.</p>
+            </div>
+          )}
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
+            {fromStripe?"Step 2 — Create Your Account":authView==="login"?"Sign In to Your Account":"Create Your Account"}
+          </h2>
           <button onClick={googleLogin}
             style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
             <span style={{fontWeight:800,color:"#4285f4",fontSize:16}}>G</span> Continue with Google
@@ -545,12 +571,19 @@ function App(){
             style={{width:"100%",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
             {authBusy?"Please wait...":authView==="login"?"Sign In & Start Learning →":"Create Account & Start Learning →"}
           </button>
-          <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
-            {authView==="login"?"No account? ":"Have account? "}
-            <span onClick={()=>{setAuthView(authView==="login"?"signup":"login");setAuthErr("");}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>
-              {authView==="login"?"Sign Up Free":"Sign In"}
-            </span>
-          </p>
+          {!fromStripe&&(
+            <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
+              {authView==="login"?"No account? ":"Have account? "}
+              <span onClick={()=>{setAuthView(authView==="login"?"signup":"login");setAuthErr("");}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>
+                {authView==="login"?"Sign Up Free":"Sign In"}
+              </span>
+            </p>
+          )}
+          {fromStripe&&authView==="signup"&&(
+            <p style={{textAlign:"center",color:"#475569",fontSize:12,marginBottom:12}}>
+              Already have an account? <span onClick={()=>{setAuthView("login");setFromStripe(false);}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>Sign In instead</span>
+            </p>
+          )}
           <p style={{textAlign:"center"}}>
             <span onClick={()=>setScreen("landing")} style={{color:"#334155",fontSize:12,cursor:"pointer"}}>← Back to home</span>
           </p>
