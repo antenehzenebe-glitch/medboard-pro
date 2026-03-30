@@ -223,7 +223,7 @@ function App(){
   };
 
   const reveal=i=>{
-    if(!sel[i])return;
+    if(!sel[i]||!qs[i])return;
     const ok=sel[i]===qs[i].correct;
     setRev(p=>({...p,[i]:true}));
     setScore(s=>({t:s.t+1,c:s.c+(ok?1:0),s:s.s}));
@@ -697,7 +697,7 @@ function App(){
             )}
 
             {/* Single question */}
-            {qs.length>0&&!busy&&(()=>{
+            {qs.length>0&&qs[0]&&!busy&&(()=>{
               const q=qs[0];
               const i=0;
               return(
