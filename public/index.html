@@ -515,7 +515,7 @@ function App(){
   if(screen==="landing")return(
     <div style={{background:BG,minHeight:"100vh"}}>
       {/* NAV */}
-      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(10,10,15,0.93)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 5%"}}>
+      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(10,10,15,0.93)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 2%"}}>
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:64,gap:8,flexWrap:"wrap"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:36,height:36,borderRadius:8,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
@@ -812,8 +812,8 @@ function App(){
   // ── APP ────────────────────────────────────
   return(
     <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 4%",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:8}}>
+      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:"100%",margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:8,padding:"0 2%"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:30,height:30,borderRadius:7,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD}}>M</div>
             <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
@@ -839,7 +839,7 @@ function App(){
         </div>
       </nav>
 
-      <div style={{maxWidth:1200,margin:"0 auto",padding:"22px 4%"}}>
+      <div style={{maxWidth:"100%",margin:"0 auto",padding:"18px 2%"}}>
 
         {/* HOME */}
         {tab==="home"&&(
@@ -893,7 +893,7 @@ function App(){
             <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
               {/* LEFT SIDEBAR — always visible */}
-              <div style={{width:220,flexShrink:0,background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:16,position:"sticky",top:70}}>
+              <div style={{width:260,flexShrink:0,background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:16,position:"sticky",top:70,maxHeight:"calc(100vh - 80px)",overflowY:"auto"}}>
                 <p style={{fontSize:11,fontWeight:700,color:"#64748b",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
                 {LEVELS.map(x=>(
                   <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
