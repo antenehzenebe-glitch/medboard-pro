@@ -1114,111 +1114,11 @@ function App(){
           </div>
         )}
 
-        {/* PHYSICIAN WEALTH */}
+        {/* DEFI */}
         {tab==="defi"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>💼 Physician Wealth Hub</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Passive income strategies and financial resources curated for physicians in training and practice</p>
-            <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:9,padding:"9px 14px",marginBottom:20,fontSize:12,color:"#fca5a5",lineHeight:1.6}}>
-              ⚠️ <strong>Disclosure:</strong> Some links below are referral/affiliate links. MedBoard Pro may receive compensation. Always do your own research. Not financial advice.
-            </div>
-
-            {/* Disability Insurance */}
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:20,marginBottom:16}}>
-              <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:4}}>🛡️ Disability Insurance</h3>
-              <p style={{color:"#64748b",fontSize:13,marginBottom:14,lineHeight:1.6}}>Own-occupation disability insurance is the most important financial protection for physicians. If you can't practice your specialty, you get paid. Get quotes before residency ends — premiums are lowest when you're young and healthy.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
-                {[
-                  {name:"Pattern",desc:"Physician-focused disability insurance. Designed by doctors for doctors. Simple online application.",color:"#3B82F6",url:"https://www.patternlife.com"},
-                  {name:"Ameritas",desc:"Top-rated own-occupation disability insurer. Preferred by many physician financial advisors.",color:"#8B5CF6",url:"https://www.ameritas.com/individual/disability-income-insurance"},
-                  {name:"Guardian Life",desc:"One of the Big 5 disability insurers. Strong own-occupation definition. Good for specialists.",color:"#10B981",url:"https://www.guardianlife.com/disability-insurance"},
-                  {name:"Principal Financial",desc:"Competitive rates for residents and fellows. Strong residency training benefit.",color:"#F59E0B",url:"https://www.principal.com/individuals/protect-whats-important/disability-insurance"},
-                ].map(p=>(
-                  <div key={p.name} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${p.color}44`,borderRadius:10,padding:14}}>
-                    <div style={{fontWeight:700,fontSize:14,color:p.color,marginBottom:6}}>{p.name}</div>
-                    <p style={{fontSize:12,color:"#94a3b8",lineHeight:1.5,marginBottom:10}}>{p.desc}</p>
-                    <a href={p.url} target="_blank" rel="noopener noreferrer"
-                      style={{display:"block",textAlign:"center",background:`${p.color}22`,border:`1px solid ${p.color}`,color:p.color,padding:"7px",borderRadius:7,fontSize:12,fontWeight:700}}>
-                      Get Quote →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Student Loan Refinancing */}
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:20,marginBottom:16}}>
-              <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:4}}>🎓 Student Loan Refinancing</h3>
-              <p style={{color:"#64748b",fontSize:13,marginBottom:14,lineHeight:1.6}}>Refinancing medical school debt can save physicians $50,000–$200,000 over the loan lifetime. Compare rates before committing. Consider PSLF eligibility before refinancing federal loans.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
-                {[
-                  {name:"Laurel Road",desc:"Physician-specific refinancing. Special rates for residents and attendings. No origination fees.",color:"#3B82F6",url:"https://www.laurelroad.com/refinance-student-loans/doctors"},
-                  {name:"SoFi",desc:"Competitive rates. Career coaching and financial planning included. Unemployment protection.",color:"#8B5CF6",url:"https://www.sofi.com/refinance-student-loan"},
-                  {name:"Splash Financial",desc:"Marketplace lender — compare multiple lenders at once. Often lowest rates for physicians.",color:"#10B981",url:"https://www.splashfinancial.com"},
-                  {name:"Earnest",desc:"Flexible repayment terms. Skip-a-payment feature. Good for variable income physicians.",color:"#F59E0B",url:"https://www.earnest.com/student-loan-refinancing"},
-                ].map(p=>(
-                  <div key={p.name} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${p.color}44`,borderRadius:10,padding:14}}>
-                    <div style={{fontWeight:700,fontSize:14,color:p.color,marginBottom:6}}>{p.name}</div>
-                    <p style={{fontSize:12,color:"#94a3b8",lineHeight:1.5,marginBottom:10}}>{p.desc}</p>
-                    <a href={p.url} target="_blank" rel="noopener noreferrer"
-                      style={{display:"block",textAlign:"center",background:`${p.color}22`,border:`1px solid ${p.color}`,color:p.color,padding:"7px",borderRadius:7,fontSize:12,fontWeight:700}}>
-                      Compare Rates →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Physician Mortgages */}
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:20,marginBottom:16}}>
-              <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:4}}>🏠 Physician Mortgage Loans</h3>
-              <p style={{color:"#64748b",fontSize:13,marginBottom:14,lineHeight:1.6}}>Physician mortgage loans allow 0–5% down payment with no PMI, even with high student debt. Available to residents, fellows, and attendings. Lock in rates before finishing training.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
-                {[
-                  {name:"Truist Bank",desc:"Up to $1.5M with 0% down for physicians. Available in most states. Fast closing.",color:"#3B82F6",url:"https://www.truist.com/loans-lines/mortgages/physician-mortgage"},
-                  {name:"BMO Bank",desc:"Physician loan program with 0% down up to $1M. No PMI. Available nationwide.",color:"#8B5CF6",url:"https://www.bmo.com/en-us/main/personal/mortgages/doctor-mortgage-loan"},
-                  {name:"KeyBank",desc:"Medical professional mortgage. 0% down up to $1M. Accepts offer letter as income proof.",color:"#10B981",url:"https://www.key.com/personal/home-loans/doctor-loans.jsp"},
-                  {name:"Huntington Bank",desc:"Physician mortgage with flexible DTI. Good for fellows with high student debt ratios.",color:"#F59E0B",url:"https://www.huntington.com/Personal/home-loans/physician-loans"},
-                ].map(p=>(
-                  <div key={p.name} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${p.color}44`,borderRadius:10,padding:14}}>
-                    <div style={{fontWeight:700,fontSize:14,color:p.color,marginBottom:6}}>{p.name}</div>
-                    <p style={{fontSize:12,color:"#94a3b8",lineHeight:1.5,marginBottom:10}}>{p.desc}</p>
-                    <a href={p.url} target="_blank" rel="noopener noreferrer"
-                      style={{display:"block",textAlign:"center",background:`${p.color}22`,border:`1px solid ${p.color}`,color:p.color,padding:"7px",borderRadius:7,fontSize:12,fontWeight:700}}>
-                      Learn More →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Real Estate Passive Income */}
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:20,marginBottom:16}}>
-              <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:4}}>🏢 Real Estate Passive Income</h3>
-              <p style={{color:"#64748b",fontSize:13,marginBottom:14,lineHeight:1.6}}>Real estate syndications and REITs allow physicians to invest passively without being a landlord. Accredited investor status (income >$200k or net worth >$1M) opens additional opportunities.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
-                {[
-                  {name:"Fundrise",desc:"Start with $10. Diversified real estate portfolio. Quarterly dividends. No accreditation required.",color:"#3B82F6",url:"https://fundrise.com"},
-                  {name:"RealtyMogul",desc:"Commercial real estate investing. REITs and private placements. Good for accredited physicians.",color:"#8B5CF6",url:"https://www.realtymogul.com"},
-                  {name:"CrowdStreet",desc:"Direct access to institutional-quality commercial real estate deals. Accredited investors only.",color:"#10B981",url:"https://www.crowdstreet.com"},
-                  {name:"Arrived Homes",desc:"Invest in single-family rentals starting at $100. Fractional ownership. Quarterly dividends.",color:"#F59E0B",url:"https://arrived.com"},
-                ].map(p=>(
-                  <div key={p.name} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${p.color}44`,borderRadius:10,padding:14}}>
-                    <div style={{fontWeight:700,fontSize:14,color:p.color,marginBottom:6}}>{p.name}</div>
-                    <p style={{fontSize:12,color:"#94a3b8",lineHeight:1.5,marginBottom:10}}>{p.desc}</p>
-                    <a href={p.url} target="_blank" rel="noopener noreferrer"
-                      style={{display:"block",textAlign:"center",background:`${p.color}22`,border:`1px solid ${p.color}`,color:p.color,padding:"7px",borderRadius:7,fontSize:12,fontWeight:700}}>
-                      Start Investing →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* DeFi Yield Tracker */}
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:20,marginBottom:16}}>
-              <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:4}}>⚡ DeFi Yield Tracker</h3>
-              <p style={{color:"#64748b",fontSize:13,marginBottom:12,lineHeight:1.6}}>Live yield data from DeFiLlama across Ethereum, Solana, Arbitrum, Polygon & BNB Chain. High risk — for experienced crypto investors only.</p>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>💰 DeFi Yield Tracker</h2>
+            <p style={{color:"#475569",marginBottom:12,fontSize:13}}>Live yields across Ethereum, Solana, Arbitrum, Polygon & BNB Chain — powered by DeFiLlama</p>
             <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:9,padding:"9px 14px",marginBottom:16,fontSize:12,color:"#fca5a5",lineHeight:1.6}}>
               ⚠️ <strong>Educational tool only.</strong> DeFi carries real financial risk including smart contract exploits and potential total loss. Higher APY = higher risk. Not financial advice.
             </div>
@@ -1263,17 +1163,3 @@ function App(){
             ))}
           </div>
         )}
-
-
-      </div>
-      <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:`1px solid ${BDR}`}}>
-        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine · antenehzenebe@gmail.com
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-</script>
-</body>
-</html>
