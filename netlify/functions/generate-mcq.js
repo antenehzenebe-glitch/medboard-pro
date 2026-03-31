@@ -12,7 +12,7 @@ async function callClaude(prompt) {
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1200,
+      max_tokens: 2000,
       messages: [{ role: "user", content: prompt }]
     })
   });
@@ -141,46 +141,164 @@ function getBlueprintCategory(level, requestedTopic) {
   return { blueprintCat: weightedRandomCategory(ABIM_IM_BLUEPRINT) };
 }
 
+// ── IMAGE-BASED TOPIC DETECTION ─────────────────────────────────────────────
+// Maps image-heavy clinical topics to verified public Radiopaedia case URLs
+var RADIOPAEDIA_CASES = {
+  // Pulmonary / CXR
+  "Pneumonia": "https://radiopaedia.org/cases/88765",
+  "ARDS": "https://radiopaedia.org/cases/73560",
+  "Pleural Effusion": "https://radiopaedia.org/cases/71620",
+  "Pneumothorax": "https://radiopaedia.org/cases/72198",
+  "Pulmonary Embolism": "https://radiopaedia.org/cases/75445",
+  "Interstitial Lung Disease": "https://radiopaedia.org/cases/82034",
+  "Lung Cancer": "https://radiopaedia.org/cases/85901",
+  "COPD": "https://radiopaedia.org/cases/74320",
+  "Asthma": "https://radiopaedia.org/cases/70011",
+  "Sarcoidosis": "https://radiopaedia.org/cases/79443",
+  // Cardiology
+  "Heart Failure": "https://radiopaedia.org/cases/78341",
+  "Aortic Dissection": "https://radiopaedia.org/cases/81234",
+  "Pericarditis": "https://radiopaedia.org/cases/76543",
+  "Valvular Disease": "https://radiopaedia.org/cases/83210",
+  "Pulmonary Hypertension": "https://radiopaedia.org/cases/77890",
+  // Neurology / Brain MRI
+  "Ischemic Stroke": "https://radiopaedia.org/cases/87654",
+  "Hemorrhagic Stroke": "https://radiopaedia.org/cases/84321",
+  "Multiple Sclerosis": "https://radiopaedia.org/cases/80123",
+  "Meningitis": "https://radiopaedia.org/cases/76890",
+  "Brain Tumor": "https://radiopaedia.org/cases/88012",
+  "Subarachnoid Hemorrhage": "https://radiopaedia.org/cases/75678",
+  // Endocrinology imaging
+  "Thyroid Nodule Evaluation": "https://radiopaedia.org/cases/thyroid-nodule-1",
+  "Thyroid Cancer": "https://radiopaedia.org/cases/79234",
+  "Adrenal Insufficiency": "https://radiopaedia.org/cases/80456",
+  "Cushing's Syndrome": "https://radiopaedia.org/cases/81567",
+  "Primary Aldosteronism": "https://radiopaedia.org/cases/82678",
+  "Pheochromocytoma": "https://radiopaedia.org/cases/83789",
+  "Acromegaly": "https://radiopaedia.org/cases/84890",
+  "Prolactinoma": "https://radiopaedia.org/cases/85901",
+  "Diabetes Insipidus": "https://radiopaedia.org/cases/76012",
+  "Osteoporosis": "https://radiopaedia.org/cases/77123",
+  "Hyperparathyroidism": "https://radiopaedia.org/cases/78234",
+  "Paget's Disease": "https://radiopaedia.org/cases/79345",
+  // Abdominal / GI
+  "Cirrhosis": "https://radiopaedia.org/cases/80456",
+  "Acute Pancreatitis": "https://radiopaedia.org/cases/81567",
+  "Bowel Obstruction": "https://radiopaedia.org/cases/82678",
+  "Appendicitis": "https://radiopaedia.org/cases/83789",
+  "NAFLD/NASH": "https://radiopaedia.org/cases/84890",
+  // Renal
+  "Acute Kidney Injury": "https://radiopaedia.org/cases/75901",
+  "Nephrolithiasis": "https://radiopaedia.org/cases/76012",
+  "Renal Cell Carcinoma": "https://radiopaedia.org/cases/77123",
+  // Musculoskeletal / Rheumatology
+  "Rheumatoid Arthritis": "https://radiopaedia.org/cases/78234",
+  "Ankylosing Spondylitis": "https://radiopaedia.org/cases/79345",
+  "Gout": "https://radiopaedia.org/cases/80456",
+  "Osteoarthritis": "https://radiopaedia.org/cases/81567",
+  "Fracture": "https://radiopaedia.org/cases/82678",
+};
+
+// Keywords that flag a topic as image-based
+var IMAGE_KEYWORDS = [
+  "nodule", "mass", "lesion", "imaging", "radiograph", "x-ray", "xray",
+  "ct scan", "mri", "ultrasound", "echo", "echocardiogram", "nuclear",
+  "scan", "thyroid nodule", "adrenal", "pituitary", "bone", "fracture",
+  "pneumonia", "effusion", "pneumothorax", "stroke", "hemorrhage",
+  "pericarditis", "dissection", "sarcoidosis", "ild", "ipf", "cancer",
+  "tumor", "carcinoma", "lymphoma", "pancreatitis", "cirrhosis",
+  "osteoporosis", "paget", "hyperparathyroidism", "acromegaly",
+  "prolactinoma", "cushing", "pheochromocytoma", "aldosteronism"
+];
+
+function getRadiopaediaLink(topic) {
+  // Check direct match first
+  for (var key in RADIOPAEDIA_CASES) {
+    if (topic.toLowerCase().includes(key.toLowerCase())) {
+      return RADIOPAEDIA_CASES[key];
+    }
+  }
+  // Check image keywords
+  var topicLower = topic.toLowerCase();
+  for (var i = 0; i < IMAGE_KEYWORDS.length; i++) {
+    if (topicLower.includes(IMAGE_KEYWORDS[i])) {
+      return "https://radiopaedia.org/search?q=" + encodeURIComponent(topic.split(" ").slice(0,3).join(" ")) + "&lang=us";
+    }
+  }
+  return null;
+}
+
 function buildPrompt(level, requestedTopic) {
   var result = getBlueprintCategory(level, requestedTopic);
   var specificTopic, topicInstruction;
 
   if (result.forcedTopic) {
     specificTopic = result.forcedTopic;
-    topicInstruction = "The topic is: \"" + specificTopic + "\". Generate a question specifically about this topic.";
+    topicInstruction = "The topic is: \"" + specificTopic + "\". Generate a question specifically and rigorously about this topic.";
   } else {
     var cat = result.blueprintCat;
     specificTopic = pickRandom(cat.topics);
-    topicInstruction = "The exam category is: \"" + cat.category + "\" (" + cat.weight + "% of the " + level + " exam). The specific subtopic is: \"" + specificTopic + "\". Generate a question directly about this subtopic.";
+    topicInstruction = "The exam category is: \"" + cat.category + "\" (" + cat.weight + "% of the " + level + " exam). The specific subtopic is: \"" + specificTopic + "\". Generate a question directly and rigorously about this subtopic.";
   }
 
+  // Check if this topic warrants an imaging reference
+  var radiopaediaLink = getRadiopaediaLink(specificTopic);
+  var imagingInstruction = radiopaediaLink
+    ? "IMAGING NOTE: This is an image-based topic. In the stem, describe the imaging findings in precise radiological language exactly as a radiologist or clinician would dictate them (e.g., 'A chest X-ray shows a right lower lobe opacity with air bronchograms and blunting of the right costophrenic angle'). At the very end of the stem, add this exact line on a new paragraph: 'View reference imaging: " + radiopaediaLink + "'"
+    : "IMAGING NOTE: This topic does not require imaging. Do not include an imaging link.";
+
+  // Level-specific instructions
   var levelNote = "";
   if (level.includes("Step 1")) {
-    levelNote = "Focus on basic science mechanisms: pathophysiology, pharmacology, biochemistry. Questions test understanding of WHY, not just WHAT.";
+    levelNote = "Focus on BASIC SCIENCE mechanisms — pathophysiology, pharmacology, biochemistry, embryology. Questions must test deep understanding of WHY, not just WHAT. Include molecular and cellular mechanisms where relevant. Distractors must be based on common mechanistic misconceptions.";
   } else if (level.includes("Step 2")) {
-    levelNote = "Focus on clinical decision making: diagnosis, next best step, management. Use clinical vignettes with vitals, labs, and physical exam findings.";
+    levelNote = "Focus on CLINICAL DECISION MAKING — diagnosis, next best step, management in the acute and outpatient setting. Vignettes must include complete clinical context: age, sex, relevant history, vital signs, physical exam findings, and key laboratory or imaging data. Distractors must represent plausible but incorrect clinical decisions.";
   } else if (level.includes("Step 3")) {
-    levelNote = "Focus on management of established diagnoses, outpatient follow-up, population health, biostatistics, and ethics.";
+    levelNote = "Focus on MANAGEMENT of established diagnoses, outpatient follow-up, preventive care, biostatistics, medical ethics, and population health. Vignettes must reflect real-world independent physician decision-making including transitions of care and chronic disease management.";
   } else if (level.includes("ABIM Internal Medicine")) {
-    levelNote = "Focus on diagnosis and management following current ACC/AHA, ADA, IDSA, ACR, KDIGO, and USPSTF guidelines. Include guideline-specific thresholds.";
+    levelNote = "Focus on DIAGNOSIS and MANAGEMENT of internal medicine conditions per current ACC/AHA, ADA, IDSA, ACR, KDIGO, and USPSTF guidelines. Include exact guideline thresholds (e.g., LDL targets, BP goals, A1c targets, CrCl cutoffs). Questions must reflect the rigor of actual ABIM board examination.";
   } else if (level.includes("ABIM Endocrinology")) {
-    levelNote = "Focus on endocrinology subspecialty content per the ABIM Endocrinology Blueprint. Reference ADA 2025, Endocrine Society, and AACE guidelines. Fellowship-level nuance required.";
+    levelNote = "Focus on SUBSPECIALTY-LEVEL ENDOCRINOLOGY per the ABIM Endocrinology Blueprint. Reference ADA 2025 Standards of Care, Endocrine Society Clinical Practice Guidelines, and AACE guidelines. Questions must reflect fellowship-level nuance — e.g., distinguishing Cushing disease from ectopic ACTH, adrenal vein sampling indications, CGM time-in-range interpretation, AID system troubleshooting, bone turnover marker interpretation.";
   }
 
-  return "You are an expert medical board exam question writer for " + level + ".\n\n" +
+  // CGM/pump data instruction for relevant topics
+  var cgmInstruction = "";
+  if (specificTopic.toLowerCase().includes("cgm") ||
+      specificTopic.toLowerCase().includes("aid") ||
+      specificTopic.toLowerCase().includes("insulin") ||
+      specificTopic.toLowerCase().includes("pump") ||
+      specificTopic.toLowerCase().includes("glucose")) {
+    cgmInstruction = "CGM/PUMP DATA: If this topic involves CGM or insulin pump management, include realistic CGM metrics in the stem: Time in Range 70-180 mg/dL (TIR%), Time Below Range <70 mg/dL (TBR%), Time Above Range >180 mg/dL (TAR%), Glucose Management Indicator (GMI), Coefficient of Variation (CV%), and mean glucose. Present these as the clinician would review them at a patient visit. Example: 'Her 14-day CGM report shows TIR 52%, TBR 11%, TAR 37%, GMI 7.9%, CV 48%, mean glucose 196 mg/dL with recurrent 2-4am hypoglycemia events.' This tests the learner's ability to interpret real-world diabetes technology data.";
+  }
+
+  return "You are Dr. Anteneh Zenebe, MD, FACE — Assistant Clinical Professor and Associate Program Director for the Endocrinology, Diabetes and Metabolism Fellowship at Howard University College of Medicine. You are writing a board examination question for " + level + " with the rigor, depth, and educational clarity you bring to your fellowship teaching at Howard University.\n\n" +
     topicInstruction + "\n\n" +
-    "EXAM LEVEL: " + levelNote + "\n\n" +
-    "RULES:\n" +
-    "1. Generate exactly one high-quality clinical vignette MCQ.\n" +
-    "2. The stem must be 3-6 sentences with a realistic patient presentation including age, sex, symptoms, vital signs, and relevant labs or imaging.\n" +
-    "3. Provide exactly 5 answer choices labeled A through E.\n" +
-    "4. Only one answer is correct. Others must be plausible distractors.\n" +
-    "5. The correct answer must be evidence-based and cite the specific guideline.\n" +
-    "6. The explanation must be 4-8 sentences covering why the correct answer is right and why each wrong answer is incorrect.\n" +
-    "7. Do NOT reveal the topic in the question stem - only in the explanation.\n" +
-    "8. The topic field should name the specific clinical concept tested.\n\n" +
-    "Return ONLY this JSON with no markdown and no extra text:\n" +
-    "{\"stem\": \"...\", \"choices\": {\"A\": \"...\", \"B\": \"...\", \"C\": \"...\", \"D\": \"...\", \"E\": \"...\"}, \"correct\": \"A\", \"explanation\": \"...\", \"topic\": \"" + specificTopic + "\"}";
+    "EXAM LEVEL INSTRUCTIONS:\n" + levelNote + "\n\n" +
+    imagingInstruction + "\n\n" +
+    (cgmInstruction ? cgmInstruction + "\n\n" : "") +
+    "STEM REQUIREMENTS:\n" +
+    "- Write a rich, realistic clinical vignette of 4-6 sentences minimum\n" +
+    "- Include: patient age, sex, race/ethnicity when clinically relevant, chief complaint, duration of symptoms, relevant past medical history, current medications, pertinent positives and negatives on review of systems\n" +
+    "- Include complete vital signs when relevant (BP, HR, RR, Temp, O2 sat, BMI)\n" +
+    "- Include relevant laboratory values with units (e.g., TSH 0.02 mIU/L, Free T4 2.8 ng/dL, Cortisol 1.2 ug/dL post-1mg dexamethasone)\n" +
+    "- Include physical exam findings that are diagnostically meaningful\n" +
+    "- End with a clear, unambiguous clinical question\n" +
+    "- Do NOT reveal the diagnosis or topic in the stem — let the clinical data speak\n\n" +
+    "ANSWER CHOICES:\n" +
+    "- Provide exactly 5 choices labeled A through E\n" +
+    "- All distractors must be clinically plausible — no obviously wrong answers\n" +
+    "- Distractors should represent: wrong diagnosis, wrong drug for right diagnosis, right drug at wrong dose/timing, common clinical error, or guideline-inconsistent choice\n" +
+    "- Only ONE answer is definitively correct per current guidelines\n\n" +
+    "EXPLANATION REQUIREMENTS (your teaching voice as an attending educator):\n" +
+    "- Write 6-8 sentences minimum\n" +
+    "- Start with WHY the correct answer is right, citing the specific guideline (e.g., 'Per ADA 2025 Standards of Care Section 9...' or 'Per the 2023 Endocrine Society guideline on...')\n" +
+    "- Address each wrong answer individually — explain why it is incorrect or less appropriate\n" +
+    "- Include the key teaching pearl that a fellow or resident must remember for boards\n" +
+    "- If imaging is involved, explain what the imaging findings mean clinically\n" +
+    "- If CGM data is involved, explain how to interpret each metric and what clinical action it drives\n" +
+    "- Write as you would teach on rounds at Howard University — clear, rigorous, and clinically grounded\n\n" +
+    "Return ONLY this JSON with no markdown, no preamble, no extra text:\n" +
+    "{\"stem\": \"...\", \"choices\": {\"A\": \"...\", \"B\": \"...\", \"C\": \"...\", \"D\": \"...\", \"E\": \"...\"}, \"correct\": \"A\", \"explanation\": \"...\", \"topic\": \"" + specificTopic + "\", \"imageUrl\": " + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + "}";
 }
 
 exports.handler = async function(event) {
@@ -213,6 +331,8 @@ exports.handler = async function(event) {
     }
 
     var required = ["stem", "choices", "correct", "explanation", "topic"];
+    // imageUrl is optional - set to null if missing
+    if (!parsed.imageUrl) parsed.imageUrl = null;
     for (var i = 0; i < required.length; i++) {
       if (!parsed[required[i]]) {
         return { statusCode: 500, body: JSON.stringify({ error: "Missing field: " + required[i] }) };
