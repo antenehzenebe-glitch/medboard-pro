@@ -21,18 +21,16 @@ a{text-decoration:none}
 <div id="root"></div>
 <script type="text/babel">
 
-const SB_URL = "https://vhzeeskhvkujihuvddcc.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
-const sb = window.supabase.createClient(SB_URL, SB_KEY);
-
+const SB_URL="https://vhzeeskhvkujihuvddcc.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
 const NAVY="#002868",GOLD="#C9A84C",BG="#0a0a0f",CARD="rgba(255,255,255,0.04)",BDR="#1e293b",SECS=90;
-
+const PORTAL_URL="https://billing.stripe.com/p/login/fZufZ9fDJ4NVbNM5iS2sM00";
 const PAYMENT_LINKS={
   student:"https://buy.stripe.com/8x24gr9flcgn9FE4eO2sM03",
   resident:"https://buy.stripe.com/8x228j0IPfszcRQ8v42sM04",
   institution:"https://buy.stripe.com/cNidR19flbcjbNM5iS2sM05"
 };
-
 const PLANS=[
   {key:"student",name:"Medical Student",price:29,period:"month",color:"#3B82F6",badge:null,
     features:["USMLE Step 1, 2 & 3 — all systems","500+ topics across all specialties","AI clinical vignettes on demand","Official society guidelines","Study & exam modes"]},
@@ -41,29 +39,27 @@ const PLANS=[
   {key:"institution",name:"Institution",price:2999,period:"year",color:"#10B981",badge:"BEST VALUE",
     features:["Up to 20 learner seats","Full access to all content","ADA, ES, AACE, ACC/AHA, ESC","Personal onboarding from Dr. Zenebe","Flat annual billing ~$250/mo"]},
 ];
-
 const GROUPS={
-  "🎲 Random":["Random — All Specialties","Random — Endocrinology Only","Random — ABIM IM Blueprint","Random — USMLE High-Yield"],
-  "🩺 Diabetes":["Type 2 — Diagnosis & Management","Type 1 — Insulin Therapy","DKA & HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA & MODY","CGM & AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
-  "🦋 Thyroid":["Hypothyroidism & Hashimoto's","Hyperthyroidism & Graves'","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
-  "🫀 Adrenal":["Adrenal Insufficiency","Cushing's Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
-  "🧠 Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushing's Disease"],
-  "🦴 Bone & Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Paget's Disease","Hypoparathyroidism"],
-  "🔬 Reproductive Endo":["PCOS","Male Hypogonadism","Menopause & HRT","Precocious Puberty","Turner & Klinefelter"],
-  "🧬 NETs & MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A & MEN2B"],
-  "🫀 Cardiology":["ACS — STEMI/NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
-  "🫁 Pulmonology":["Asthma & COPD","Pneumonia","Pulmonary Embolism","Interstitial Lung Disease","ARDS","Sleep Apnea"],
-  "🫘 Nephrology":["Acute Kidney Injury","CKD","Glomerulonephritis","Electrolyte Disorders","Acid-Base Disorders","Nephrotic Syndrome"],
-  "🫄 GI & Hepatology":["IBD — Crohn's & UC","Cirrhosis","Hepatitis B & C","GI Bleeding","Acute Pancreatitis","NAFLD/NASH"],
-  "🧠 Neurology":["Ischemic Stroke","Seizures & Epilepsy","Multiple Sclerosis","Meningitis","Parkinson's Disease","Headache"],
-  "🦠 Infectious Disease":["Sepsis & Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
-  "🩸 Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT & Anticoagulation","Leukemia & Lymphoma","Multiple Myeloma"],
-  "🦴 Rheumatology":["Rheumatoid Arthritis","SLE","Gout & Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
-  "💊 Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
-  "📋 USMLE Step 3":["Foundations of Independent Practice","Ambulatory Medicine","Biostatistics","Patient Safety","CCS — Endocrinology","CCS — Mixed"],
-  "⚖️ Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
+  "Random":["Random — All Specialties","Random — Endocrinology Only","Random — ABIM IM Blueprint","Random — USMLE High-Yield"],
+  "Diabetes":["Type 2 — Diagnosis & Management","Type 1 — Insulin Therapy","DKA & HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA & MODY","CGM & AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
+  "Thyroid":["Hypothyroidism & Hashimoto's","Hyperthyroidism & Graves'","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
+  "Adrenal":["Adrenal Insufficiency","Cushing's Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
+  "Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushing's Disease"],
+  "Bone & Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Paget's Disease","Hypoparathyroidism"],
+  "Reproductive Endo":["PCOS","Male Hypogonadism","Menopause & HRT","Precocious Puberty","Turner & Klinefelter"],
+  "NETs & MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A & MEN2B"],
+  "Cardiology":["ACS — STEMI/NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
+  "Pulmonology":["Asthma & COPD","Pneumonia","Pulmonary Embolism","Interstitial Lung Disease","ARDS","Sleep Apnea"],
+  "Nephrology":["Acute Kidney Injury","CKD","Glomerulonephritis","Electrolyte Disorders","Acid-Base Disorders","Nephrotic Syndrome"],
+  "GI & Hepatology":["IBD — Crohn's & UC","Cirrhosis","Hepatitis B & C","GI Bleeding","Acute Pancreatitis","NAFLD/NASH"],
+  "Neurology":["Ischemic Stroke","Seizures & Epilepsy","Multiple Sclerosis","Meningitis","Parkinson's Disease","Headache"],
+  "Infectious Disease":["Sepsis & Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
+  "Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT & Anticoagulation","Leukemia & Lymphoma","Multiple Myeloma"],
+  "Rheumatology":["Rheumatoid Arthritis","SLE","Gout & Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
+  "Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
+  "USMLE Step 3":["Foundations of Independent Practice","Ambulatory Medicine","Biostatistics","Patient Safety","CCS — Endocrinology","CCS — Mixed"],
+  "Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
 };
-
 const LEVELS=[
   {l:"USMLE Step 1",v:"USMLE Step 1 (M2 basic science and pathophysiology)"},
   {l:"USMLE Step 2 CK",v:"USMLE Step 2 CK (M3/M4 clinical decision-making)"},
@@ -71,7 +67,6 @@ const LEVELS=[
   {l:"ABIM Internal Medicine",v:"ABIM Internal Medicine boards (residents)"},
   {l:"ABIM Endocrinology",v:"ABIM Endocrinology & Metabolism subspecialty (fellows)"},
 ];
-
 const GUIDES=[
   {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"📊",u:"https://diabetesjournals.org/care/issue/47/Supplement_1"},
   {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"🔬",u:"https://www.endocrine.org/clinical-practice-guidelines"},
@@ -86,16 +81,14 @@ const GUIDES=[
   {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"🦴",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
   {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"🫁",u:"https://www.thoracic.org/statements"},
 ];
-
 const FAQS=[
   {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE — Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
-  {q:"What exams does it cover?",a:"USMLE Step 1, Step 2 CK, and Step 3, ABIM Internal Medicine boards, and ABIM Endocrinology & Metabolism subspecialty boards — the complete physician training continuum."},
+  {q:"What exams does it cover?",a:"USMLE Step 1, Step 2 CK, and Step 3, ABIM Internal Medicine boards, and ABIM Endocrinology & Metabolism subspecialty boards."},
   {q:"How is it different from UWorld or Amboss?",a:"MedBoard Pro offers unmatched endocrinology depth, AI-generated vignettes on demand across 500+ topics, and guidelines from 20+ US and European societies — built by a fellowship program director."},
-  {q:"Which guidelines are used?",a:"Questions cite the most current guidelines from ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European societies, plus top textbooks including Harrison's, Williams Textbook of Endocrinology, and Braunwald's Heart Disease."},
+  {q:"Which guidelines are used?",a:"ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European societies."},
   {q:"Is there a free trial?",a:"Yes — 14-day free trial. A credit card is required but you will not be charged until Day 15. Cancel anytime before then at no charge."},
   {q:"Can I cancel anytime?",a:"Absolutely. Cancel any time with no penalties or hidden fees."},
 ];
-
 
 function LabPanel(){
   const GOLD="#C9A84C",BDR="#1e293b";
@@ -146,11 +139,10 @@ function LabPanel(){
       {n:"CA 19-9",v:"<37 U/mL"},{n:"CA 15-3",v:"<30 U/mL"},
       {n:"AFP",v:"<10 ng/mL"},{n:"Beta-hCG",v:"<5 mIU/mL"},
       {n:"Chromogranin A",v:"<94 ng/mL"},{n:"5-HIAA 24hr",v:"2-9 mg/day"},
-      {n:"Kappa light chain",v:"3.3-19.4 mg/L"},
-      {n:"Lambda light chain",v:"5.7-26.3 mg/L"},
+      {n:"Kappa light chain",v:"3.3-19.4 mg/L"},{n:"Lambda light chain",v:"5.7-26.3 mg/L"},
       {n:"Kappa:lambda ratio",v:"0.26-1.65"},{n:"SPEP",v:"No M spike"},
       {n:"BM blasts normal",v:"<5%"},{n:"JAK2 V617F",v:"Negative"},
-      {n:"BCR-ABL CML",v:"Negative"},{n:"Erythropoietin",v:"4-24 mIU/mL"},
+      {n:"BCR-ABL",v:"Negative"},{n:"Erythropoietin",v:"4-24 mIU/mL"},
     ]},
     {cat:"Endocrinology",color:"#C9A84C",labs:[
       {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},
@@ -158,7 +150,7 @@ function LabPanel(){
       {n:"Thyroglobulin",v:"2-35 ng/mL"},{n:"HbA1c normal",v:"<5.7%"},
       {n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0% general"},
       {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
-      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"Cortisol PM",v:"2-11 ug/dL"},
+      {n:"Cortisol AM 8am",v:"6-23 ug/dL"},{n:"Cortisol PM",v:"2-11 ug/dL"},
       {n:"Midnight cortisol",v:"<1.8 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},
       {n:"UFC 24hr",v:"<50 ug/24hr"},{n:"LDDST post dex",v:"<1.8 ug/dL"},
       {n:"Aldosterone upright",v:"4-31 ng/dL"},{n:"Renin upright",v:"0.6-4.3 ng/mL/hr"},
@@ -179,13 +171,10 @@ function LabPanel(){
       {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL-C optimal",v:"<100 mg/dL"},
       {n:"LDL high risk target",v:"<70 mg/dL"},{n:"LDL extreme risk",v:"<55 mg/dL"},
       {n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
-      {n:"HDL protective",v:">60 mg/dL"},{n:"TG normal",v:"<150 mg/dL"},
-      {n:"TG borderline",v:"150-199 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},
-      {n:"TG pancreatitis risk",v:">=500 mg/dL"},
-      {n:"Non-HDL target",v:"<130 mg/dL"},{n:"VLDL",v:"2-30 mg/dL"},
-      {n:"Apo B",v:"<90 mg/dL"},{n:"Apo B high risk",v:"<80 mg/dL"},
-      {n:"Apo A-I",v:"120-180 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL"},
-      {n:"Lp(a) high risk",v:">50 mg/dL"},{n:"hs-CRP low CV risk",v:"<1.0 mg/L"},
+      {n:"TG normal",v:"<150 mg/dL"},{n:"TG borderline",v:"150-199 mg/dL"},
+      {n:"TG high",v:"200-499 mg/dL"},{n:"TG pancreatitis risk",v:">=500 mg/dL"},
+      {n:"Non-HDL target",v:"<130 mg/dL"},{n:"Apo B",v:"<90 mg/dL"},
+      {n:"Lp(a)",v:"<30 mg/dL"},{n:"hs-CRP low CV risk",v:"<1.0 mg/L"},
       {n:"hs-CRP high CV risk",v:">3.0 mg/L"},{n:"Omega-3 index target",v:">8%"},
     ]},
     {cat:"Rheumatology",color:"#F59E0B",labs:[
@@ -199,18 +188,15 @@ function LabPanel(){
       {n:"C4 complement",v:"16-47 mg/dL"},{n:"CH50",v:"41-90 U/mL"},
       {n:"Antiphospholipid Ab",v:"<20 GPL"},{n:"Lupus anticoagulant",v:"Negative"},
       {n:"HLA-B27",v:"Negative"},{n:"Uric acid gout target",v:"<6.0 mg/dL"},
-      {n:"Synovial non-inflam",v:"<2,000 WBC/uL"},
-      {n:"Synovial inflammatory",v:"2,000-50,000/uL"},
+      {n:"Synovial non-inflam",v:"<2,000 WBC/uL"},{n:"Synovial inflammatory",v:"2,000-50,000/uL"},
       {n:"Synovial septic",v:">50,000/uL"},{n:"CPK myositis",v:">10x ULN"},
     ]},
     {cat:"Urology",color:"#6366F1",labs:[
       {n:"PSA total",v:"<4.0 ng/mL"},{n:"PSA 40-49yr",v:"<2.5 ng/mL"},
       {n:"PSA 50-59yr",v:"<3.5 ng/mL"},{n:"Free PSA ratio",v:">25%"},
-      {n:"Urine Alb/Cr normal",v:"<30 mg/g"},
-      {n:"Microalbuminuria",v:"30-300 mg/g"},
+      {n:"Urine Alb/Cr normal",v:"<30 mg/g"},{n:"Microalbuminuria",v:"30-300 mg/g"},
       {n:"Macroalbuminuria",v:">300 mg/g"},{n:"Urine protein/Cr",v:"<0.2"},
-      {n:"Nephrotic range",v:">3.5 g/day"},{n:"Urine pH",v:"4.5-8.0"},
-      {n:"Specific gravity",v:"1.005-1.030"},{n:"FENa",v:"<1% prerenal >2% intrinsic"},
+      {n:"Nephrotic range",v:">3.5 g/day"},{n:"FENa",v:"<1% prerenal >2% intrinsic"},
       {n:"FEUrea",v:"<35% prerenal"},{n:"24hr urine Ca",v:"100-300 mg/day"},
       {n:"24hr urine oxalate",v:"<40 mg/day"},{n:"24hr urine citrate",v:">320 mg/day"},
       {n:"Semen volume",v:">1.5 mL"},{n:"Sperm concentration",v:">16M/mL"},
@@ -240,14 +226,14 @@ function LabPanel(){
     {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese"},
     {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics - use FEUrea"},
     {n:"FEUrea",f:"(uUrea x pCr) / (pUrea x uCr) x 100",v:"<35% prerenal",note:"More reliable when diuretics used"},
-    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols (methanol, ethylene glycol)"},
+    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols"},
     {n:"Winter's Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation",note:"PaCO2 lower = concurrent resp alkalosis"},
-    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg",note:"Elevated in V/Q mismatch, shunt, diffusion impairment"},
-    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = concurrent non-AG acidosis; >2 = met alkalosis"},
+    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg",note:"Elevated in V/Q mismatch, shunt"},
+    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = non-AG acidosis; >2 = met alkalosis"},
     {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant",note:"Predicts 90-day mortality in cirrhosis"},
     {n:"Child-Pugh Score",f:"Bili + Albumin + INR + Ascites + Encephalopathy",v:"A(5-6) / B(7-9) / C(10-15)",note:"Class C ~35% 1-year survival"},
     {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate",note:"DOAC preferred in non-valvular AF"},
-    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk",note:"High score does NOT contraindicate anticoag"},
+    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk",note:"Does NOT contraindicate anticoag"},
     {n:"HEART Score",f:"History+ECG+Age+Risk factors+Troponin (0-2 each)",v:"0-3 low / 4-6 mod / 7-10 high",note:"Low = safe early discharge"},
     {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high",note:"Low + neg D-dimer rules out PE"},
     {n:"Wells Score DVT",f:"Cancer+Paralysis+Bedridden+Tenderness+Swelling+Calf>3cm+Edema+Collateral+Prior DVT - Alt dx(2)",v:"<2 low / >=2 high",note:"High = proceed to ultrasound"},
@@ -257,7 +243,7 @@ function LabPanel(){
     {n:"qSOFA",f:"RR>=22 + Altered mentation + SBP<=100",v:">=2 high risk",note:"Bedside sepsis screening outside ICU"},
     {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk",note:"Treat: hip Fx >=3% or major Fx >=20%"},
     {n:"Corrected QTc",f:"QT / sqrt(RR in seconds)",v:"<440ms male / <460ms female",note:">500ms = high risk Torsades"},
-    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9",note:"Overweight 25-29.9 / Obese >=30 / Severe >=40"},
+    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9",note:"Overweight 25-29.9 / Obese >=30"},
     {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference",note:"Female: 45.5 kg + 2.3 per inch over 5 feet"},
     {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal",note:"ARDS: mild 200-300 / mod 100-200 / severe <100"},
   ];
@@ -266,12 +252,12 @@ function LabPanel(){
       <div style={{height:1,background:BDR,marginBottom:12}}/>
       <div style={{display:"flex",gap:4,marginBottom:10}}>
         <button onClick={()=>setLabTab("labs")}
-          style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#64748b",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-          🔬 Labs
+          style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+          Labs
         </button>
         <button onClick={()=>setLabTab("calcs")}
-          style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#64748b",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-          🧮 Calcs
+          style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+          Calcs
         </button>
       </div>
       {labTab==="labs"&&(
@@ -328,13 +314,10 @@ function App(){
   const [waitEmail,setWaitEmail]=React.useState("");
   const [waitDone,setWaitDone]=React.useState(false);
   const [fromStripe,setFromStripe]=React.useState(false);
-
-  // MCQ
-  const [grp,setGrp]=React.useState("🎲 Random");
+  const [grp,setGrp]=React.useState("Random");
   const [topic,setTopic]=React.useState("Random — All Specialties");
   const [lvl,setLvl]=React.useState(LEVELS[3]);
   const [cnt,setCnt]=React.useState(1);
-  const [currentQ,setCurrentQ]=React.useState(0);
   const [qNum,setQNum]=React.useState(0);
   const [examMode,setExamMode]=React.useState(false);
   const [tLeft,setTLeft]=React.useState(null);
@@ -346,22 +329,16 @@ function App(){
   const [rev,setRev]=React.useState({});
   const [score,setScore]=React.useState({t:0,c:0,s:0});
   const tRef=React.useRef(null);
-
-  // DeFi
   const [pools,setPools]=React.useState([]);
   const [dBusy,setDBusy]=React.useState(false);
   const [dErr,setDErr]=React.useState("");
   const [dChain,setDChain]=React.useState("All");
   const [wl,setWl]=React.useState([]);
 
-  // Auth session
   React.useEffect(()=>{
-    // ✅ Detect Stripe redirect (?subscribed=true)
     const params=new URLSearchParams(window.location.search);
     if(params.get("subscribed")==="true"){
-      setFromStripe(true);
-      setAuthView("signup");
-      setScreen("auth");
+      setFromStripe(true);setAuthView("signup");setScreen("auth");
       window.history.replaceState({},"","/");
     }
     sb.auth.getSession().then(({data:{session}})=>{
@@ -370,7 +347,7 @@ function App(){
     }).catch(()=>setAuthLoading(false));
     const {data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>{
       if(session?.user){setUser(session.user);setScreen("app");}
-      else{setUser(null);}
+      else setUser(null);
     });
     return()=>subscription.unsubscribe();
   },[]);
@@ -378,33 +355,27 @@ function App(){
   const login=async()=>{
     setAuthErr("");setAuthBusy(true);
     const{error}=await sb.auth.signInWithPassword({email,password:pw});
-    if(error){setAuthErr(error.message);}
+    if(error)setAuthErr(error.message);
     else{setScreen("app");setTab("mcq");}
     setAuthBusy(false);
   };
-
   const signup=async()=>{
     setAuthErr("");setAuthBusy(true);
     if(pw.length<8){setAuthErr("Password must be at least 8 characters");setAuthBusy(false);return;}
     const{error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:nm}}});
     if(error)setAuthErr(error.message);
-    else setAuthErr("✅ Check your email to confirm your account, then sign in!");
+    else setAuthErr("Check your email to confirm your account, then sign in!");
     setAuthBusy(false);
   };
-
   const googleLogin=async()=>{
     await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href}});
   };
-
   const logout=async()=>{
     await sb.auth.signOut();
     setUser(null);setScreen("landing");
     setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});setQNum(0);
   };
-
   const getPrice=p=>p.period==="year"?p.price:annual?Math.round(p.price*0.8):p.price;
-
-  // Timer
   const fmtT=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
   const stopT=()=>{clearInterval(tRef.current);setTActive(false);};
   const revealAll=React.useCallback(questions=>{
@@ -419,46 +390,28 @@ function App(){
       });
     },1000);
   };
-
-  // MCQ generator — calls Netlify function
   const generate=async()=>{
-    stopT();
-    setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);
+    stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);
     try{
       const res=await fetch("/.netlify/functions/generate-mcq",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
+        method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({topic,level:lvl.v,count:cnt}),
       });
-      if(!res.ok){
-        const errData=await res.json().catch(()=>({error:"Server error"}));
-        throw new Error(errData.error||`Server error ${res.status}`);
-      }
+      if(!res.ok){const e=await res.json().catch(()=>({error:"Server error"}));throw new Error(e.error||`Server error ${res.status}`);}
       const data=await res.json();
       if(!Array.isArray(data))throw new Error("Invalid response format");
-      setQs(data);
-      setCurrentQ(0);
-      setScore(s=>({...s,s:s.s+1}));
+      setQs(data);setScore(s=>({...s,s:s.s+1}));
       if(examMode)startT(data.length,data);
-    }catch(e){
-      setMcqErr("Failed to generate questions: "+e.message+". Please try again.");
-    }
+    }catch(e){setMcqErr("Failed to generate questions: "+e.message);}
     setBusy(false);
   };
-
-  // ✅ FIX 1: nextQuestion is now properly defined
-  const nextQuestion=()=>{
-    setQNum(n=>n+1);
-    generate();
-  };
-
+  const nextQuestion=()=>{setQNum(n=>n+1);generate();};
   const reveal=i=>{
     if(!sel[i]||!qs[i])return;
     const ok=sel[i]===qs[i].correct;
     setRev(p=>({...p,[i]:true}));
     setScore(s=>({t:s.t+1,c:s.c+(ok?1:0),s:s.s}));
   };
-
   const fetchDefi=async()=>{
     setDBusy(true);setDErr("");
     try{
@@ -475,7 +428,6 @@ function App(){
     }catch(e){setDErr("Could not load data. Try again.");}
     setDBusy(false);
   };
-
   const fAPY=n=>`${n.toFixed(2)}%`;
   const fTVL=n=>n>=1e9?`$${(n/1e9).toFixed(2)}B`:n>=1e6?`$${(n/1e6).toFixed(1)}M`:`$${(n/1e3).toFixed(0)}K`;
   const rC=r=>r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";
@@ -487,64 +439,57 @@ function App(){
     if(sel[i]===l)return"#ef4444";
     return"transparent";
   };
-
-  const ss=Object.entries(rev).filter(([i])=>qs[i]&&sel[i]===qs[i].correct).length;
-  const st=Object.keys(rev).length;
   const uname=user?.user_metadata?.full_name||user?.email?.split("@")[0]||"Doctor";
 
   const NB=({id,label,icon})=>(
     <button onClick={()=>{setTab(id);if(id==="defi"&&!pools.length)fetchDefi();}}
-      style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 12px",border:"none",borderRadius:8,cursor:"pointer",
-        background:tab===id?`rgba(201,168,76,0.12)`:"transparent",
-        borderBottom:tab===id?`2px solid ${GOLD}`:"2px solid transparent",
+      style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",border:"none",borderRadius:8,cursor:"pointer",
+        background:tab===id?"rgba(201,168,76,0.12)":"transparent",
+        borderBottom:tab===id?"2px solid "+GOLD:"2px solid transparent",
         color:tab===id?GOLD:"#94a3b8",fontWeight:700,fontSize:12,transition:"all 0.2s",minWidth:52}}>
-      <span style={{fontSize:16}}>{icon}</span>{label}
+      <span style={{fontSize:18}}>{icon}</span>{label}
     </button>
   );
 
   if(authLoading)return(
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{width:52,height:52,borderRadius:12,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 14px"}}>M</div>
+        <div style={{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 14px"}}>M</div>
         <p style={{color:"#475569",fontSize:14}}>Loading MedBoard Pro...</p>
       </div>
     </div>
   );
 
-  // ── LANDING ────────────────────────────────
   if(screen==="landing")return(
     <div style={{background:BG,minHeight:"100vh"}}>
-      {/* NAV */}
-      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(10,10,15,0.93)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 2%"}}>
+      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(10,10,15,0.93)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 5%"}}>
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:64,gap:8,flexWrap:"wrap"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:8,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
+            <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
             <span style={{fontWeight:700,fontSize:18,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
           </div>
           <div style={{display:"flex",gap:24,fontSize:14}}>
             {["Features","About","Pricing","FAQ"].map(l=>(
-              <a key={l} href={`#${l.toLowerCase()}`} style={{color:"#94a3b8"}}
+              <a key={l} href={"#"+l.toLowerCase()} style={{color:"#94a3b8"}}
                 onMouseEnter={e=>e.target.style.color="#f1f5f9"} onMouseLeave={e=>e.target.style.color="#94a3b8"}>{l}</a>
             ))}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <button onClick={()=>{setAuthView("login");setScreen("auth");}}
-              style={{background:"transparent",border:`1px solid #334155`,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
+              style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
               Subscriber Sign In
             </button>
             <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-              style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
-              View Plans →
+              style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
+              View Plans
             </button>
           </div>
         </div>
       </nav>
-
-      {/* HERO */}
       <section style={{textAlign:"center",padding:"100px 5% 80px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:"10%",left:"50%",transform:"translateX(-50%)",width:600,height:600,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,0.08),transparent 70%)",pointerEvents:"none"}}/>
         <div style={{display:"inline-block",background:"rgba(201,168,76,0.12)",border:"1px solid rgba(201,168,76,0.4)",borderRadius:20,padding:"6px 18px",fontSize:13,color:GOLD,marginBottom:24}}>
-          🏥 Created by a Fellowship Associate Program Director at Howard University
+          Created by a Fellowship Associate Program Director at Howard University
         </div>
         <h1 style={{fontSize:"clamp(30px,5vw,58px)",fontWeight:800,lineHeight:1.1,maxWidth:820,margin:"0 auto 20px",color:"#f1f5f9"}}>
           Board Prep That Actually <span style={{color:GOLD}}>Understands Medicine</span>
@@ -557,43 +502,39 @@ function App(){
         </p>
         <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:14}}>
           <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-            style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16,boxShadow:`0 0 30px rgba(201,168,76,0.2)`}}>
-            Start 14-Day Free Trial →
+            style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16,boxShadow:"0 0 30px rgba(201,168,76,0.2)"}}>
+            Start 14-Day Free Trial
           </button>
           <button onClick={()=>{setAuthView("login");setScreen("auth");}}
             style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:16}}>
             Subscriber Sign In
           </button>
         </div>
-        <p style={{color:"#475569",fontSize:13,marginBottom:8}}>Credit card required · No charge until Day 15 · Cancel anytime before trial ends</p>
+        <p style={{color:"#475569",fontSize:13,marginBottom:8}}>Credit card required · No charge until Day 15 · Cancel anytime</p>
         <p style={{color:"#334155",fontSize:12,marginBottom:56}}>After payment, you will be redirected to create your account and access the platform immediately.</p>
-
-        {/* Continuum */}
         <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
           {[{e:"USMLE Step 1",w:"M2 Students",c:"#3B82F6"},{e:"USMLE Step 2 CK",w:"M3/M4",c:"#8B5CF6"},{e:"USMLE Step 3",w:"PGY-1/2",c:"#6366f1"},{e:"ABIM IM",w:"Residents",c:"#10b981"},{e:"ABIM Endo",w:"Fellows",c:GOLD}].map(e=>(
-            <div key={e.e} style={{background:CARD,border:`1px solid ${e.c}44`,borderRadius:10,padding:"10px 16px",textAlign:"center",minWidth:100}}>
+            <div key={e.e} style={{background:CARD,border:"1px solid "+e.c+"44",borderRadius:10,padding:"10px 16px",textAlign:"center",minWidth:100}}>
               <div style={{fontSize:12,fontWeight:800,color:e.c}}>{e.e}</div>
               <div style={{fontSize:11,color:"#475569"}}>{e.w}</div>
             </div>
           ))}
         </div>
       </section>
-
-      {/* FEATURES */}
       <section id="features" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
         <div style={{maxWidth:1100,margin:"0 auto"}}>
           <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:14,color:"#f1f5f9"}}>Everything you need to pass</h2>
           <p style={{textAlign:"center",color:"#475569",marginBottom:48,fontSize:15}}>From M2 shelf exams to subspecialty boards — one platform covers the full training continuum</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:20}}>
             {[
-              {icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 & 3. Fresh clinical vignettes generated on demand. Each question cites specific guidelines and textbooks. Questions never repeat."},
-              {icon:"⏱️",title:"Study & Exam Modes",desc:"Study mode gives instant feedback after each answer. Exam mode runs 90 seconds per question with a live countdown timer — just like the real boards."},
-              {icon:"🎲",title:"Random or Targeted",desc:"Generate questions on a specific topic or let the AI pick randomly across all specialties — perfect for simulating the real board exam experience."},
-              {icon:"🔬",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US & European societies. Always the most current evidence."},
-              {icon:"📚",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines — ADA, Endocrine Society, AACE, ACC/AHA, KDIGO, IDSA, NCCN and more. Free, always current."},
+              {icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 & 3. Fresh clinical vignettes on demand. Questions never repeat."},
+              {icon:"⏱️",title:"Study & Exam Modes",desc:"Study mode gives instant feedback. Exam mode runs 90 seconds per question with a live countdown timer — just like the real boards."},
+              {icon:"🔬",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US & European societies. Always current evidence."},
+              {icon:"📚",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines — ADA, Endocrine Society, AACE, ACC/AHA, KDIGO, IDSA, NCCN and more."},
+              {icon:"🔬",title:"Lab & Calc Reference",desc:"Comprehensive lab reference values and 26 medical calculations built into the question sidebar — always at your fingertips."},
               {icon:"💰",title:"DeFi Yield Tracker",desc:"Live yield data from DeFiLlama across Ethereum, Solana, Arbitrum & more. Passive income intelligence for high-earning physicians."},
             ].map(f=>(
-              <div key={f.title} style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:16,padding:26,transition:"border-color 0.2s",cursor:"default"}}
+              <div key={f.title} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:26,transition:"border-color 0.2s",cursor:"default"}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
                 <div style={{fontSize:30,marginBottom:14}}>{f.icon}</div>
@@ -604,18 +545,15 @@ function App(){
           </div>
         </div>
       </section>
-
-      {/* ABOUT */}
       <section id="about" style={{padding:"80px 5%"}}>
         <div style={{maxWidth:900,margin:"0 auto"}}>
           <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>About the Founder</h2>
           <div style={{background:CARD,border:"1px solid #6366f1",borderRadius:16,padding:32,display:"flex",gap:28,flexWrap:"wrap"}}>
-            <div style={{width:90,height:90,borderRadius:"50%",background:`linear-gradient(135deg,${NAVY},#6366f1)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:800,color:"#fff",flexShrink:0}}>AZ</div>
+            <div style={{width:90,height:90,borderRadius:"50%",background:"linear-gradient(135deg,"+NAVY+",#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:800,color:"#fff",flexShrink:0}}>AZ</div>
             <div style={{flex:1,minWidth:260}}>
               <h3 style={{fontSize:22,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Anteneh Zenebe, MD, FACE</h3>
               <p style={{color:"#8b5cf6",fontWeight:600,marginBottom:14,fontSize:14}}>Assistant Clinical Professor · Associate Program Director<br/>Endocrinology, Diabetes & Metabolism Fellowship<br/>Howard University College of Medicine / Howard University Hospital</p>
-              <p style={{color:"#94a3b8",lineHeight:1.8,marginBottom:12,fontSize:15}}>Board-certified endocrinologist and Fellow of the American College of Endocrinology. Dedicated to training physicians who serve underserved communities at Howard University — one of the nation's leading HBCUs.</p>
-              <p style={{color:"#94a3b8",lineHeight:1.8,fontSize:15}}>MedBoard Pro is the digital extension of the curriculum Dr. Zenebe has developed at Howard University, now available to learners nationwide.</p>
+              <p style={{color:"#94a3b8",lineHeight:1.8,marginBottom:12,fontSize:15}}>Board-certified endocrinologist and Fellow of the American College of Endocrinology. Dedicated to training physicians who serve underserved communities at Howard University.</p>
               <div style={{display:"flex",gap:8,marginTop:16,flexWrap:"wrap"}}>
                 {["Board-Certified Endocrinologist","FACE Fellow","Associate Program Director","Howard University Faculty"].map(t=>(
                   <span key={t} style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#a78bfa",borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:600}}>{t}</span>
@@ -625,33 +563,6 @@ function App(){
           </div>
         </div>
       </section>
-
-      {/* TESTIMONIAL */}
-      <section style={{padding:"60px 5%",background:"rgba(255,255,255,0.02)"}}>
-        <div style={{maxWidth:900,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:40,color:"#f1f5f9"}}>What Learners Say</h2>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:16,padding:28}}>
-              <div style={{color:"#f59e0b",marginBottom:12,fontSize:18}}>★★★★★</div>
-              <p style={{color:"#94a3b8",fontStyle:"italic",lineHeight:1.7,fontSize:15,marginBottom:20}}>"Dr. Zenebe's vignette-based lectures completely changed how I approach endocrine cases on rounds. By the time I sat for my ABIM shelf, those cases felt familiar. I passed on my first attempt."</p>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:"linear-gradient(135deg,#334155,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,color:"#fff"}}>RJ</div>
-                <div>
-                  <div style={{fontWeight:600,fontSize:14,color:"#f1f5f9"}}>Dr. R. Johnson</div>
-                  <div style={{color:"#475569",fontSize:12}}>Internal Medicine Resident, PGY-2</div>
-                </div>
-              </div>
-            </div>
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:16,padding:28,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",minHeight:180}}>
-              <div style={{fontSize:32,marginBottom:12}}>✍️</div>
-              <p style={{color:"#475569",fontSize:14,lineHeight:1.6}}>Be among the first to review MedBoard Pro. Early access users get 3 months free.</p>
-              <button onClick={()=>window.location.href=PAYMENT_LINKS.student} style={{marginTop:16,background:"transparent",border:"1px solid #8b5cf6",color:"#8b5cf6",padding:"8px 18px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Join Early Access →</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING */}
       <section id="pricing" style={{padding:"80px 5%"}}>
         <div style={{maxWidth:1100,margin:"0 auto"}}>
           <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:20,color:"#f1f5f9"}}>Simple, transparent pricing</h2>
@@ -661,16 +572,16 @@ function App(){
               <div onClick={()=>setAnnual(!annual)} style={{width:44,height:24,borderRadius:12,background:annual?"#6366f1":"#334155",cursor:"pointer",position:"relative",transition:"background 0.3s"}}>
                 <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:annual?23:3,transition:"left 0.3s"}}/>
               </div>
-              <span style={{fontSize:14,color:annual?"#f1f5f9":"#475569"}}>Annual <span style={{color:"#10b981",fontWeight:700}}>−20%</span></span>
+              <span style={{fontSize:14,color:annual?"#f1f5f9":"#475569"}}>Annual <span style={{color:"#10b981",fontWeight:700}}>-20%</span></span>
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
             {PLANS.map(plan=>(
-              <div key={plan.key} style={{background:plan.badge==="MOST POPULAR"?"rgba(99,102,241,0.1)":"rgba(255,255,255,0.03)",border:`2px solid ${plan.badge==="MOST POPULAR"?"#6366f1":BDR}`,borderRadius:20,padding:32,position:"relative",display:"flex",flexDirection:"column"}}>
+              <div key={plan.key} style={{background:plan.badge==="MOST POPULAR"?"rgba(99,102,241,0.1)":"rgba(255,255,255,0.03)",border:"2px solid "+(plan.badge==="MOST POPULAR"?"#6366f1":BDR),borderRadius:20,padding:32,position:"relative",display:"flex",flexDirection:"column"}}>
                 {plan.badge&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:plan.badge==="MOST POPULAR"?"#6366f1":"#10b981",color:"#fff",fontSize:11,fontWeight:700,padding:"4px 14px",borderRadius:20,whiteSpace:"nowrap"}}>{plan.badge}</div>}
                 <div style={{color:plan.color,fontSize:13,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{plan.name}</div>
                 <div style={{fontSize:44,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>${getPrice(plan).toLocaleString()}<span style={{fontSize:15,color:"#475569",fontWeight:400}}>/{plan.period}</span></div>
-                {plan.period==="year"&&<div style={{fontSize:13,color:"#10b981",marginBottom:8}}>Flat annual rate · ~$250/month</div>}
+                {plan.period==="year"&&<div style={{fontSize:13,color:"#10b981",marginBottom:8}}>Flat annual rate ~$250/month</div>}
                 {plan.period!=="year"&&annual&&<div style={{fontSize:13,color:"#10b981",marginBottom:8}}>Billed ${getPrice(plan)*12}/year</div>}
                 <ul style={{listStyle:"none",padding:0,margin:"20px 0",flex:1}}>
                   {plan.features.map(f=>(
@@ -680,70 +591,62 @@ function App(){
                   ))}
                 </ul>
                 <button onClick={()=>window.location.href=PAYMENT_LINKS[plan.key]}
-                  style={{width:"100%",background:plan.badge==="MOST POPULAR"?"linear-gradient(135deg,#6366f1,#8b5cf6)":"transparent",border:plan.badge==="MOST POPULAR"?"none":`2px solid ${plan.color}`,color:plan.badge==="MOST POPULAR"?"#fff":plan.color,padding:14,borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                  Start 14-Day Free Trial → Pay Now
+                  style={{width:"100%",background:plan.badge==="MOST POPULAR"?"linear-gradient(135deg,#6366f1,#8b5cf6)":"transparent",border:plan.badge==="MOST POPULAR"?"none":"2px solid "+plan.color,color:plan.badge==="MOST POPULAR"?"#fff":plan.color,padding:14,borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
+                  Start 14-Day Free Trial
                 </button>
               </div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* FAQ */}
       <section id="faq" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
         <div style={{maxWidth:780,margin:"0 auto"}}>
           <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Frequently Asked Questions</h2>
           {FAQS.map((f,i)=>(
-            <div key={i} style={{borderBottom:`1px solid ${BDR}`}}>
+            <div key={i} style={{borderBottom:"1px solid "+BDR}}>
               <button onClick={()=>setOpenFaq(openFaq===i?null:i)}
                 style={{width:"100%",background:"none",border:"none",color:"#f1f5f9",textAlign:"left",padding:"20px 0",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:16,fontWeight:600,gap:16}}>
-                {f.q}<span style={{color:"#6366f1",fontSize:22,flexShrink:0}}>{openFaq===i?"−":"+"}</span>
+                {f.q}<span style={{color:"#6366f1",fontSize:22,flexShrink:0}}>{openFaq===i?"-":"+"}</span>
               </button>
               {openFaq===i&&<p style={{color:"#94a3b8",lineHeight:1.8,paddingBottom:20,fontSize:15,margin:0}}>{f.a}</p>}
             </div>
           ))}
         </div>
       </section>
-
-      {/* WAITLIST */}
-      <section style={{padding:"100px 5%",textAlign:"center",background:"rgba(255,255,255,0.02)"}}>
+      <section style={{padding:"80px 5%",textAlign:"center"}}>
         <div style={{maxWidth:560,margin:"0 auto"}}>
           <h2 style={{fontSize:38,fontWeight:800,marginBottom:16,color:"#f1f5f9"}}>Join the Early Access List</h2>
-          <p style={{color:"#64748b",marginBottom:36,fontSize:16,lineHeight:1.7}}>Be first to access MedBoard Pro. Early users receive 3 months free and direct input into the platform's development.</p>
+          <p style={{color:"#64748b",marginBottom:36,fontSize:16,lineHeight:1.7}}>Be first to access MedBoard Pro. Early users receive 3 months free.</p>
           {waitDone?(
-            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:12,padding:24,color:"#10b981",fontWeight:600,fontSize:16}}>✅ You're on the list! We'll be in touch at antenehzenebe@gmail.com</div>
+            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:12,padding:24,color:"#10b981",fontWeight:600,fontSize:16}}>You are on the list!</div>
           ):(
             <div style={{display:"flex",gap:12,flexWrap:"wrap",justifyContent:"center"}}>
               <input type="email" placeholder="your@email.com" value={waitEmail} onChange={e=>setWaitEmail(e.target.value)}
-                style={{flex:1,minWidth:240,background:"#1e293b",border:`1px solid #334155`,color:"#f1f5f9",padding:"14px 18px",borderRadius:10,fontSize:15,outline:"none"}}/>
+                style={{flex:1,minWidth:240,background:"#1e293b",border:"1px solid #334155",color:"#f1f5f9",padding:"14px 18px",borderRadius:10,fontSize:15,outline:"none"}}/>
               <button onClick={()=>{if(waitEmail)setWaitDone(true);}}
-                style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"14px 28px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
+                style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"14px 28px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
                 Get Early Access
               </button>
             </div>
           )}
-          <p style={{marginTop:14,color:"#334155",fontSize:12}}>No spam. Unsubscribe anytime.</p>
         </div>
       </section>
-
-      <footer style={{borderTop:`1px solid ${BDR}`,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
-        <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Assistant Clinical Professor & Associate Program Director · Howard University College of Medicine</div>
-        <div>© 2026 MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
+      <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
+        <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine</div>
+        <div>2026 MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
       </footer>
     </div>
   );
 
-  // ── AUTH ───────────────────────────────────
   if(screen==="auth")return(
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{width:"100%",maxWidth:420}}>
         <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{width:52,height:52,borderRadius:12,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 12px"}}>M</div>
+          <div style={{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 12px"}}>M</div>
           <h1 style={{fontSize:22,fontWeight:800,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></h1>
           <p style={{color:"#475569",fontSize:13,marginTop:4}}>Howard University · Board Prep Platform</p>
         </div>
-        <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:20,padding:28}}>
-          {/* ✅ Stripe success banner */}
+        <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:20,padding:28}}>
           {fromStripe&&(
             <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:10,padding:"12px 16px",marginBottom:20,textAlign:"center"}}>
               <div style={{fontSize:20,marginBottom:4}}>🎉</div>
@@ -755,7 +658,7 @@ function App(){
             {fromStripe?"Step 2 — Create Your Account":authView==="login"?"Sign In to Your Account":"Create Your Account"}
           </h2>
           <button onClick={googleLogin}
-            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
             <span style={{fontWeight:800,color:"#4285f4",fontSize:16}}>G</span> Continue with Google
           </button>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
@@ -765,27 +668,27 @@ function App(){
             <div style={{marginBottom:14}}>
               <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>FULL NAME</label>
               <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Dr. John Smith"
-                style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+                style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
             </div>
           )}
           <div style={{marginBottom:14}}>
             <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>EMAIL</label>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="doctor@hospital.com"
-              style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+              style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
           </div>
           <div style={{marginBottom:18}}>
             <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>PASSWORD</label>
             <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Minimum 8 characters"
-              style={{width:"100%",background:"#1e293b",border:`1px solid ${BDR}`,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+              style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
           </div>
           {authErr&&(
-            <div style={{background:authErr.startsWith("✅")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",border:`1px solid ${authErr.startsWith("✅")?"#10b981":"#ef4444"}`,borderRadius:8,padding:"10px 13px",color:authErr.startsWith("✅")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>
+            <div style={{background:authErr.startsWith("Check")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",border:"1px solid "+(authErr.startsWith("Check")?"#10b981":"#ef4444"),borderRadius:8,padding:"10px 13px",color:authErr.startsWith("Check")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>
               {authErr}
             </div>
           )}
           <button onClick={authView==="login"?login:signup} disabled={authBusy}
-            style={{width:"100%",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
-            {authBusy?"Please wait...":authView==="login"?"Sign In & Start Learning →":"Create Account & Start Learning →"}
+            style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
+            {authBusy?"Please wait...":authView==="login"?"Sign In & Start Learning":"Create Account & Start Learning"}
           </button>
           {!fromStripe&&(
             <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
@@ -801,67 +704,61 @@ function App(){
             </p>
           )}
           <p style={{textAlign:"center"}}>
-            <span onClick={()=>setScreen("landing")} style={{color:"#334155",fontSize:12,cursor:"pointer"}}>← Back to home</span>
+            <span onClick={()=>setScreen("landing")} style={{color:"#334155",fontSize:12,cursor:"pointer"}}>Back to home</span>
           </p>
         </div>
-        <p style={{textAlign:"center",color:"#1e293b",fontSize:11,marginTop:16}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University</p>
       </div>
     </div>
   );
 
-  // ── APP ────────────────────────────────────
   return(
     <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${BDR}`,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:"100%",margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4,padding:"0 2%"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:30,height:30,borderRadius:7,background:`linear-gradient(135deg,${NAVY},#1a3a7a)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD}}>M</div>
+      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:"100%",margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4,padding:"0 1%"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <div style={{width:30,height:30,borderRadius:7,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD}}>M</div>
             <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
           </div>
-          <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:2,flexShrink:1}}>
             <NB id="home" label="Home" icon="🏠"/>
-            <NB id="mcq" label="MCQs" icon="🎯"/>
+            <NB id="mcq" label="MCQ Bank" icon="🎯"/>
             <NB id="guides" label="Guides" icon="📚"/>
             <NB id="progress" label="Progress" icon="📊"/>
             <NB id="defi" label="DeFi" icon="💰"/>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:12,fontWeight:600,color:"#f1f5f9"}}>{uname}</div>
               <div style={{fontSize:10,color:"#475569"}}>{user?.email}</div>
             </div>
-            <button onClick={()=>window.open("https://billing.stripe.com/p/login/fZufZ9fDJ4NVbNM5iS2sM00","_blank")}
-              style={{background:"rgba(201,168,76,0.1)",border:`1px solid ${GOLD}`,color:GOLD,padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600}}>
-              💳 Manage Plan
+            <button onClick={()=>window.open(PORTAL_URL,"_blank")}
+              style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600}}>
+              Manage Plan
             </button>
-            <button onClick={logout} style={{background:"transparent",border:`1px solid ${BDR}`,color:"#94a3b8",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Sign Out</button>
+            <button onClick={logout} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Sign Out</button>
           </div>
         </div>
       </nav>
-
       <div style={{maxWidth:"100%",margin:"0 auto",padding:"18px 2%"}}>
-
-        {/* HOME */}
         {tab==="home"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {uname}! 👋</h2>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {uname}!</h2>
             <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Howard University College of Medicine · Board Prep Dashboard</p>
-            <div style={{background:`rgba(201,168,76,0.08)`,border:`1px solid ${GOLD}`,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>✅ Active</div></div>
+            <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid "+GOLD,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>Active</div></div>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Email</div><div style={{fontSize:13,fontWeight:600,color:"#f1f5f9"}}>{user?.email}</div></div>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Sessions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.s}</div></div>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Questions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.t}</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?`${Math.round(score.c/score.t*100)}%`:"—"}</div></div>
-              <button onClick={()=>window.open("https://billing.stripe.com/p/login/fZufZ9fDJ4NVbNM5iS2sM00","_blank")}
-                style={{marginLeft:"auto",background:"rgba(201,168,76,0.1)",border:`1px solid ${GOLD}`,color:GOLD,padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                💳 Manage Subscription
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?Math.round(score.c/score.t*100)+"%":"—"}</div></div>
+              <button onClick={()=>window.open(PORTAL_URL,"_blank")}
+                style={{marginLeft:"auto",background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
+                Manage Subscription
               </button>
             </div>
-            <h3 style={{fontSize:16,fontWeight:700,marginBottom:14,color:"#f1f5f9"}}>Quick Actions</h3>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:24}}>
-              {[{icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned board questions",tab:"mcq",color:"#6366f1"},{icon:"📚",title:"Guidelines",desc:"Official society resources",tab:"guides",color:"#10b981"},{icon:"📊",title:"My Progress",desc:"Track performance",tab:"progress",color:"#f59e0b"},{icon:"💰",title:"DeFi Tracker",desc:"Live yield opportunities",tab:"defi",color:GOLD}].map(a=>(
+              {[{icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned questions",tab:"mcq",color:"#6366f1"},{icon:"📚",title:"Guidelines",desc:"Official society resources",tab:"guides",color:"#10b981"},{icon:"📊",title:"My Progress",desc:"Track performance",tab:"progress",color:"#f59e0b"},{icon:"💰",title:"DeFi Tracker",desc:"Live yield opportunities",tab:"defi",color:GOLD}].map(a=>(
                 <div key={a.tab} onClick={()=>{setTab(a.tab);if(a.tab==="defi"&&!pools.length)fetchDefi();}}
-                  style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:16,cursor:"pointer",transition:"border-color 0.2s"}}
+                  style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:16,cursor:"pointer",transition:"border-color 0.2s"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
                   <div style={{fontSize:24,marginBottom:8}}>{a.icon}</div>
@@ -870,17 +767,6 @@ function App(){
                 </div>
               ))}
             </div>
-            <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:18}}>
-              <h3 style={{fontWeight:700,marginBottom:12,fontSize:14,color:"#f1f5f9"}}>📋 Your Training Continuum</h3>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8}}>
-                {[{e:"USMLE Step 1",w:"M2",c:"#3B82F6"},{e:"USMLE Step 2",w:"M3/M4",c:"#8B5CF6"},{e:"USMLE Step 3",w:"PGY-1/2",c:"#6366f1"},{e:"ABIM IM",w:"Residents",c:"#10b981"},{e:"ABIM Endo",w:"Fellows",c:GOLD}].map(e=>(
-                  <div key={e.e} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${e.c}44`,borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:11,fontWeight:800,color:e.c}}>{e.e}</div>
-                    <div style={{fontSize:10,color:"#475569"}}>{e.w}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
@@ -888,37 +774,30 @@ function App(){
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 MCQ Bank</h2>
             <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Unlimited · Study or timed exam mode</p>
-
-            {/* Two-column layout: sidebar + main content */}
             <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
-
-              {/* LEFT SIDEBAR — always visible */}
-              <div style={{width:320,flexShrink:0,background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,position:"sticky",top:70,maxHeight:"calc(100vh - 80px)",overflowY:"auto"}}>
+              <div style={{width:320,flexShrink:0,background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,position:"sticky",top:70,maxHeight:"calc(100vh - 80px)",overflowY:"auto"}}>
                 <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
                 {LEVELS.map(x=>(
                   <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:7,border:`1px solid ${lvl.l===x.l?GOLD:BDR}`,background:lvl.l===x.l?`rgba(201,168,76,0.1)`:"transparent",color:lvl.l===x.l?GOLD:"#e2e8f0",fontSize:13,fontWeight:lvl.l===x.l?700:500,cursor:"pointer",marginBottom:5,transition:"all 0.2s"}}>
+                    style={{width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:7,border:"1px solid "+(lvl.l===x.l?GOLD:BDR),background:lvl.l===x.l?"rgba(201,168,76,0.1)":"transparent",color:lvl.l===x.l?GOLD:"#e2e8f0",fontSize:13,fontWeight:lvl.l===x.l?700:500,cursor:"pointer",marginBottom:5,transition:"all 0.2s"}}>
                     {x.l}
                   </button>
                 ))}
-
                 <div style={{height:1,background:BDR,margin:"14px 0"}}/>
-
                 <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:10,letterSpacing:1}}>SPECIALTY</p>
                 {Object.keys(GROUPS).map(g=>(
                   <button key={g} onClick={()=>{setGrp(g);setTopic(GROUPS[g][0]);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"7px 12px",borderRadius:7,border:`1px solid ${grp===g?GOLD:BDR}`,background:grp===g?`rgba(201,168,76,0.08)`:"transparent",color:grp===g?GOLD:"#e2e8f0",fontSize:12,fontWeight:grp===g?700:500,cursor:"pointer",marginBottom:4,transition:"all 0.2s"}}>
+                    style={{width:"100%",textAlign:"left",padding:"7px 12px",borderRadius:7,border:"1px solid "+(grp===g?GOLD:BDR),background:grp===g?"rgba(201,168,76,0.08)":"transparent",color:grp===g?GOLD:"#e2e8f0",fontSize:12,fontWeight:grp===g?700:500,cursor:"pointer",marginBottom:4,transition:"all 0.2s"}}>
                     {g}
                   </button>
                 ))}
-
                 {grp&&GROUPS[grp].length>1&&(
                   <>
                     <div style={{height:1,background:BDR,margin:"10px 0"}}/>
                     <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8,letterSpacing:1}}>TOPIC</p>
                     {GROUPS[grp].map(t=>(
                       <button key={t} onClick={()=>{setTopic(t);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                        style={{width:"100%",textAlign:"left",padding:"6px 12px",borderRadius:6,border:"none",background:topic===t?`rgba(201,168,76,0.08)`:"transparent",color:topic===t?GOLD:"#e2e8f0",fontSize:12,fontWeight:topic===t?700:500,cursor:"pointer",marginBottom:2,transition:"all 0.2s"}}>
+                        style={{width:"100%",textAlign:"left",padding:"6px 12px",borderRadius:6,border:"none",background:topic===t?"rgba(201,168,76,0.08)":"transparent",color:topic===t?GOLD:"#e2e8f0",fontSize:12,fontWeight:topic===t?700:500,cursor:"pointer",marginBottom:2,transition:"all 0.2s"}}>
                         {t}
                       </button>
                     ))}
@@ -926,161 +805,136 @@ function App(){
                 )}
                 <LabPanel/>
               </div>
-
-              {/* RIGHT — main content */}
               <div style={{flex:1,minWidth:0}}>
-
-            {/* Setup panel — only show when no active question */}
-            {qs.length===0&&!busy&&(
-              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:18,marginBottom:18}}>
-                <div style={{display:"flex",gap:10,marginBottom:16}}>
-                  <button onClick={()=>setExamMode(false)}
-                    style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${!examMode?"#10b981":BDR}`,background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                    📖 Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback</span>
-                  </button>
-                  <button onClick={()=>setExamMode(true)}
-                    style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${examMode?"#ef4444":BDR}`,background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                    ⏱️ Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit</span>
-                  </button>
-                </div>
-
-                <div style={{background:"rgba(201,168,76,0.06)",border:`1px solid ${GOLD}44`,borderRadius:9,padding:"10px 14px",marginBottom:14}}>
-                  <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>📌 Selected: <span style={{color:"#f1f5f9"}}>{grp} → {topic}</span></p>
-                  <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Board level: {lvl.l} · Change selections in the left panel</p>
-                </div>
-
-                <button onClick={generate} disabled={busy}
-                  style={{width:"100%",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"14px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                  {examMode?"⏱️ Start Exam Mode →":"⚡ Start Practicing →"}
-                </button>
-              </div>
-            )}
-
-            {/* Loading state */}
-            {busy&&(
-              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:14,padding:40,textAlign:"center",marginBottom:18}}>
-                <div style={{fontSize:36,marginBottom:16}}>⏳</div>
-                <p style={{color:"#64748b",fontSize:15,marginBottom:8}}>Generating your question...</p>
-                <p style={{color:"#334155",fontSize:13}}>Powered by AI · ~5 seconds</p>
-              </div>
-            )}
-
-            {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>qs.length>0?nextQuestion():generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
-
-            {/* ✅ FIX 2: sessionCount replaced with score.t — no more undefined variable crash */}
-            {score.t>0&&qs.length>0&&(
-              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                <span style={{fontSize:12,color:"#64748b"}}>Questions answered:</span>
-                <span style={{fontWeight:800,color:GOLD,fontSize:15}}>{score.t}</span>
-                {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
-                {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
-                {/* ✅ FIX 3: Single onClick, no duplicate, no setSessionCount */}
-                <button
-                  onClick={()=>{stopT();setQs([]);setSel({});setRev({});setCurrentQ(0);setTLeft(null);setQNum(0);setScore({t:0,c:0,s:0});}}
-                  style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700,marginLeft:"auto"}}>
-                  ✕ End Session
-                </button>
-              </div>
-            )}
-
-            {/* Single question */}
-            {qs.length>0&&qs[0]&&!busy&&(()=>{
-              try{
-              const q=qs[0];
-              const i=0;
-              const answered=!!rev[i];
-              const correct=answered&&sel[i]===q.correct;
-              return(
-                <div style={{background:CARD,border:`1px solid ${rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR}`,borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
-                  <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                    <span style={{background:NAVY,border:`1px solid ${GOLD}`,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum+1}</span>
-                    {answered&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
-                    {answered&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:correct?"#10b981":"#ef4444"}}>{correct?"✓ Correct":"✗ Incorrect"}</span>}
-                  </div>
-
-                  <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
-
-                  <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-                    {Object.entries(q.choices).map(([l,t])=>(
-                      <button key={l} onClick={()=>{if(!answered)setSel(p=>({...p,[i]:l}));}}
-                        style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:answered?"default":"pointer",
-                          border:`1px solid ${qColor(i,l)==="transparent"?BDR:qColor(i,l)}`,
-                          background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":`${qColor(i,l)}22`,
-                          color:answered&&l===q.correct?"#10b981":answered&&sel[i]===l?"#ef4444":"#cbd5e1",
-                          fontWeight:sel[i]===l?700:400,fontSize:14,transition:"all 0.2s"}}>
-                        <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
-                        {answered&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}>✓ Correct answer</span>}
-                        {answered&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}>✗ Your answer</span>}
+                {qs.length===0&&!busy&&(
+                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,marginBottom:18}}>
+                    <div style={{display:"flex",gap:10,marginBottom:16}}>
+                      <button onClick={()=>setExamMode(false)}
+                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(!examMode?"#10b981":BDR),background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
+                        Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback</span>
                       </button>
-                    ))}
-                  </div>
-
-                  {/* ✅ Explanation — now shows correctly because nextQuestion is defined */}
-                  {answered&&(
-                    <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${BDR}`,borderRadius:9,padding:16,marginBottom:16}}>
-                      <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>📖 Explanation</p>
-                      <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
+                      <button onClick={()=>setExamMode(true)}
+                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(examMode?"#ef4444":BDR),background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
+                        Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit</span>
+                      </button>
                     </div>
-                  )}
-
-                  <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                    {!answered?(
-                      <>
-                        <button onClick={()=>reveal(i)} disabled={!sel[i]}
-                          style={{background:sel[i]?`linear-gradient(135deg,${NAVY},#1a4a9a)`:"#1e293b",border:`1px solid ${sel[i]?GOLD:BDR}`,color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
-                          Submit Answer
-                        </button>
-                        {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}
-                      </>
-                    ):(
-                      <button onClick={nextQuestion} disabled={busy}
-                        style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                        {busy?"⏳ Loading...":"Next Question →"}
-                      </button>
-                    )}
+                    <div style={{background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:9,padding:"10px 14px",marginBottom:14}}>
+                      <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>Selected: <span style={{color:"#f1f5f9"}}>{grp} — {topic}</span></p>
+                      <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Level: {lvl.l}</p>
+                    </div>
+                    <button onClick={generate} disabled={busy}
+                      style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"14px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:15}}>
+                      {examMode?"Start Exam Mode":"Start Practicing"}
+                    </button>
                   </div>
-                </div>
-              );}catch(e){return <div style={{color:"#ef4444",padding:20}}>Error displaying question. Please click End Session and try again.</div>;}
-            })()}
-              </div>{/* end right column */}
-            </div>{/* end two-column layout */}
+                )}
+                {busy&&(
+                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:40,textAlign:"center",marginBottom:18}}>
+                    <div style={{fontSize:36,marginBottom:16}}>⏳</div>
+                    <p style={{color:"#64748b",fontSize:15,marginBottom:8}}>Generating your question...</p>
+                    <p style={{color:"#334155",fontSize:13}}>Powered by AI · ~5 seconds</p>
+                  </div>
+                )}
+                {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
+                {score.t>0&&qs.length>0&&(
+                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,color:"#64748b"}}>Questions answered:</span>
+                    <span style={{fontWeight:800,color:GOLD,fontSize:15}}>{score.t}</span>
+                    {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
+                    {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
+                    <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);setScore({t:0,c:0,s:0});}}
+                      style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700,marginLeft:"auto"}}>
+                      End Session
+                    </button>
+                  </div>
+                )}
+                {qs.length>0&&qs[0]&&!busy&&(()=>{
+                  try{
+                    const q=qs[0];const i=0;
+                    const answered=!!rev[i];
+                    const correct=answered&&sel[i]===q.correct;
+                    return(
+                      <div style={{background:CARD,border:"1px solid "+(rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR),borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                          <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum+1}</span>
+                          {answered&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
+                          {answered&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:correct?"#10b981":"#ef4444"}}>{correct?"Correct":"Incorrect"}</span>}
+                        </div>
+                        <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
+                        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+                          {Object.entries(q.choices).map(([l,t])=>(
+                            <button key={l} onClick={()=>{if(!answered)setSel(p=>({...p,[i]:l}));}}
+                              style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:answered?"default":"pointer",
+                                border:"1px solid "+(qColor(i,l)==="transparent"?BDR:qColor(i,l)),
+                                background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":qColor(i,l)+"22",
+                                color:answered&&l===q.correct?"#10b981":answered&&sel[i]===l?"#ef4444":"#cbd5e1",
+                                fontWeight:sel[i]===l?700:400,fontSize:14,transition:"all 0.2s"}}>
+                              <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
+                              {answered&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}> Correct answer</span>}
+                              {answered&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}> Your answer</span>}
+                            </button>
+                          ))}
+                        </div>
+                        {answered&&(
+                          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginBottom:16}}>
+                            <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>Explanation</p>
+                            <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
+                          </div>
+                        )}
+                        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                          {!answered?(
+                            <>
+                              <button onClick={()=>reveal(i)} disabled={!sel[i]}
+                                style={{background:sel[i]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[i]?GOLD:BDR),color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
+                                Submit Answer
+                              </button>
+                              {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}
+                            </>
+                          ):(
+                            <button onClick={nextQuestion} disabled={busy}
+                              style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                              {busy?"Loading...":"Next Question"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }catch(e){return <div style={{color:"#ef4444",padding:20}}>Error displaying question. Click End Session and try again.</div>;}
+                })()}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* GUIDES */}
         {tab==="guides"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>📚 Official Guidelines & Resources</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Direct links to official society guidelines — always current, always free, no paywalls</p>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Direct links to official society guidelines — always current, always free</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
               {GUIDES.map(g=>(
-                <div key={g.id} style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10,transition:"border-color 0.2s"}}
+                <div key={g.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10,transition:"border-color 0.2s"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
                   <div style={{fontSize:28}}>{g.i}</div>
                   <div style={{fontWeight:700,fontSize:14,lineHeight:1.4,color:"#f1f5f9"}}>{g.t}</div>
-                  <span style={{background:`rgba(201,168,76,0.1)`,border:`1px solid ${GOLD}44`,color:GOLD,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.s}</span>
+                  <span style={{background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",color:GOLD,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.s}</span>
                   <a href={g.u} target="_blank" rel="noopener noreferrer"
-                    style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"9px",borderRadius:7,fontWeight:600,fontSize:12,textAlign:"center",display:"block",marginTop:"auto"}}>
-                    🔗 Open Official Guidelines
+                    style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"9px",borderRadius:7,fontWeight:600,fontSize:12,textAlign:"center",display:"block",marginTop:"auto"}}>
+                    Open Official Guidelines
                   </a>
                 </div>
               ))}
             </div>
-            <div style={{background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:10,padding:14,marginTop:16}}>
-              <p style={{color:"#818cf8",fontSize:12,margin:0}}>📌 All links go directly to official society websites. Always the most current guidelines — updated by the societies themselves.</p>
-            </div>
           </div>
         )}
 
-        {/* PROGRESS */}
         {tab==="progress"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>📊 Your Progress</h2>
             <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Track your board prep performance across all sessions</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:22}}>
-              {[{l:"Sessions",v:score.s,i:"📝",c:"#6366f1"},{l:"Questions",v:score.t,i:"❓",c:"#3b82f6"},{l:"Correct",v:score.c,i:"✅",c:"#10b981"},{l:"Accuracy",v:score.t>0?`${Math.round(score.c/score.t*100)}%`:"—",i:"🎯",c:GOLD}].map(s=>(
-                <div key={s.l} style={{background:CARD,border:`1px solid ${s.c}44`,borderRadius:12,padding:18,textAlign:"center"}}>
+              {[{l:"Sessions",v:score.s,i:"📝",c:"#6366f1"},{l:"Questions",v:score.t,i:"❓",c:"#3b82f6"},{l:"Correct",v:score.c,i:"✅",c:"#10b981"},{l:"Accuracy",v:score.t>0?Math.round(score.c/score.t*100)+"%":"—",i:"🎯",c:GOLD}].map(s=>(
+                <div key={s.l} style={{background:CARD,border:"1px solid "+s.c+"44",borderRadius:12,padding:18,textAlign:"center"}}>
                   <div style={{fontSize:24,marginBottom:7}}>{s.i}</div>
                   <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
                   <div style={{fontSize:11,color:"#475569",marginTop:3}}>{s.l}</div>
@@ -1088,14 +942,14 @@ function App(){
               ))}
             </div>
             {score.t===0?(
-              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:36,textAlign:"center"}}>
+              <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:36,textAlign:"center"}}>
                 <div style={{fontSize:44,marginBottom:12}}>🎯</div>
                 <h3 style={{fontWeight:700,marginBottom:8,color:"#f1f5f9"}}>No questions answered yet</h3>
-                <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Start the MCQ generator to begin tracking your progress!</p>
-                <button onClick={()=>setTab("mcq")} style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"11px 24px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Generate Questions →</button>
+                <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Start the MCQ Bank to begin tracking your progress!</p>
+                <button onClick={()=>setTab("mcq")} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 24px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Go to MCQ Bank</button>
               </div>
             ):(
-              <div style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:22}}>
+              <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:22}}>
                 <h3 style={{fontWeight:700,marginBottom:14,fontSize:15,color:"#f1f5f9"}}>Performance Summary</h3>
                 <div style={{marginBottom:14}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
@@ -1103,7 +957,7 @@ function App(){
                     <span style={{fontSize:13,fontWeight:700,color:GOLD}}>{Math.round(score.c/score.t*100)}%</span>
                   </div>
                   <div style={{height:10,background:"#1e293b",borderRadius:5,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${Math.round(score.c/score.t*100)}%`,background:`linear-gradient(90deg,${NAVY},${GOLD})`,borderRadius:5,transition:"width 0.4s"}}/>
+                    <div style={{height:"100%",width:Math.round(score.c/score.t*100)+"%",background:"linear-gradient(90deg,"+NAVY+","+GOLD+")",borderRadius:5,transition:"width 0.4s"}}/>
                   </div>
                 </div>
                 <p style={{color:"#475569",fontSize:13,lineHeight:1.6}}>
@@ -1114,31 +968,30 @@ function App(){
           </div>
         )}
 
-        {/* DEFI */}
         {tab==="defi"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>💰 DeFi Yield Tracker</h2>
             <p style={{color:"#475569",marginBottom:12,fontSize:13}}>Live yields across Ethereum, Solana, Arbitrum, Polygon & BNB Chain — powered by DeFiLlama</p>
             <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:9,padding:"9px 14px",marginBottom:16,fontSize:12,color:"#fca5a5",lineHeight:1.6}}>
-              ⚠️ <strong>Educational tool only.</strong> DeFi carries real financial risk including smart contract exploits and potential total loss. Higher APY = higher risk. Not financial advice.
+              Educational tool only. DeFi carries real financial risk including smart contract exploits and potential total loss. Not financial advice.
             </div>
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
               {["All","Ethereum","Arbitrum","Solana","Polygon","BSC"].map(c=>(
-                <button key={c} onClick={()=>setDChain(c)} style={{padding:"6px 14px",border:`1px solid ${dChain===c?GOLD:BDR}`,borderRadius:20,cursor:"pointer",background:dChain===c?`rgba(201,168,76,0.15)`:"transparent",color:dChain===c?GOLD:"#64748b",fontSize:12,fontWeight:600}}>{c}</button>
+                <button key={c} onClick={()=>setDChain(c)} style={{padding:"6px 14px",border:"1px solid "+(dChain===c?GOLD:BDR),borderRadius:20,cursor:"pointer",background:dChain===c?"rgba(201,168,76,0.15)":"transparent",color:dChain===c?GOLD:"#64748b",fontSize:12,fontWeight:600}}>{c}</button>
               ))}
-              <button onClick={fetchDefi} style={{marginLeft:"auto",background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:600}}>🔄 Refresh</button>
+              <button onClick={fetchDefi} style={{marginLeft:"auto",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:600}}>Refresh</button>
             </div>
-            {dBusy&&<div style={{textAlign:"center",padding:"36px",color:"#475569"}}>⏳ Fetching live yield data from DeFiLlama...</div>}
+            {dBusy&&<div style={{textAlign:"center",padding:"36px",color:"#475569"}}>⏳ Fetching live yield data...</div>}
             {dErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:14,color:"#ef4444"}}>{dErr}</div>}
             {!dBusy&&!dErr&&!pools.length&&(
               <div style={{textAlign:"center",padding:"36px",color:"#475569"}}>
                 <div style={{fontSize:36,marginBottom:10}}>💰</div>
                 <p style={{marginBottom:14,fontSize:14}}>Click Refresh to load live yield data</p>
-                <button onClick={fetchDefi} style={{background:`linear-gradient(135deg,${NAVY},#1a4a9a)`,border:`1px solid ${GOLD}`,color:"#fff",padding:"11px 22px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>Load Live Data</button>
+                <button onClick={fetchDefi} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 22px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>Load Live Data</button>
               </div>
             )}
             {!dBusy&&pools.filter(p=>dChain==="All"||p.chain===dChain).slice(0,50).map(p=>(
-              <div key={p.id} style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:11,padding:"13px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:9,transition:"border-color 0.2s"}}
+              <div key={p.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:11,padding:"13px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:9,transition:"border-color 0.2s"}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
                 <div style={{width:9,height:9,borderRadius:"50%",background:cC(p.chain),flexShrink:0}}/>
@@ -1154,12 +1007,25 @@ function App(){
                   <div style={{fontSize:12,fontWeight:700,color:"#94a3b8"}}>{fTVL(p.tvl)}</div>
                   <div style={{fontSize:9,color:"#475569"}}>TVL</div>
                 </div>
-                <span style={{background:`${rC(p.risk)}22`,border:`1px solid ${rC(p.risk)}`,color:rC(p.risk),borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>{p.risk}</span>
+                <span style={{background:rC(p.risk)+"22",border:"1px solid "+rC(p.risk),color:rC(p.risk),borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>{p.risk}</span>
                 <button onClick={()=>setWl(w=>w.includes(p.id)?w.filter(x=>x!==p.id):[...w,p.id])}
-                  style={{background:"transparent",border:`1px solid ${wl.includes(p.id)?GOLD:BDR}`,color:wl.includes(p.id)?GOLD:"#475569",borderRadius:7,padding:"4px 9px",cursor:"pointer",fontSize:13}}>
+                  style={{background:"transparent",border:"1px solid "+(wl.includes(p.id)?GOLD:BDR),color:wl.includes(p.id)?GOLD:"#475569",borderRadius:7,padding:"4px 9px",cursor:"pointer",fontSize:13}}>
                   {wl.includes(p.id)?"⭐":"☆"}
                 </button>
               </div>
             ))}
           </div>
         )}
+
+      </div>
+      <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:"1px solid "+BDR}}>
+        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine · antenehzenebe@gmail.com
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
