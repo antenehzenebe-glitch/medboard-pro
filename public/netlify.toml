@@ -4,6 +4,4 @@
 
 [functions]
   node_bundler = "esbuild"
-
-[[plugins]]
-  package = "@netlify/plugin-functions-install-core"
+  timeout = 30
