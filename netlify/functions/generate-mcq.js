@@ -3,6 +3,7 @@
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 async function callClaude(prompt) {
+  console.log("Calling Claude, prompt length:", prompt.length);
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -18,9 +19,15 @@ async function callClaude(prompt) {
   });
   if (!response.ok) {
     const err = await response.text();
+    console.error("Anthropic API error:", response.status, err);
     throw new Error("Anthropic API error " + response.status + ": " + err);
   }
   const data = await response.json();
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    console.error("Unexpected API response:", JSON.stringify(data));
+    throw new Error("Unexpected API response format");
+  }
+  console.log("Claude response length:", data.content[0].text.length, "stop_reason:", data.stop_reason);
   return data.content[0].text;
 }
 
@@ -321,7 +328,7 @@ function buildPrompt(level, requestedTopic) {
     topicInstruction = "Topic: " + specificTopic;
   } else {
     var cat = result.blueprintCat;
-    specificTopic = pickRandom(cat.topics);
+    specificTopic = pickRandom(cat.topics).split(' - ')[0].split(' — ')[0];
     topicInstruction = "Topic: " + specificTopic + " (" + cat.category + " - " + cat.weight + "% of " + level + ")";
   }
 
@@ -362,7 +369,7 @@ function buildPrompt(level, requestedTopic) {
     explanationLine + "\n\n" +
     "Return ONLY valid JSON, no markdown, no extra text:\n" +
     jsonLine +
-    "\nIMPORTANT: Set showImageButton to true ONLY when the question is specifically asking the subscriber to interpret a visual image — for example if the stem says 'The following chest X-ray is shown' or 'Based on the image below, what is the diagnosis?'. Set showImageButton to false in ALL other cases, including when the stem merely describes imaging findings in words (e.g. 'ultrasound shows a hypoechoic nodule' — this is a text description, NOT a visual question). Most questions should have showImageButton: false.";
+    "\nSet showImageButton:true ONLY if the question asks subscriber to look at an actual image (e.g. See image below). Set false if stem just describes findings in words. Default is false.";
 }
 
 exports.handler = async function(event) {
