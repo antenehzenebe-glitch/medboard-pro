@@ -145,70 +145,152 @@ function getBlueprintCategory(level, requestedTopic) {
 // Maps image-heavy clinical topics to verified public Radiopaedia case URLs
 var RADIOPAEDIA_CASES = {
   // Pulmonary / CXR
-  "Pneumonia": "https://radiopaedia.org/cases/88765",
-  "ARDS": "https://radiopaedia.org/cases/73560",
-  "Pleural Effusion": "https://radiopaedia.org/cases/71620",
-  "Pneumothorax": "https://radiopaedia.org/cases/72198",
-  "Pulmonary Embolism": "https://radiopaedia.org/cases/75445",
-  "Interstitial Lung Disease": "https://radiopaedia.org/cases/82034",
-  "Lung Cancer": "https://radiopaedia.org/cases/85901",
-  "COPD": "https://radiopaedia.org/cases/74320",
-  "Asthma": "https://radiopaedia.org/cases/70011",
-  "Sarcoidosis": "https://radiopaedia.org/cases/79443",
+  "Pneumonia": "https://radiopaedia.org/search?q=pneumonia&lang=us",
+  "ARDS": "https://radiopaedia.org/search?q=ARDS+acute+respiratory+distress&lang=us",
+  "Pleural Effusion": "https://radiopaedia.org/search?q=pleural+effusion&lang=us",
+  "Pneumothorax": "https://radiopaedia.org/search?q=pneumothorax&lang=us",
+  "Pulmonary Embolism": "https://radiopaedia.org/search?q=pulmonary+embolism+CT&lang=us",
+  "Interstitial Lung Disease": "https://radiopaedia.org/search?q=interstitial+lung+disease+HRCT&lang=us",
+  "Lung Cancer": "https://radiopaedia.org/search?q=lung+cancer+mass&lang=us",
+  "COPD": "https://radiopaedia.org/search?q=COPD+emphysema+chest+xray&lang=us",
+  "Sarcoidosis": "https://radiopaedia.org/search?q=sarcoidosis+chest&lang=us",
   // Cardiology
-  "Heart Failure": "https://radiopaedia.org/cases/78341",
-  "Aortic Dissection": "https://radiopaedia.org/cases/81234",
-  "Pericarditis": "https://radiopaedia.org/cases/76543",
-  "Valvular Disease": "https://radiopaedia.org/cases/83210",
-  "Pulmonary Hypertension": "https://radiopaedia.org/cases/77890",
-  // Neurology / Brain MRI
-  "Ischemic Stroke": "https://radiopaedia.org/cases/87654",
-  "Hemorrhagic Stroke": "https://radiopaedia.org/cases/84321",
-  "Multiple Sclerosis": "https://radiopaedia.org/cases/80123",
-  "Meningitis": "https://radiopaedia.org/cases/76890",
-  "Brain Tumor": "https://radiopaedia.org/cases/88012",
-  "Subarachnoid Hemorrhage": "https://radiopaedia.org/cases/75678",
+  "Heart Failure": "https://radiopaedia.org/search?q=heart+failure+cardiomegaly&lang=us",
+  "Aortic Dissection": "https://radiopaedia.org/search?q=aortic+dissection+CT&lang=us",
+  "Pericarditis": "https://radiopaedia.org/search?q=pericarditis+pericardial+effusion&lang=us",
+  "Valvular Disease": "https://radiopaedia.org/search?q=aortic+stenosis+valvular&lang=us",
+  "Pulmonary Hypertension": "https://radiopaedia.org/search?q=pulmonary+hypertension+xray&lang=us",
+  // Neurology
+  "Ischemic Stroke": "https://radiopaedia.org/search?q=ischemic+stroke+MRI+DWI&lang=us",
+  "Hemorrhagic Stroke": "https://radiopaedia.org/search?q=intracranial+hemorrhage+CT&lang=us",
+  "Multiple Sclerosis": "https://radiopaedia.org/search?q=multiple+sclerosis+MRI+lesions&lang=us",
+  "Meningitis": "https://radiopaedia.org/search?q=meningitis+MRI+enhancement&lang=us",
+  "Subarachnoid Hemorrhage": "https://radiopaedia.org/search?q=subarachnoid+hemorrhage+CT&lang=us",
   // Endocrinology imaging
-  "Thyroid Nodule Evaluation": "https://radiopaedia.org/cases/thyroid-nodule-1",
-  "Thyroid Cancer": "https://radiopaedia.org/cases/79234",
-  "Adrenal Insufficiency": "https://radiopaedia.org/cases/80456",
-  "Cushing's Syndrome": "https://radiopaedia.org/cases/81567",
-  "Primary Aldosteronism": "https://radiopaedia.org/cases/82678",
-  "Pheochromocytoma": "https://radiopaedia.org/cases/83789",
-  "Acromegaly": "https://radiopaedia.org/cases/84890",
-  "Prolactinoma": "https://radiopaedia.org/cases/85901",
-  "Diabetes Insipidus": "https://radiopaedia.org/cases/76012",
-  "Osteoporosis": "https://radiopaedia.org/cases/77123",
-  "Hyperparathyroidism": "https://radiopaedia.org/cases/78234",
-  "Paget's Disease": "https://radiopaedia.org/cases/79345",
+  "Thyroid Nodule Evaluation": "https://radiopaedia.org/search?q=thyroid+nodule+ultrasound&lang=us",
+  "Thyroid Cancer": "https://radiopaedia.org/search?q=thyroid+cancer+papillary+ultrasound&lang=us",
+  "Cushing's Syndrome": "https://radiopaedia.org/search?q=adrenal+adenoma+cushing+CT&lang=us",
+  "Primary Aldosteronism": "https://radiopaedia.org/search?q=adrenal+adenoma+CT+aldosteronoma&lang=us",
+  "Pheochromocytoma": "https://radiopaedia.org/search?q=pheochromocytoma+adrenal+MRI&lang=us",
+  "Acromegaly": "https://radiopaedia.org/search?q=pituitary+macroadenoma+acromegaly+MRI&lang=us",
+  "Prolactinoma": "https://radiopaedia.org/search?q=prolactinoma+pituitary+MRI&lang=us",
+  "Diabetes Insipidus": "https://radiopaedia.org/search?q=diabetes+insipidus+pituitary+MRI&lang=us",
+  "Osteoporosis": "https://radiopaedia.org/search?q=osteoporosis+compression+fracture+DXA&lang=us",
+  "Hyperparathyroidism": "https://radiopaedia.org/search?q=hyperparathyroidism+sestamibi+scan&lang=us",
+  "Paget's Disease": "https://radiopaedia.org/search?q=paget+disease+bone+xray&lang=us",
+  "Adrenal Insufficiency": "https://radiopaedia.org/search?q=adrenal+atrophy+CT+addison&lang=us",
+  "Cushing's Disease": "https://radiopaedia.org/search?q=pituitary+adenoma+cushing+MRI&lang=us",
+  "Pituitary Apoplexy": "https://radiopaedia.org/search?q=pituitary+apoplexy+MRI+hemorrhage&lang=us",
+  "Hypopituitarism": "https://radiopaedia.org/search?q=empty+sella+pituitary+MRI&lang=us",
   // Abdominal / GI
-  "Cirrhosis": "https://radiopaedia.org/cases/80456",
-  "Acute Pancreatitis": "https://radiopaedia.org/cases/81567",
-  "Bowel Obstruction": "https://radiopaedia.org/cases/82678",
-  "Appendicitis": "https://radiopaedia.org/cases/83789",
-  "NAFLD/NASH": "https://radiopaedia.org/cases/84890",
+  "Cirrhosis": "https://radiopaedia.org/search?q=cirrhosis+liver+CT+nodular&lang=us",
+  "Acute Pancreatitis": "https://radiopaedia.org/search?q=acute+pancreatitis+CT+necrosis&lang=us",
+  "NAFLD/NASH": "https://radiopaedia.org/search?q=hepatic+steatosis+fatty+liver+CT&lang=us",
   // Renal
-  "Acute Kidney Injury": "https://radiopaedia.org/cases/75901",
-  "Nephrolithiasis": "https://radiopaedia.org/cases/76012",
-  "Renal Cell Carcinoma": "https://radiopaedia.org/cases/77123",
+  "Nephrolithiasis": "https://radiopaedia.org/search?q=kidney+stones+CT+urogram&lang=us",
+  "Glomerulonephritis": "https://radiopaedia.org/search?q=glomerulonephritis+kidney+ultrasound&lang=us",
   // Musculoskeletal / Rheumatology
-  "Rheumatoid Arthritis": "https://radiopaedia.org/cases/78234",
-  "Ankylosing Spondylitis": "https://radiopaedia.org/cases/79345",
-  "Gout": "https://radiopaedia.org/cases/80456",
-  "Osteoarthritis": "https://radiopaedia.org/cases/81567",
-  "Fracture": "https://radiopaedia.org/cases/82678",
+  "Rheumatoid Arthritis": "https://radiopaedia.org/search?q=rheumatoid+arthritis+joint+xray&lang=us",
+  "Ankylosing Spondylitis": "https://radiopaedia.org/search?q=ankylosing+spondylitis+sacroiliac+MRI&lang=us",
+  "Gout": "https://radiopaedia.org/search?q=gout+tophus+joint+xray&lang=us",
+  "Osteoarthritis": "https://radiopaedia.org/search?q=osteoarthritis+joint+space+narrowing&lang=us",
+  // Pulmonary Function Tests
+  "Pulmonary Function Tests": "https://radiopaedia.org/search?q=pulmonary+function+test+spirometry+obstructive+restrictive&lang=us",
+  "Asthma & COPD": "https://radiopaedia.org/search?q=spirometry+FEV1+FVC+obstructive+pattern&lang=us",
+  "Restrictive Lung Disease": "https://radiopaedia.org/search?q=restrictive+lung+disease+pulmonary+function+test&lang=us",
+  "Obstructive Lung Disease": "https://radiopaedia.org/search?q=obstructive+spirometry+FEV1+reduced&lang=us",
+  "Sleep Apnea": "https://radiopaedia.org/search?q=obstructive+sleep+apnea+polysomnography&lang=us",
+  "Pleural Disease": "https://radiopaedia.org/search?q=pleural+disease+mesothelioma+CT&lang=us",
+  // ECG / Cardiology
+  "ACS": "https://radiopaedia.org/search?q=ST+elevation+myocardial+infarction+ECG&lang=us",
+  "ACS — STEMI/NSTEMI": "https://radiopaedia.org/search?q=STEMI+ECG+ST+elevation&lang=us",
+  "Atrial Fibrillation": "https://radiopaedia.org/search?q=atrial+fibrillation+ECG+irregularly+irregular&lang=us",
+  "Heart Blocks": "https://radiopaedia.org/search?q=heart+block+ECG+PR+interval&lang=us",
+  "Hypertension": "https://radiopaedia.org/search?q=hypertensive+heart+disease+LVH+echocardiogram&lang=us",
+  "Lipid Disorders": "https://radiopaedia.org/search?q=xanthoma+xanthelasma+familial+hypercholesterolemia&lang=us",
+  "Infective Endocarditis": "https://radiopaedia.org/search?q=endocarditis+echocardiogram+vegetation&lang=us",
+  "Pericardial Effusion": "https://radiopaedia.org/search?q=pericardial+effusion+tamponade+echo&lang=us",
+  // Nuclear Medicine / Endocrine scans
+  "Thyroid in Pregnancy": "https://radiopaedia.org/search?q=thyroid+ultrasound+nodule+pregnancy&lang=us",
+  "Subacute Thyroiditis": "https://radiopaedia.org/search?q=thyroiditis+thyroid+scan+uptake&lang=us",
+  "Hyperthyroidism & Graves'": "https://radiopaedia.org/search?q=graves+disease+thyroid+scan+diffuse+uptake&lang=us",
+  "Hypothyroidism & Hashimoto's": "https://radiopaedia.org/search?q=hashimoto+thyroiditis+ultrasound+heterogeneous&lang=us",
+  "Thyroid Storm": "https://radiopaedia.org/search?q=thyroid+storm+imaging+graves&lang=us",
+  "MEN1": "https://radiopaedia.org/search?q=MEN1+pituitary+pancreatic+parathyroid+imaging&lang=us",
+  "MEN2A & MEN2B": "https://radiopaedia.org/search?q=MEN2+medullary+thyroid+pheochromocytoma+imaging&lang=us",
+  "Carcinoid Tumors": "https://radiopaedia.org/search?q=carcinoid+tumor+octreotide+scan+NET&lang=us",
+  "Insulinoma": "https://radiopaedia.org/search?q=insulinoma+pancreatic+MRI+CT&lang=us",
+  "Gastrinoma": "https://radiopaedia.org/search?q=gastrinoma+pancreatic+CT+Zollinger+Ellison&lang=us",
+  // Bone / DXA
+  "Vitamin D Deficiency": "https://radiopaedia.org/search?q=rickets+osteomalacia+xray+vitamin+D&lang=us",
+  "Hypoparathyroidism": "https://radiopaedia.org/search?q=hypoparathyroidism+basal+ganglia+calcification+CT&lang=us",
+  "Hypercalcemia": "https://radiopaedia.org/search?q=hypercalcemia+bone+resorption+xray+PTH&lang=us",
+  "Calcium and Bone": "https://radiopaedia.org/search?q=bone+density+DXA+osteoporosis+fracture&lang=us",
+  // GI / Hepatology
+  "IBD — Crohn's & UC": "https://radiopaedia.org/search?q=Crohn+disease+CT+enterography+bowel&lang=us",
+  "GI Bleeding": "https://radiopaedia.org/search?q=GI+bleeding+angiography+nuclear+scan&lang=us",
+  "Hepatitis B & C": "https://radiopaedia.org/search?q=liver+cirrhosis+hepatocellular+carcinoma+CT&lang=us",
+  // Renal / Urology
+  "CKD": "https://radiopaedia.org/search?q=chronic+kidney+disease+small+kidneys+ultrasound&lang=us",
+  "Acute Kidney Injury": "https://radiopaedia.org/search?q=acute+kidney+injury+renal+ultrasound&lang=us",
+  "Nephrotic Syndrome": "https://radiopaedia.org/search?q=nephrotic+syndrome+kidney+biopsy+imaging&lang=us",
+  "Electrolyte Disorders": "https://radiopaedia.org/search?q=hyperkalemia+ECG+peaked+T+waves&lang=us",
+  "Acid-Base Disorders": "https://radiopaedia.org/search?q=arterial+blood+gas+interpretation+acid+base&lang=us",
+  // Hematology
+  "Anemia": "https://radiopaedia.org/search?q=sickle+cell+anemia+bone+xray+avascular+necrosis&lang=us",
+  "Sickle Cell Disease": "https://radiopaedia.org/search?q=sickle+cell+disease+avascular+necrosis+MRI&lang=us",
+  "Multiple Myeloma": "https://radiopaedia.org/search?q=multiple+myeloma+lytic+lesions+skull+xray&lang=us",
+  "Leukemia & Lymphoma": "https://radiopaedia.org/search?q=lymphoma+CT+mediastinal+mass+lymphadenopathy&lang=us",
+  "DVT & Anticoagulation": "https://radiopaedia.org/search?q=deep+vein+thrombosis+ultrasound+compression&lang=us",
+  "Thrombocytopenia": "https://radiopaedia.org/search?q=thrombocytopenia+splenomegaly+imaging&lang=us",
+  // Rheumatology
+  "SLE": "https://radiopaedia.org/search?q=lupus+nephritis+joint+imaging+SLE&lang=us",
+  "Giant Cell Arteritis": "https://radiopaedia.org/search?q=giant+cell+arteritis+temporal+artery+PET+CT&lang=us",
+  "Vasculitis": "https://radiopaedia.org/search?q=vasculitis+angiography+CT+aortitis&lang=us",
+  "Gout & Pseudogout": "https://radiopaedia.org/search?q=gout+tophi+joint+xray+DECT&lang=us",
+  // Neurology
+  "Seizures & Epilepsy": "https://radiopaedia.org/search?q=epilepsy+MRI+temporal+lobe+sclerosis&lang=us",
+  "Parkinson's Disease": "https://radiopaedia.org/search?q=parkinson+disease+DAT+scan+dopamine&lang=us",
+  "Headache": "https://radiopaedia.org/search?q=migraine+MRI+white+matter+lesions&lang=us",
+  // Infectious Disease
+  "Sepsis & Septic Shock": "https://radiopaedia.org/search?q=sepsis+source+CT+abscess+empyema&lang=us",
+  "HIV": "https://radiopaedia.org/search?q=HIV+AIDS+opportunistic+infection+CT+PCP&lang=us",
+  "Tuberculosis": "https://radiopaedia.org/search?q=tuberculosis+chest+xray+cavitation+upper+lobe&lang=us",
+  // Reproductive / PCOS
+  "PCOS": "https://radiopaedia.org/search?q=polycystic+ovary+syndrome+ultrasound+necklace&lang=us",
+  "Male Hypogonadism": "https://radiopaedia.org/search?q=testicular+ultrasound+hypogonadism&lang=us",
+  // Dermatology
+  "Melanoma": "https://radiopaedia.org/search?q=melanoma+dermoscopy+CT+staging&lang=us",
+};
 };
 
 // Keywords that flag a topic as image-based
 var IMAGE_KEYWORDS = [
+  // Radiology modalities
   "nodule", "mass", "lesion", "imaging", "radiograph", "x-ray", "xray",
-  "ct scan", "mri", "ultrasound", "echo", "echocardiogram", "nuclear",
-  "scan", "thyroid nodule", "adrenal", "pituitary", "bone", "fracture",
-  "pneumonia", "effusion", "pneumothorax", "stroke", "hemorrhage",
-  "pericarditis", "dissection", "sarcoidosis", "ild", "ipf", "cancer",
-  "tumor", "carcinoma", "lymphoma", "pancreatitis", "cirrhosis",
-  "osteoporosis", "paget", "hyperparathyroidism", "acromegaly",
-  "prolactinoma", "cushing", "pheochromocytoma", "aldosteronism"
+  "ct scan", "ct ", "mri", "ultrasound", "echo", "echocardiogram",
+  "nuclear", "scan", "pet", "scintigraphy", "sestamibi", "octreotide",
+  "angiography", "fluoroscopy", "biopsy",
+  // Pulmonary function
+  "spirometry", "pulmonary function", "fev1", "fvc", "dlco",
+  "flow volume", "peak flow", "bronchoprovocation", "methacholine",
+  "polysomnography", "sleep study",
+  // ECG / cardiac
+  "ecg", "ekg", "electrocardiogram", "st elevation", "st depression",
+  "pr interval", "qt interval", "t wave", "arrhythmia", "holter",
+  // Endocrine specific
+  "thyroid nodule", "thyroid scan", "uptake", "adrenal", "pituitary",
+  "dxa", "bone density", "dexa", "sestamibi", "parathyroid scan",
+  // Pathology
+  "bone", "fracture", "pneumonia", "effusion", "pneumothorax",
+  "stroke", "hemorrhage", "pericarditis", "dissection", "sarcoidosis",
+  "ild", "ipf", "cancer", "tumor", "carcinoma", "lymphoma",
+  "pancreatitis", "cirrhosis", "osteoporosis", "paget",
+  "hyperparathyroidism", "acromegaly", "prolactinoma", "cushing",
+  "pheochromocytoma", "aldosteronism", "dvt", "thrombosis",
+  "anemia", "myeloma", "lymphadenopathy", "abscess", "empyema",
+  "cavitation", "fibrosis", "consolidation", "atelectasis",
+  "cardiomegaly", "pleural", "pericardial", "aortic",
 ];
 
 function getRadiopaediaLink(topic) {
@@ -222,7 +304,7 @@ function getRadiopaediaLink(topic) {
   var topicLower = topic.toLowerCase();
   for (var i = 0; i < IMAGE_KEYWORDS.length; i++) {
     if (topicLower.includes(IMAGE_KEYWORDS[i])) {
-      return "https://radiopaedia.org/search?q=" + encodeURIComponent(topic.split(" ").slice(0,3).join(" ")) + "&lang=us";
+      return "https://radiopaedia.org/search?q=" + encodeURIComponent(topic.replace(/[&]/g, "and").split(" ").slice(0,4).join("+")) + "&lang=us";
     }
   }
   return null;
