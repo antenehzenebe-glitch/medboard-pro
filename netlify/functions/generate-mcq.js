@@ -370,14 +370,20 @@ exports.handler = async function(event) {
     return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
   }
 
-  var topic, level;
+  var topic, level, warmup;
   try {
     var body = JSON.parse(event.body);
     topic = body.topic;
     level = body.level;
+    warmup = body.warmup || false;
     if (!topic || !level) throw new Error("Missing topic or level");
   } catch (e) {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid request body" }) };
+  }
+
+  // Keep-warm ping - return immediately without generating
+  if (warmup) {
+    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ warm: true }) };
   }
 
   try {
