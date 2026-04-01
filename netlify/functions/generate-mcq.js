@@ -315,71 +315,50 @@ function buildPrompt(level, requestedTopic) {
 
   if (result.forcedTopic) {
     specificTopic = result.forcedTopic;
-    topicInstruction = "The topic is: \"" + specificTopic + "\". Generate a question specifically and rigorously about this topic.";
+    topicInstruction = "Topic: " + specificTopic;
   } else {
     var cat = result.blueprintCat;
     specificTopic = pickRandom(cat.topics);
-    topicInstruction = "The exam category is: \"" + cat.category + "\" (" + cat.weight + "% of the " + level + " exam). The specific subtopic is: \"" + specificTopic + "\". Generate a question directly and rigorously about this subtopic.";
+    topicInstruction = "Topic: " + specificTopic + " (" + cat.category + " - " + cat.weight + "% of " + level + ")";
   }
 
-  // Check if this topic warrants an imaging reference
   var radiopaediaLink = getRadiopaediaLink(specificTopic);
-  var imagingInstruction = radiopaediaLink
-    ? "IMAGING NOTE: This is an image-based topic. In the stem, describe the imaging findings in precise radiological language exactly as a radiologist or clinician would dictate them (e.g., 'A chest X-ray shows a right lower lobe opacity with air bronchograms and blunting of the right costophrenic angle'). At the very end of the stem, add this exact line on a new paragraph: 'View reference imaging: " + radiopaediaLink + "'"
-    : "IMAGING NOTE: This topic does not require imaging. Do not include an imaging link.";
 
-  // Level-specific instructions
   var levelNote = "";
   if (level.includes("Step 1")) {
-    levelNote = "Focus on BASIC SCIENCE mechanisms — pathophysiology, pharmacology, biochemistry, embryology. Questions must test deep understanding of WHY, not just WHAT. Include molecular and cellular mechanisms where relevant. Distractors must be based on common mechanistic misconceptions.";
+    levelNote = "Focus on basic science mechanisms, pathophysiology, pharmacology. Test WHY not just WHAT.";
   } else if (level.includes("Step 2")) {
-    levelNote = "Focus on CLINICAL DECISION MAKING — diagnosis, next best step, management in the acute and outpatient setting. Vignettes must include complete clinical context: age, sex, relevant history, vital signs, physical exam findings, and key laboratory or imaging data. Distractors must represent plausible but incorrect clinical decisions.";
+    levelNote = "Focus on clinical decision making - diagnosis, next best step, management. Include vitals, labs, exam.";
   } else if (level.includes("Step 3")) {
-    levelNote = "Focus on MANAGEMENT of established diagnoses, outpatient follow-up, preventive care, biostatistics, medical ethics, and population health. Vignettes must reflect real-world independent physician decision-making including transitions of care and chronic disease management.";
+    levelNote = "Focus on outpatient management, chronic disease, preventive care, ethics, biostatistics.";
   } else if (level.includes("ABIM Internal Medicine")) {
-    levelNote = "Focus on DIAGNOSIS and MANAGEMENT of internal medicine conditions per current ACC/AHA, ADA, IDSA, ACR, KDIGO, and USPSTF guidelines. Include exact guideline thresholds (e.g., LDL targets, BP goals, A1c targets, CrCl cutoffs). Questions must reflect the rigor of actual ABIM board examination.";
+    levelNote = "Diagnosis and management per ACC/AHA, ADA, IDSA, ACR, KDIGO guidelines with specific thresholds.";
   } else if (level.includes("ABIM Endocrinology")) {
-    levelNote = "Focus on SUBSPECIALTY-LEVEL ENDOCRINOLOGY per the ABIM Endocrinology Blueprint. Reference ADA 2025 Standards of Care, Endocrine Society Clinical Practice Guidelines, and AACE guidelines. Questions must reflect fellowship-level nuance — e.g., distinguishing Cushing disease from ectopic ACTH, adrenal vein sampling indications, CGM time-in-range interpretation, AID system troubleshooting, bone turnover marker interpretation.";
+    levelNote = "Fellowship-level endocrinology per ADA 2025, Endocrine Society, AACE guidelines. Nuanced distinctions required.";
   }
 
-  // CGM/pump data instruction for relevant topics
-  var cgmInstruction = "";
-  if (specificTopic.toLowerCase().includes("cgm") ||
-      specificTopic.toLowerCase().includes("aid") ||
-      specificTopic.toLowerCase().includes("insulin") ||
-      specificTopic.toLowerCase().includes("pump") ||
-      specificTopic.toLowerCase().includes("glucose")) {
-    cgmInstruction = "CGM/PUMP DATA: If this topic involves CGM or insulin pump management, include realistic CGM metrics in the stem: Time in Range 70-180 mg/dL (TIR%), Time Below Range <70 mg/dL (TBR%), Time Above Range >180 mg/dL (TAR%), Glucose Management Indicator (GMI), Coefficient of Variation (CV%), and mean glucose. Present these as the clinician would review them at a patient visit. Example: 'Her 14-day CGM report shows TIR 52%, TBR 11%, TAR 37%, GMI 7.9%, CV 48%, mean glucose 196 mg/dL with recurrent 2-4am hypoglycemia events.' This tests the learner's ability to interpret real-world diabetes technology data.";
+  var cgmNote = "";
+  if (specificTopic.toLowerCase().includes("cgm") || specificTopic.toLowerCase().includes("aid") || specificTopic.toLowerCase().includes("insulin pump")) {
+    cgmNote = " Include CGM metrics: TIR%, TBR%, TAR%, GMI, CV%, mean glucose.";
   }
 
-  return "You are Dr. Anteneh Zenebe, MD, FACE — Assistant Clinical Professor and Associate Program Director for the Endocrinology, Diabetes and Metabolism Fellowship at Howard University College of Medicine. You are writing a board examination question for " + level + " with the rigor, depth, and educational clarity you bring to your fellowship teaching at Howard University.\n\n" +
+  var imagingNote = radiopaediaLink
+    ? " Describe key imaging findings as a clinician would dictate (e.g. chest X-ray shows right lower lobe consolidation with air bronchograms)."
+    : "";
+
+  var stemLine = "STEM: 3-4 sentences. Age, sex, symptoms, 2-3 key lab values with units, vital signs." + imagingNote + cgmNote + " End with a clear clinical question such as: Which of the following is the most appropriate next step in management? OR Which of the following is the most likely diagnosis?";
+  var choicesLine = "CHOICES: Exactly 5 (A-E). One correct per current guidelines. Four plausible distractors representing common clinical errors.";
+  var explanationLine = "EXPLANATION: 4-5 sentences. Why correct answer is right with specific guideline citation (ADA 2025, Endocrine Society, ACC/AHA etc). Why each wrong answer is incorrect. One board pearl.";
+  var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + "}";
+
+  return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
     topicInstruction + "\n\n" +
-    "EXAM LEVEL INSTRUCTIONS:\n" + levelNote + "\n\n" +
-    imagingInstruction + "\n\n" +
-    (cgmInstruction ? cgmInstruction + "\n\n" : "") +
-    "STEM REQUIREMENTS:\n" +
-    "- Write a rich, realistic clinical vignette of 4-6 sentences minimum\n" +
-    "- Include: patient age, sex, race/ethnicity when clinically relevant, chief complaint, duration of symptoms, relevant past medical history, current medications, pertinent positives and negatives on review of systems\n" +
-    "- Include complete vital signs when relevant (BP, HR, RR, Temp, O2 sat, BMI)\n" +
-    "- Include relevant laboratory values with units (e.g., TSH 0.02 mIU/L, Free T4 2.8 ng/dL, Cortisol 1.2 ug/dL post-1mg dexamethasone)\n" +
-    "- Include physical exam findings that are diagnostically meaningful\n" +
-    "- End with a clear, unambiguous clinical question\n" +
-    "- Do NOT reveal the diagnosis or topic in the stem — let the clinical data speak\n\n" +
-    "ANSWER CHOICES:\n" +
-    "- Provide exactly 5 choices labeled A through E\n" +
-    "- All distractors must be clinically plausible — no obviously wrong answers\n" +
-    "- Distractors should represent: wrong diagnosis, wrong drug for right diagnosis, right drug at wrong dose/timing, common clinical error, or guideline-inconsistent choice\n" +
-    "- Only ONE answer is definitively correct per current guidelines\n\n" +
-    "EXPLANATION REQUIREMENTS (your teaching voice as an attending educator):\n" +
-    "- Write 6-8 sentences minimum\n" +
-    "- Start with WHY the correct answer is right, citing the specific guideline (e.g., 'Per ADA 2025 Standards of Care Section 9...' or 'Per the 2023 Endocrine Society guideline on...')\n" +
-    "- Address each wrong answer individually — explain why it is incorrect or less appropriate\n" +
-    "- Include the key teaching pearl that a fellow or resident must remember for boards\n" +
-    "- If imaging is involved, explain what the imaging findings mean clinically\n" +
-    "- If CGM data is involved, explain how to interpret each metric and what clinical action it drives\n" +
-    "- Write as you would teach on rounds at Howard University — clear, rigorous, and clinically grounded\n\n" +
-    "Return ONLY this JSON with no markdown, no preamble, no extra text:\n" +
-    "{\"stem\": \"...\", \"choices\": {\"A\": \"...\", \"B\": \"...\", \"C\": \"...\", \"D\": \"...\", \"E\": \"...\"}, \"correct\": \"A\", \"explanation\": \"...\", \"topic\": \"" + specificTopic + "\", \"imageUrl\": " + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + "}";
+    "Write ONE high-quality clinical vignette MCQ.\n" +
+    stemLine + "\n" +
+    choicesLine + "\n" +
+    explanationLine + "\n\n" +
+    "Return ONLY valid JSON, no markdown, no extra text:\n" +
+    jsonLine;
 }
 
 exports.handler = async function(event) {
