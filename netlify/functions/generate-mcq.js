@@ -2,33 +2,57 @@
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+async function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
 async function callClaude(prompt) {
   console.log("Calling Claude, prompt length:", prompt.length);
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }]
-    })
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    console.error("Anthropic API error:", response.status, err);
-    throw new Error("Anthropic API error " + response.status + ": " + err);
+  var maxRetries = 3;
+  var retryDelays = [1000, 2000, 3000]; // 1s, 2s, 3s between retries
+
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) {
+      console.log("Retry attempt " + attempt + " after overload...");
+      await sleep(retryDelays[attempt - 1]);
+    }
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1500,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    // Retry on 529 overloaded or 529 server errors
+    if (response.status === 529 || response.status === 503 || response.status === 502) {
+      console.log("API overloaded (status " + response.status + "), will retry...");
+      if (attempt === maxRetries - 1) {
+        throw new Error("Anthropic API is currently busy. Please try again in a moment.");
+      }
+      continue;
+    }
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("Anthropic API error:", response.status, err);
+      throw new Error("Anthropic API error " + response.status + ": " + err);
+    }
+
+    const data = await response.json();
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      console.error("Unexpected API response:", JSON.stringify(data));
+      throw new Error("Unexpected API response format");
+    }
+    console.log("Claude response length:", data.content[0].text.length, "stop_reason:", data.stop_reason);
+    return data.content[0].text;
   }
-  const data = await response.json();
-  if (!data.content || !data.content[0] || !data.content[0].text) {
-    console.error("Unexpected API response:", JSON.stringify(data));
-    throw new Error("Unexpected API response format");
-  }
-  console.log("Claude response length:", data.content[0].text.length, "stop_reason:", data.stop_reason);
-  return data.content[0].text;
 }
 
 // ABIM INTERNAL MEDICINE BLUEPRINT
