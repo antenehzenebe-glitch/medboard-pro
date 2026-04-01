@@ -529,7 +529,7 @@ function App(){
         </div>
       </section>
       <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
-        <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine</div>
+        <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE</div>
         <div>2026 MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
         <div style={{marginTop:10,display:"flex",gap:20,justifyContent:"center"}}>
           <span onClick={()=>setShowTos(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Terms of Service</span>
@@ -545,13 +545,20 @@ function App(){
         <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 12px"}}>M</div>
           <h1 style={{fontSize:22,fontWeight:800,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></h1>
-          <p style={{color:"#475569",fontSize:13,marginTop:4}}>Howard University · Board Prep Platform</p>
+          <p style={{color:"#475569",fontSize:13,marginTop:4}}>Board Prep Platform</p>
         </div>
         <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:20,padding:28}}>
           {fromStripe&&(
             <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:10,padding:"12px 16px",marginBottom:20,textAlign:"center"}}>
               <p style={{color:"#10b981",fontWeight:700,fontSize:14,marginBottom:4}}>Payment confirmed! Welcome to MedBoard Pro.</p>
               <p style={{color:"#64748b",fontSize:12}}>Create your account below to access your 14-day free trial.</p>
+            </div>
+          )}
+          {!fromStripe&&(
+            <div style={{background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#94a3b8",lineHeight:1.7}}>
+              <p style={{fontWeight:700,color:"#818cf8",marginBottom:6}}>New subscriber?</p>
+              <p>After completing payment, return here and sign in with Google or create an account with your email and password.</p>
+              <p style={{marginTop:6}}>Need help? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span></p>
             </div>
           )}
           <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
@@ -641,7 +648,7 @@ function App(){
         {tab==="home"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {uname}!</h2>
-            <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Howard University College of Medicine · Board Prep Dashboard</p>
+            <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Board Prep Dashboard</p>
             <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid "+GOLD,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>Active</div></div>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Sessions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.s}</div></div>
@@ -924,7 +931,7 @@ function App(){
 
       </div>
       <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:"1px solid "+BDR}}>
-        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University · antenehzenebe@gmail.com
+        MedBoard Pro · Anteneh Zenebe, MD, FACE · antenehzenebe@gmail.com
         <div style={{marginTop:8,display:"flex",gap:16,justifyContent:"center"}}>
           <span onClick={()=>setShowTos(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
           <span onClick={()=>setShowPrivacy(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
