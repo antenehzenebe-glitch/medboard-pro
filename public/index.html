@@ -68,14 +68,14 @@ const LEVELS=[
   {l:"ABIM Endocrinology",v:"ABIM Endocrinology & Metabolism subspecialty (fellows)"},
 ];
 const GUIDES=[
-  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"📊",u:"https://diabetesjournals.org/care/issue/47/Supplement_1"},
+  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"📊",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
   {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"🔬",u:"https://www.endocrine.org/clinical-practice-guidelines"},
-  {id:3,t:"AACE Diabetes Management Guidelines",s:"Endocrinology",i:"🩺",u:"https://www.aace.com/publications/guidelines"},
+  {id:3,t:"AACE Diabetes Management Guidelines",s:"Endocrinology",i:"🩺",u:"https://pro.aace.com/clinical-guidance"},
   {id:4,t:"ACC/AHA Cardiovascular Guidelines",s:"Cardiology",i:"🫀",u:"https://www.acc.org/guidelines"},
   {id:5,t:"KDIGO Kidney Disease Guidelines",s:"Nephrology",i:"🫘",u:"https://kdigo.org/guidelines"},
   {id:6,t:"USPSTF Preventive Recommendations",s:"Preventive",i:"✅",u:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
   {id:7,t:"ESC Cardiovascular Guidelines",s:"Cardiology",i:"🏥",u:"https://www.escardio.org/Guidelines"},
-  {id:8,t:"EASD Diabetes Guidelines",s:"Endocrinology",i:"🦋",u:"https://www.easd.eu/guidelines"},
+  {id:8,t:"EASD Diabetes Guidelines",s:"Endocrinology",i:"🦋",u:"https://www.easd.org/guidelines/statements-and-guidelines.html"},
   {id:9,t:"IDSA Infectious Disease Guidelines",s:"ID",i:"🦠",u:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
   {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"🎗",u:"https://www.nccn.org/guidelines/guidelines-detail"},
   {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"🦴",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
@@ -548,7 +548,7 @@ function App(){
             ))}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <button onClick={()=>{setAuthView("login");setScreen("auth");}}
+            <button onClick={()=>{setAuthView("login");setFromStripe(false);setScreen("auth");}}
               style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
               Subscriber Sign In
             </button>
@@ -578,7 +578,7 @@ function App(){
             style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16,boxShadow:"0 0 30px rgba(201,168,76,0.2)"}}>
             Start 14-Day Free Trial
           </button>
-          <button onClick={()=>{setAuthView("login");setScreen("auth");}}
+          <button onClick={()=>{setAuthView("login");setFromStripe(false);setScreen("auth");}}
             style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:16}}>
             Subscriber Sign In
           </button>
@@ -686,23 +686,6 @@ function App(){
           ))}
         </div>
       </section>
-      <section style={{padding:"80px 5%",textAlign:"center"}}>
-        <div style={{maxWidth:560,margin:"0 auto"}}>
-          <h2 style={{fontSize:38,fontWeight:800,marginBottom:16,color:"#f1f5f9"}}>Join the Early Access List</h2>
-          <p style={{color:"#64748b",marginBottom:36,fontSize:16,lineHeight:1.7}}>Be first to access MedBoard Pro. Early users receive 3 months free.</p>
-          {waitDone?(
-            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:12,padding:24,color:"#10b981",fontWeight:600,fontSize:16}}>You are on the list!</div>
-          ):(
-            <div style={{display:"flex",gap:12,flexWrap:"wrap",justifyContent:"center"}}>
-              <input type="email" placeholder="your@email.com" value={waitEmail} onChange={e=>setWaitEmail(e.target.value)}
-                style={{flex:1,minWidth:240,background:"#1e293b",border:"1px solid #334155",color:"#f1f5f9",padding:"14px 18px",borderRadius:10,fontSize:15,outline:"none"}}/>
-              <button onClick={()=>{if(waitEmail)setWaitDone(true);}}
-                style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"14px 28px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                Get Early Access
-              </button>
-            </div>
-          )}
-        </div>
       </section>
       <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
         <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine</div>
@@ -732,7 +715,7 @@ function App(){
             </div>
           )}
           <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
-            {fromStripe?"Step 2 — Create Your Account":authView==="login"?"Sign In to Your Account":"Create Your Account"}
+            {fromStripe?"Step 2 — Create Your Account":"Sign In to Your Account"}
           </h2>
           <button onClick={googleLogin}
             style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
@@ -763,16 +746,13 @@ function App(){
               {authErr}
             </div>
           )}
-          <button onClick={authView==="login"?login:signup} disabled={authBusy}
+          <button onClick={fromStripe?signup:login} disabled={authBusy}
             style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
-            {authBusy?"Please wait...":authView==="login"?"Sign In & Start Learning":"Create Account & Start Learning"}
+            {authBusy?"Please wait...":fromStripe?"Create Account & Start Learning":"Sign In & Start Learning"}
           </button>
-          {!fromStripe&&(
+          {!fromStripe&&authView==="login"&&(
             <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
-              {authView==="login"?"No account? ":"Have account? "}
-              <span onClick={()=>{setAuthView(authView==="login"?"signup":"login");setAuthErr("");}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>
-                {authView==="login"?"Sign Up Free":"Sign In"}
-              </span>
+              New user? <span onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>Subscribe to get access →</span>
             </p>
           )}
           {fromStripe&&authView==="signup"&&(
