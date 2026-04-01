@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>MedBoard Pro — Medical Board Prep</title>
+<title>MedBoard Pro</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -20,7 +20,6 @@ a{text-decoration:none}
 <body>
 <div id="root"></div>
 <script type="text/babel">
-
 const SB_URL="https://vhzeeskhvkujihuvddcc.supabase.co";
 const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
@@ -33,31 +32,30 @@ const PAYMENT_LINKS={
 };
 const PLANS=[
   {key:"student",name:"Medical Student",price:29,period:"month",color:"#3B82F6",badge:null,
-    features:["USMLE Step 1, 2 & 3 — all systems","500+ topics across all specialties","AI clinical vignettes on demand","Official society guidelines","Study & exam modes"]},
+    features:["USMLE Step 1, 2 & 3","500+ topics","AI clinical vignettes on demand","Official society guidelines","Study & exam modes"]},
   {key:"resident",name:"Resident / Fellow",price:59,period:"month",color:"#8B5CF6",badge:"MOST POPULAR",
-    features:["Everything in Student plan","ABIM Internal Medicine board prep","ABIM Endocrinology subspecialty","Timed exam mode (90 sec/question)","Progress tracking & scoring"]},
+    features:["Everything in Student","ABIM Internal Medicine","ABIM Endocrinology subspecialty","Timed exam mode","Progress tracking"]},
   {key:"institution",name:"Institution",price:2999,period:"year",color:"#10B981",badge:"BEST VALUE",
-    features:["Up to 20 learner seats","Full access to all content","ADA, ES, AACE, ACC/AHA, ESC","Personal onboarding from Dr. Zenebe","Flat annual billing ~$250/mo"]},
+    features:["Up to 20 learner seats","Full access all content","ADA, ES, AACE, ACC/AHA, ESC","Personal onboarding","~$250/mo flat"]},
 ];
 const GROUPS={
-  "Random":["Random — All Specialties","Random — Endocrinology Only","Random — ABIM IM Blueprint","Random — USMLE High-Yield"],
-  "Diabetes":["Type 2 — Diagnosis & Management","Type 1 — Insulin Therapy","DKA & HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA & MODY","CGM & AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
-  "Thyroid":["Hypothyroidism & Hashimoto's","Hyperthyroidism & Graves'","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
-  "Adrenal":["Adrenal Insufficiency","Cushing's Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
-  "Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushing's Disease"],
-  "Bone & Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Paget's Disease","Hypoparathyroidism"],
-  "Reproductive Endo":["PCOS","Male Hypogonadism","Menopause & HRT","Precocious Puberty","Turner & Klinefelter"],
-  "NETs & MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A & MEN2B"],
-  "Cardiology":["ACS — STEMI/NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
-  "Pulmonology":["Asthma & COPD","Pneumonia","Pulmonary Embolism","Interstitial Lung Disease","ARDS","Sleep Apnea"],
+  "Random":["Random -- All Specialties","Random -- Endocrinology Only","Random -- ABIM IM Blueprint","Random -- USMLE High-Yield"],
+  "Diabetes":["Type 2 Diagnosis and Management","Type 1 Insulin Therapy","DKA and HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA and MODY","CGM and AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
+  "Thyroid":["Hypothyroidism and Hashimotos","Hyperthyroidism and Graves","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
+  "Adrenal":["Adrenal Insufficiency","Cushings Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
+  "Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushings Disease"],
+  "Bone and Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Pagets Disease","Hypoparathyroidism"],
+  "Reproductive Endo":["PCOS","Male Hypogonadism","Menopause and HRT","Precocious Puberty","Turner and Klinefelter"],
+  "NETs and MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A and MEN2B"],
+  "Cardiology":["ACS STEMI NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
+  "Pulmonology":["Asthma and COPD","Pneumonia","Interstitial Lung Disease","ARDS","Sleep Apnea","Pulmonary Function Tests"],
   "Nephrology":["Acute Kidney Injury","CKD","Glomerulonephritis","Electrolyte Disorders","Acid-Base Disorders","Nephrotic Syndrome"],
-  "GI & Hepatology":["IBD — Crohn's & UC","Cirrhosis","Hepatitis B & C","GI Bleeding","Acute Pancreatitis","NAFLD/NASH"],
-  "Neurology":["Ischemic Stroke","Seizures & Epilepsy","Multiple Sclerosis","Meningitis","Parkinson's Disease","Headache"],
-  "Infectious Disease":["Sepsis & Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
-  "Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT & Anticoagulation","Leukemia & Lymphoma","Multiple Myeloma"],
-  "Rheumatology":["Rheumatoid Arthritis","SLE","Gout & Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
+  "GI and Hepatology":["IBD Crohns and UC","Cirrhosis","Hepatitis B and C","GI Bleeding","Acute Pancreatitis","NAFLD NASH"],
+  "Neurology":["Ischemic Stroke","Seizures and Epilepsy","Multiple Sclerosis","Meningitis","Parkinsons Disease","Headache"],
+  "Infectious Disease":["Sepsis and Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
+  "Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT and Anticoagulation","Leukemia and Lymphoma","Multiple Myeloma"],
+  "Rheumatology":["Rheumatoid Arthritis","SLE","Gout and Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
   "Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
-  "USMLE Step 3":["Foundations of Independent Practice","Ambulatory Medicine","Biostatistics","Patient Safety","CCS — Endocrinology","CCS — Mixed"],
   "Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
 };
 const LEVELS=[
@@ -65,158 +63,112 @@ const LEVELS=[
   {l:"USMLE Step 2 CK",v:"USMLE Step 2 CK (M3/M4 clinical decision-making)"},
   {l:"USMLE Step 3",v:"USMLE Step 3 (PGY-1/2 clinical management and CCS)"},
   {l:"ABIM Internal Medicine",v:"ABIM Internal Medicine boards (residents)"},
-  {l:"ABIM Endocrinology",v:"ABIM Endocrinology & Metabolism subspecialty (fellows)"},
+  {l:"ABIM Endocrinology",v:"ABIM Endocrinology and Metabolism subspecialty (fellows)"},
 ];
 const GUIDES=[
-  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"📊",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
-  {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"🔬",u:"https://www.endocrine.org/clinical-practice-guidelines"},
-  {id:3,t:"AACE Diabetes Management Guidelines",s:"Endocrinology",i:"🩺",u:"https://pro.aace.com/clinical-guidance"},
-  {id:4,t:"ACC/AHA Cardiovascular Guidelines",s:"Cardiology",i:"🫀",u:"https://www.acc.org/guidelines"},
-  {id:5,t:"KDIGO Kidney Disease Guidelines",s:"Nephrology",i:"🫘",u:"https://kdigo.org/guidelines"},
-  {id:6,t:"USPSTF Preventive Recommendations",s:"Preventive",i:"✅",u:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
-  {id:7,t:"ESC Cardiovascular Guidelines",s:"Cardiology",i:"🏥",u:"https://www.escardio.org/Guidelines"},
-  {id:8,t:"EASD Diabetes Guidelines",s:"Endocrinology",i:"🦋",u:"https://www.easd.org/guidelines/statements-and-guidelines.html"},
-  {id:9,t:"IDSA Infectious Disease Guidelines",s:"ID",i:"🦠",u:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
-  {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"🎗",u:"https://www.nccn.org/guidelines/guidelines-detail"},
-  {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"🦴",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
-  {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"🫁",u:"https://www.thoracic.org/statements"},
+  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"D",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
+  {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"E",u:"https://www.endocrine.org/clinical-practice-guidelines"},
+  {id:3,t:"AACE Clinical Guidance",s:"Endocrinology",i:"A",u:"https://pro.aace.com/clinical-guidance"},
+  {id:4,t:"ACC/AHA Cardiovascular Guidelines",s:"Cardiology",i:"C",u:"https://www.acc.org/guidelines"},
+  {id:5,t:"KDIGO Kidney Disease Guidelines",s:"Nephrology",i:"K",u:"https://kdigo.org/guidelines"},
+  {id:6,t:"USPSTF Preventive Recommendations",s:"Preventive",i:"U",u:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
+  {id:7,t:"ESC Cardiovascular Guidelines",s:"Cardiology",i:"S",u:"https://www.escardio.org/Guidelines"},
+  {id:8,t:"EASD Diabetes Guidelines",s:"Endocrinology",i:"X",u:"https://www.easd.org/guidelines/statements-and-guidelines.html"},
+  {id:9,t:"IDSA Infectious Disease Guidelines",s:"ID",i:"I",u:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
+  {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"N",u:"https://www.nccn.org/guidelines/guidelines-detail"},
+  {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"R",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
+  {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"P",u:"https://www.thoracic.org/statements"},
 ];
 const FAQS=[
-  {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE — Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
-  {q:"What exams does it cover?",a:"USMLE Step 1, Step 2 CK, and Step 3, ABIM Internal Medicine boards, and ABIM Endocrinology & Metabolism subspecialty boards."},
-  {q:"How is it different from UWorld or Amboss?",a:"MedBoard Pro offers unmatched endocrinology depth, AI-generated vignettes on demand across 500+ topics, and guidelines from 20+ US and European societies — built by a fellowship program director."},
+  {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE -- Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
+  {q:"What exams does it cover?",a:"USMLE Step 1, Step 2 CK, and Step 3, ABIM Internal Medicine boards, and ABIM Endocrinology and Metabolism subspecialty boards."},
+  {q:"How is it different from UWorld or Amboss?",a:"MedBoard Pro offers unmatched endocrinology depth, AI-generated vignettes on demand across 500+ topics, and guidelines from 20+ US and European societies -- built by a fellowship program director."},
   {q:"Which guidelines are used?",a:"ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European societies."},
-  {q:"Is there a free trial?",a:"Yes — 14-day free trial. A credit card is required but you will not be charged until Day 15. Cancel anytime before then at no charge."},
+  {q:"Is there a free trial?",a:"Yes -- 14-day free trial. A credit card is required but you will not be charged until Day 15. Cancel anytime before then at no charge."},
   {q:"Can I cancel anytime?",a:"Absolutely. Cancel any time with no penalties or hidden fees."},
 ];
-
+const TOS_SECTIONS=[
+  {t:"1. Acceptance of Terms",b:"By accessing or using MedBoard Pro, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform."},
+  {t:"2. Subscription and Payment",b:"MedBoard Pro offers paid subscription plans with a 14-day free trial. Your credit card will not be charged until Day 15. Subscriptions auto-renew. Cancel anytime via the Manage Subscription portal. All payments processed by Stripe."},
+  {t:"3. Cancellation Policy",b:"You may cancel anytime with no penalties. Cancellation takes effect at end of current billing period. No refunds for partial periods. To cancel, click Manage Subscription inside the app or email antenehzenebe@gmail.com."},
+  {t:"4. Intellectual Property",b:"All content on MedBoard Pro including MCQ questions, explanations, curriculum design, and study manuals is the intellectual property of Dr. Anteneh Zenebe, MD, FACE, protected by US copyright law. Use is for personal board preparation only."},
+  {t:"5. No Medical Advice",b:"MedBoard Pro is an educational platform for board exam preparation only. Content does not constitute medical advice, diagnosis, or treatment. Do not use as a substitute for professional medical judgment."},
+  {t:"6. No Real Patient Data",b:"MedBoard Pro does not use, store, or display any real patient data. All clinical vignettes are entirely fictional and AI-generated for educational purposes."},
+  {t:"7. Acceptable Use",b:"You agree to use MedBoard Pro solely for lawful personal educational purposes. You may not share credentials, resell access, or scrape content. Violations result in immediate termination without refund."},
+  {t:"8. Disclaimer of Warranties",b:"MedBoard Pro is provided as-is without warranties of any kind. We do not guarantee the platform will be error-free or that it will result in passing any board examination."},
+  {t:"9. Limitation of Liability",b:"To the maximum extent permitted by law, MedBoard Pro and Dr. Anteneh Zenebe shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform."},
+  {t:"10. Governing Law",b:"These Terms are governed by the laws of the District of Columbia, United States of America."},
+  {t:"11. Changes to Terms",b:"We reserve the right to modify these terms at any time. Continued use after changes constitutes acceptance."},
+  {t:"12. Contact",b:"Dr. Anteneh Zenebe, MD, FACE -- antenehzenebe@gmail.com -- Howard University College of Medicine, Washington, DC."},
+];
+const PRIVACY_SECTIONS=[
+  {t:"1. Information We Collect",b:"MedBoard Pro collects only your email address and full name when you create an account, and subscription status managed by Stripe. We do not collect your credit card number."},
+  {t:"2. How We Use Your Information",b:"Your email is used to manage your account, send subscription receipts via Stripe, and communicate platform updates. We do not use your information for advertising or third-party marketing."},
+  {t:"3. Payment Processing",b:"All payment processing is handled by Stripe, Inc. MedBoard Pro never sees, stores, or has access to your credit card details. Stripe is PCI-DSS Level 1 certified."},
+  {t:"4. Data Storage",b:"Your account data is stored securely using Supabase, a SOC 2 Type II certified cloud database provider. Data is encrypted at rest and in transit."},
+  {t:"5. No Data Selling",b:"MedBoard Pro does not sell, rent, trade, or transfer your personal information to any third party for commercial purposes."},
+  {t:"6. No Real Patient Data",b:"MedBoard Pro does not process any real patient health information. All clinical content is fictional and AI-generated for educational purposes."},
+  {t:"7. Cookies",b:"MedBoard Pro uses only essential session cookies required to maintain your login state. We do not use tracking or advertising cookies."},
+  {t:"8. GDPR Rights",b:"EU users have the right to access, correct, or delete personal data and the right to data portability. Contact antenehzenebe@gmail.com. We will respond within 30 days."},
+  {t:"9. CCPA Rights",b:"California residents have the right to know what personal information is collected and the right to delete it. MedBoard Pro does not sell personal information."},
+  {t:"10. Data Security",b:"We implement appropriate technical and organizational measures to protect your personal information against unauthorized access or disclosure."},
+  {t:"11. Children's Privacy",b:"MedBoard Pro is designed for medical students, residents, and physicians. We do not knowingly collect information from anyone under 18."},
+  {t:"12. Changes to This Policy",b:"We may update this Privacy Policy periodically. We will notify you of material changes by email."},
+  {t:"13. Contact Us",b:"Dr. Anteneh Zenebe, MD, FACE -- antenehzenebe@gmail.com -- Howard University College of Medicine, Washington, DC 20060."},
+];
 function LabPanel(){
-  const GOLD="#C9A84C",BDR="#1e293b";
   const [labTab,setLabTab]=React.useState("labs");
   const [openCat,setOpenCat]=React.useState(null);
   const LAB_DATA=[
     {cat:"Chemistry",color:"#3B82F6",labs:[
-      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},
-      {n:"Chloride",v:"98-106 mEq/L"},{n:"Bicarbonate",v:"22-29 mEq/L"},
-      {n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
-      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose fasting",v:"70-99 mg/dL"},
-      {n:"Calcium total",v:"8.5-10.5 mg/dL"},{n:"Calcium ionized",v:"1.12-1.32 mmol/L"},
-      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},
-      {n:"Albumin",v:"3.5-5.0 g/dL"},{n:"Total protein",v:"6.0-8.3 g/dL"},
-      {n:"Total bilirubin",v:"0.1-1.2 mg/dL"},{n:"Direct bilirubin",v:"0.0-0.3 mg/dL"},
-      {n:"ALT",v:"7-56 U/L"},{n:"AST",v:"10-40 U/L"},
-      {n:"Alk phosphatase",v:"44-147 U/L"},{n:"GGT",v:"9-48 U/L"},
-      {n:"LDH",v:"140-280 U/L"},{n:"Amylase",v:"30-110 U/L"},
-      {n:"Lipase",v:"10-140 U/L"},{n:"CK total",v:"30-200 U/L"},
-      {n:"Troponin I",v:"<0.04 ng/mL"},{n:"Troponin T hs",v:"<14 ng/L"},
-      {n:"BNP",v:"<100 pg/mL"},{n:"NT-proBNP",v:"<125 pg/mL"},
-      {n:"CRP",v:"<1.0 mg/L"},{n:"ESR male",v:"0-15 mm/hr"},
-      {n:"ESR female",v:"0-20 mm/hr"},{n:"Procalcitonin",v:"<0.1 ng/mL"},
-      {n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Ammonia",v:"15-45 umol/L"},
-      {n:"Serum osmolality",v:"275-295 mOsm/kg"},{n:"Anion gap",v:"8-12 mEq/L"},
-      {n:"Iron male",v:"60-170 ug/dL"},{n:"TIBC",v:"240-450 ug/dL"},
-      {n:"Transferrin sat",v:"20-50%"},{n:"Ferritin male",v:"24-336 ng/mL"},
-      {n:"Ferritin female",v:"11-307 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
-      {n:"Folate serum",v:"2.7-17.0 ng/mL"},{n:"Homocysteine",v:"4-15 umol/L"},
-      {n:"Uric acid male",v:"3.5-7.2 mg/dL"},{n:"Uric acid female",v:"2.6-6.0 mg/dL"},
+      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},{n:"Chloride",v:"98-106 mEq/L"},
+      {n:"Bicarbonate",v:"22-29 mEq/L"},{n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
+      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose fasting",v:"70-99 mg/dL"},{n:"Calcium total",v:"8.5-10.5 mg/dL"},
+      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},{n:"Albumin",v:"3.5-5.0 g/dL"},
+      {n:"ALT",v:"7-56 U/L"},{n:"AST",v:"10-40 U/L"},{n:"Alk Phos",v:"44-147 U/L"},
+      {n:"Total Bilirubin",v:"0.1-1.2 mg/dL"},{n:"Troponin I",v:"<0.04 ng/mL"},{n:"BNP",v:"<100 pg/mL"},
+      {n:"CRP",v:"<1.0 mg/L"},{n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Serum Osmolality",v:"275-295 mOsm/kg"},
+      {n:"Anion Gap",v:"8-12 mEq/L"},{n:"Ferritin male",v:"24-336 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
     ]},
     {cat:"Hematology",color:"#EF4444",labs:[
-      {n:"WBC",v:"4,500-11,000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},
-      {n:"Hgb female",v:"12.0-15.5 g/dL"},{n:"Hct male",v:"41-53%"},
-      {n:"Hct female",v:"36-46%"},{n:"MCV",v:"80-100 fL"},
-      {n:"MCH",v:"27-33 pg"},{n:"MCHC",v:"32-36 g/dL"},
-      {n:"RDW",v:"11.5-14.5%"},{n:"Platelets",v:"150-400k/uL"},
-      {n:"Reticulocytes",v:"0.5-1.5%"},{n:"Neutrophils",v:"50-70%"},
-      {n:"Lymphocytes",v:"20-40%"},{n:"Monocytes",v:"2-8%"},
-      {n:"Eosinophils",v:"1-4%"},{n:"PT",v:"11-13.5 sec"},
-      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},
-      {n:"D-dimer",v:"<0.5 ug/mL"},{n:"Fibrinogen",v:"200-400 mg/dL"},
-      {n:"Haptoglobin",v:"30-200 mg/dL"},{n:"Direct Coombs",v:"Negative"},
-    ]},
-    {cat:"Hem-Onc",color:"#8B5CF6",labs:[
-      {n:"Beta-2 microglobulin",v:"<2.4 mg/L"},{n:"PSA total",v:"<4.0 ng/mL"},
-      {n:"CEA",v:"<3.0 ng/mL"},{n:"CA-125",v:"<35 U/mL"},
-      {n:"CA 19-9",v:"<37 U/mL"},{n:"CA 15-3",v:"<30 U/mL"},
-      {n:"AFP",v:"<10 ng/mL"},{n:"Beta-hCG",v:"<5 mIU/mL"},
-      {n:"Chromogranin A",v:"<94 ng/mL"},{n:"5-HIAA 24hr",v:"2-9 mg/day"},
-      {n:"Kappa light chain",v:"3.3-19.4 mg/L"},{n:"Lambda light chain",v:"5.7-26.3 mg/L"},
-      {n:"Kappa:lambda ratio",v:"0.26-1.65"},{n:"SPEP",v:"No M spike"},
-      {n:"BM blasts normal",v:"<5%"},{n:"JAK2 V617F",v:"Negative"},
-      {n:"BCR-ABL",v:"Negative"},{n:"Erythropoietin",v:"4-24 mIU/mL"},
+      {n:"WBC",v:"4500-11000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},{n:"Hgb female",v:"12.0-15.5 g/dL"},
+      {n:"Hct male",v:"41-53%"},{n:"MCV",v:"80-100 fL"},{n:"Platelets",v:"150-400k/uL"},
+      {n:"Neutrophils",v:"50-70%"},{n:"Lymphocytes",v:"20-40%"},{n:"PT",v:"11-13.5 sec"},
+      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},{n:"D-dimer",v:"<0.5 ug/mL"},
+      {n:"Fibrinogen",v:"200-400 mg/dL"},{n:"Haptoglobin",v:"30-200 mg/dL"},
     ]},
     {cat:"Endocrinology",color:"#C9A84C",labs:[
-      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},
-      {n:"Free T3",v:"2.3-4.2 pg/mL"},{n:"TPO antibodies",v:"<35 IU/mL"},
-      {n:"Thyroglobulin",v:"2-35 ng/mL"},{n:"HbA1c normal",v:"<5.7%"},
-      {n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0% general"},
+      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},{n:"Free T3",v:"2.3-4.2 pg/mL"},
+      {n:"HbA1c normal",v:"<5.7%"},{n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0%"},
       {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
-      {n:"Cortisol AM 8am",v:"6-23 ug/dL"},{n:"Cortisol PM",v:"2-11 ug/dL"},
-      {n:"Midnight cortisol",v:"<1.8 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},
-      {n:"UFC 24hr",v:"<50 ug/24hr"},{n:"LDDST post dex",v:"<1.8 ug/dL"},
-      {n:"Aldosterone upright",v:"4-31 ng/dL"},{n:"Renin upright",v:"0.6-4.3 ng/mL/hr"},
-      {n:"ARR suspicious",v:">30"},{n:"Plasma metanephrines",v:"<0.5 nmol/L"},
-      {n:"Plasma normetanephrines",v:"<0.9 nmol/L"},{n:"17-OH Progesterone",v:"<200 ng/dL"},
-      {n:"DHEA-S male",v:"80-560 ug/dL"},{n:"DHEA-S female",v:"35-430 ug/dL"},
-      {n:"PTH intact",v:"10-65 pg/mL"},{n:"PTH-rP",v:"<2.0 pmol/L"},
-      {n:"25-OH Vit D",v:"30-100 ng/mL"},{n:"1,25-OH Vit D",v:"18-72 pg/mL"},
-      {n:"P1NP bone formation",v:"20-76 ug/L"},{n:"CTX bone resorption",v:"<573 pg/mL"},
-      {n:"Prolactin male",v:"2-18 ng/mL"},{n:"Prolactin female",v:"2-29 ng/mL"},
-      {n:"IGF-1 adult 20-40yr",v:"115-355 ng/mL"},{n:"GH fasting",v:"<5 ng/mL"},
-      {n:"GH nadir OGTT",v:"<0.4 ng/mL"},{n:"LH male",v:"1.7-8.6 IU/L"},
-      {n:"FSH male",v:"1.5-12.4 IU/L"},{n:"Testosterone male",v:"300-1000 ng/dL"},
-      {n:"Free testosterone",v:"50-210 pg/mL"},{n:"Testosterone female",v:"15-70 ng/dL"},
-      {n:"Estradiol postmeno",v:"<10-20 pg/mL"},{n:"AMH repro age",v:"1.0-3.5 ng/mL"},
+      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},{n:"UFC 24hr",v:"<50 ug/24hr"},
+      {n:"LDDST post dex",v:"<1.8 ug/dL"},{n:"Aldosterone upright",v:"4-31 ng/dL"},
+      {n:"Plasma metanephrines",v:"<0.5 nmol/L"},{n:"PTH intact",v:"10-65 pg/mL"},
+      {n:"25-OH Vit D",v:"30-100 ng/mL"},{n:"Prolactin male",v:"2-18 ng/mL"},
+      {n:"IGF-1 adult 20-40yr",v:"115-355 ng/mL"},{n:"Testosterone male",v:"300-1000 ng/dL"},
+      {n:"LH male",v:"1.7-8.6 IU/L"},{n:"FSH male",v:"1.5-12.4 IU/L"},
     ]},
     {cat:"Lipidology",color:"#10B981",labs:[
-      {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL-C optimal",v:"<100 mg/dL"},
-      {n:"LDL high risk target",v:"<70 mg/dL"},{n:"LDL extreme risk",v:"<55 mg/dL"},
-      {n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
-      {n:"TG normal",v:"<150 mg/dL"},{n:"TG borderline",v:"150-199 mg/dL"},
-      {n:"TG high",v:"200-499 mg/dL"},{n:"TG pancreatitis risk",v:">=500 mg/dL"},
-      {n:"Non-HDL target",v:"<130 mg/dL"},{n:"Apo B",v:"<90 mg/dL"},
-      {n:"Lp(a)",v:"<30 mg/dL"},{n:"hs-CRP low CV risk",v:"<1.0 mg/L"},
-      {n:"hs-CRP high CV risk",v:">3.0 mg/L"},{n:"Omega-3 index target",v:">8%"},
+      {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL optimal",v:"<100 mg/dL"},
+      {n:"LDL high risk",v:"<70 mg/dL"},{n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
+      {n:"TG normal",v:"<150 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},{n:"Non-HDL target",v:"<130 mg/dL"},
+      {n:"Apo B",v:"<90 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL"},
+    ]},
+    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
+      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},{n:"PaO2",v:"75-100 mmHg"},
+      {n:"HCO3",v:"22-26 mEq/L"},{n:"O2 sat",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
+      {n:"Anion gap",v:"8-12 mEq/L"},{n:"P/F normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
     ]},
     {cat:"Rheumatology",color:"#F59E0B",labs:[
       {n:"ANA screening",v:"<1:40 negative"},{n:"Anti-dsDNA",v:"<30 IU/mL"},
-      {n:"Anti-Smith",v:"Negative specific SLE"},{n:"Anti-Ro/SSA",v:"Negative"},
-      {n:"Anti-La/SSB",v:"Negative"},{n:"Anti-Scl-70",v:"Negative diffuse SSc"},
-      {n:"Anti-centromere",v:"Negative limited SSc"},{n:"Anti-Jo-1",v:"Negative myositis"},
       {n:"RF IgM",v:"<14 IU/mL"},{n:"Anti-CCP",v:"<20 U/mL"},
-      {n:"c-ANCA/PR3",v:"Negative GPA"},{n:"p-ANCA/MPO",v:"Negative MPA/EGPA"},
-      {n:"Anti-GBM",v:"Negative"},{n:"C3 complement",v:"90-180 mg/dL"},
-      {n:"C4 complement",v:"16-47 mg/dL"},{n:"CH50",v:"41-90 U/mL"},
-      {n:"Antiphospholipid Ab",v:"<20 GPL"},{n:"Lupus anticoagulant",v:"Negative"},
-      {n:"HLA-B27",v:"Negative"},{n:"Uric acid gout target",v:"<6.0 mg/dL"},
-      {n:"Synovial non-inflam",v:"<2,000 WBC/uL"},{n:"Synovial inflammatory",v:"2,000-50,000/uL"},
-      {n:"Synovial septic",v:">50,000/uL"},{n:"CPK myositis",v:">10x ULN"},
-    ]},
-    {cat:"Urology",color:"#6366F1",labs:[
-      {n:"PSA total",v:"<4.0 ng/mL"},{n:"PSA 40-49yr",v:"<2.5 ng/mL"},
-      {n:"PSA 50-59yr",v:"<3.5 ng/mL"},{n:"Free PSA ratio",v:">25%"},
-      {n:"Urine Alb/Cr normal",v:"<30 mg/g"},{n:"Microalbuminuria",v:"30-300 mg/g"},
-      {n:"Macroalbuminuria",v:">300 mg/g"},{n:"Urine protein/Cr",v:"<0.2"},
-      {n:"Nephrotic range",v:">3.5 g/day"},{n:"FENa",v:"<1% prerenal >2% intrinsic"},
-      {n:"FEUrea",v:"<35% prerenal"},{n:"24hr urine Ca",v:"100-300 mg/day"},
-      {n:"24hr urine oxalate",v:"<40 mg/day"},{n:"24hr urine citrate",v:">320 mg/day"},
-      {n:"Semen volume",v:">1.5 mL"},{n:"Sperm concentration",v:">16M/mL"},
-      {n:"Sperm motility",v:">42%"},{n:"Sperm morphology",v:">4% normal"},
-    ]},
-    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
-      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},
-      {n:"PaO2",v:"75-100 mmHg"},{n:"HCO3",v:"22-26 mEq/L"},
-      {n:"O2 saturation",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
-      {n:"Anion gap",v:"8-12 mEq/L"},{n:"Delta-delta ratio",v:"1-2 pure AGMA"},
-      {n:"A-a gradient",v:"Age/4 + 4 mmHg"},
-      {n:"P/F normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
-      {n:"P/F moderate ARDS",v:"100-200"},{n:"P/F severe ARDS",v:"<100"},
+      {n:"C3 complement",v:"90-180 mg/dL"},{n:"C4 complement",v:"16-47 mg/dL"},
+      {n:"Uric acid gout target",v:"<6.0 mg/dL"},
     ]},
     {cat:"CSF",color:"#14B8A6",labs:[
       {n:"Opening pressure",v:"70-180 mmH2O"},{n:"WBC",v:"0-5 cells/uL"},
       {n:"Protein",v:"15-45 mg/dL"},{n:"Glucose",v:"45-80 mg/dL"},
-      {n:"CSF:serum glucose",v:">0.6"},{n:"Bacterial WBC",v:">1000/uL PMN"},
-      {n:"Viral WBC",v:"10-500/uL lymphocytes"},
-      {n:"IgG index",v:"<0.7"},{n:"Oligoclonal bands",v:"Negative"},
+      {n:"CSF:serum glucose",v:">0.6"},
     ]},
   ];
   const CALCS=[
@@ -224,103 +176,78 @@ function LabPanel(){
     {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL",note:"Add 0.8 per 1 g/dL drop in albumin below 4"},
     {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose-100)/100]",v:"Normal 136-145 mEq/L",note:"For hyperglycemia correction"},
     {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese"},
-    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics - use FEUrea"},
-    {n:"FEUrea",f:"(uUrea x pCr) / (pUrea x uCr) x 100",v:"<35% prerenal",note:"More reliable when diuretics used"},
+    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics"},
     {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols"},
-    {n:"Winter's Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation",note:"PaCO2 lower = concurrent resp alkalosis"},
-    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg",note:"Elevated in V/Q mismatch, shunt"},
+    {n:"Winters Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation"},
+    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg"},
     {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = non-AG acidosis; >2 = met alkalosis"},
-    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant",note:"Predicts 90-day mortality in cirrhosis"},
-    {n:"Child-Pugh Score",f:"Bili + Albumin + INR + Ascites + Encephalopathy",v:"A(5-6) / B(7-9) / C(10-15)",note:"Class C ~35% 1-year survival"},
-    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate",note:"DOAC preferred in non-valvular AF"},
-    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk",note:"Does NOT contraindicate anticoag"},
-    {n:"HEART Score",f:"History+ECG+Age+Risk factors+Troponin (0-2 each)",v:"0-3 low / 4-6 mod / 7-10 high",note:"Low = safe early discharge"},
-    {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high",note:"Low + neg D-dimer rules out PE"},
-    {n:"Wells Score DVT",f:"Cancer+Paralysis+Bedridden+Tenderness+Swelling+Calf>3cm+Edema+Collateral+Prior DVT - Alt dx(2)",v:"<2 low / >=2 high",note:"High = proceed to ultrasound"},
-    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpt / 2 admit / >=3 ICU",note:"Score 3+ = >14% 30-day mortality"},
-    {n:"BISAP Pancreatitis",f:"BUN>25+Mental status+SIRS+Age>60+Pleural effusion",v:"0-2 low / >=3 high risk",note:"Score >=3: 5-20% mortality"},
-    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 increase = organ dysfunction",note:"Septic shock: SOFA>=2 + vasopressors + lactate>2"},
-    {n:"qSOFA",f:"RR>=22 + Altered mentation + SBP<=100",v:">=2 high risk",note:"Bedside sepsis screening outside ICU"},
-    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk",note:"Treat: hip Fx >=3% or major Fx >=20%"},
+    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant"},
+    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate"},
+    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk"},
+    {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high"},
+    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpt / 2 admit / >=3 ICU"},
+    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 increase = organ dysfunction"},
+    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk"},
     {n:"Corrected QTc",f:"QT / sqrt(RR in seconds)",v:"<440ms male / <460ms female",note:">500ms = high risk Torsades"},
-    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9",note:"Overweight 25-29.9 / Obese >=30"},
-    {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference",note:"Female: 45.5 kg + 2.3 per inch over 5 feet"},
+    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9"},
+    {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference"},
     {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal",note:"ARDS: mild 200-300 / mod 100-200 / severe <100"},
   ];
   return(
-    <div style={{marginTop:12}}>
-      <div style={{height:1,background:BDR,marginBottom:12}}/>
-      <div style={{display:"flex",gap:4,marginBottom:10}}>
-        <button onClick={()=>setLabTab("labs")}
-          style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-          Labs
-        </button>
-        <button onClick={()=>setLabTab("calcs")}
-          style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-          Calcs
-        </button>
-      </div>
-      {labTab==="labs"&&(
-        <div>
-          {LAB_DATA.map(function(section){return(
-            <div key={section.cat} style={{marginBottom:4}}>
-              <button onClick={()=>setOpenCat(openCat===section.cat?null:section.cat)}
-                style={{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}}>
-                <span>{section.cat}</span><span style={{fontSize:9}}>{openCat===section.cat?"hide":"show"}</span>
-              </button>
-              {openCat===section.cat&&(
-                <div style={{padding:"4px 0",maxHeight:240,overflowY:"auto"}}>
-                  {section.labs.map(function(lab){return(
-                    <div key={lab.n} style={{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                      <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>{lab.n}</span>
-                      <span style={{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}}>{lab.v}</span>
-                    </div>
-                  );})}
-                </div>
-              )}
-            </div>
-          );})}
-        </div>
-      )}
-      {labTab==="calcs"&&(
-        <div style={{maxHeight:440,overflowY:"auto"}}>
-          {CALCS.map(function(c){return(
-            <div key={c.n} style={{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}}>
-              <p style={{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}}>{c.n}</p>
-              <p style={{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}}>{c.f}</p>
-              <p style={{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}}>{c.v}</p>
-              {c.note&&<p style={{fontSize:10,color:"#cbd5e1",lineHeight:1.3}}>{c.note}</p>}
-            </div>
-          );})}
-        </div>
-      )}
-    </div>
+    React.createElement("div",{style:{marginTop:12}},
+      React.createElement("div",{style:{height:1,background:BDR,marginBottom:12}}),
+      React.createElement("div",{style:{display:"flex",gap:4,marginBottom:10}},
+        React.createElement("button",{onClick:function(){setLabTab("labs");},style:{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}},"Labs"),
+        React.createElement("button",{onClick:function(){setLabTab("calcs");},style:{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}},"Calcs")
+      ),
+      labTab==="labs"&&React.createElement("div",null,
+        LAB_DATA.map(function(section){
+          return React.createElement("div",{key:section.cat,style:{marginBottom:4}},
+            React.createElement("button",{onClick:function(){setOpenCat(openCat===section.cat?null:section.cat);},style:{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}},
+              React.createElement("span",null,section.cat),React.createElement("span",{style:{fontSize:9}},openCat===section.cat?"hide":"show")
+            ),
+            openCat===section.cat&&React.createElement("div",{style:{padding:"4px 0",maxHeight:240,overflowY:"auto"}},
+              section.labs.map(function(lab){
+                return React.createElement("div",{key:lab.n,style:{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}},
+                  React.createElement("span",{style:{fontSize:11,color:"#e2e8f0",flex:1}},lab.n),
+                  React.createElement("span",{style:{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}},lab.v)
+                );
+              })
+            )
+          );
+        })
+      ),
+      labTab==="calcs"&&React.createElement("div",{style:{maxHeight:440,overflowY:"auto"}},
+        CALCS.map(function(c){
+          return React.createElement("div",{key:c.n,style:{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}},
+            React.createElement("p",{style:{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}},c.n),
+            React.createElement("p",{style:{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}},c.f),
+            React.createElement("p",{style:{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}},c.v),
+            c.note&&React.createElement("p",{style:{fontSize:10,color:"#cbd5e1",lineHeight:1.3}},c.note)
+          );
+        })
+      )
+    )
   );
 }
-
 function App(){
   const [screen,setScreen]=React.useState("landing");
   const [user,setUser]=React.useState(null);
   const [authLoading,setAuthLoading]=React.useState(true);
-  const [authView,setAuthView]=React.useState("login");
   const [email,setEmail]=React.useState("");
   const [pw,setPw]=React.useState("");
   const [nm,setNm]=React.useState("");
   const [authErr,setAuthErr]=React.useState("");
   const [authBusy,setAuthBusy]=React.useState(false);
+  const [fromStripe,setFromStripe]=React.useState(false);
   const [tab,setTab]=React.useState("mcq");
   const [annual,setAnnual]=React.useState(false);
   const [openFaq,setOpenFaq]=React.useState(null);
-  const [waitEmail,setWaitEmail]=React.useState("");
   const [showTos,setShowTos]=React.useState(false);
   const [showPrivacy,setShowPrivacy]=React.useState(false);
-  const [waitDone,setWaitDone]=React.useState(false);
-  const [fromStripe,setFromStripe]=React.useState(false);
   const [grp,setGrp]=React.useState("Random");
-  const [topic,setTopic]=React.useState("Random — All Specialties");
+  const [topic,setTopic]=React.useState("Random -- All Specialties");
   const [lvl,setLvl]=React.useState(LEVELS[3]);
-  const [cnt,setCnt]=React.useState(1);
-  const [qNum,setQNum]=React.useState(0);
   const [examMode,setExamMode]=React.useState(false);
   const [tLeft,setTLeft]=React.useState(null);
   const [tActive,setTActive]=React.useState(false);
@@ -330,207 +257,149 @@ function App(){
   const [sel,setSel]=React.useState({});
   const [rev,setRev]=React.useState({});
   const [score,setScore]=React.useState({t:0,c:0,s:0});
-  const tRef=React.useRef(null);
+  const [qNum,setQNum]=React.useState(0);
   const [pools,setPools]=React.useState([]);
-  const [dBusy,setDBusy]=React.useState(false);
+  const [dBusy,setDbusy]=React.useState(false);
   const [dErr,setDErr]=React.useState("");
   const [dChain,setDChain]=React.useState("All");
   const [wl,setWl]=React.useState([]);
+  const tRef=React.useRef(null);
 
-  React.useEffect(()=>{
-    const params=new URLSearchParams(window.location.search);
-    if(params.get("subscribed")==="true"){
-      setFromStripe(true);setAuthView("signup");setScreen("auth");
-      window.history.replaceState({},"","/");
-    }
-    sb.auth.getSession().then(({data:{session}})=>{
-      if(session?.user){setUser(session.user);setScreen("app");}
+  React.useEffect(function(){
+    var params=new URLSearchParams(window.location.search);
+    if(params.get("subscribed")==="true"){setFromStripe(true);setScreen("auth");window.history.replaceState({},"","/");}
+    sb.auth.getSession().then(function(res){
+      if(res.data.session&&res.data.session.user){setUser(res.data.session.user);setScreen("app");}
       setAuthLoading(false);
-    }).catch(()=>setAuthLoading(false));
-    const {data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>{
-      if(session?.user){setUser(session.user);setScreen("app");}
+    }).catch(function(){setAuthLoading(false);});
+    var sub=sb.auth.onAuthStateChange(function(_,session){
+      if(session&&session.user){setUser(session.user);setScreen("app");}
       else setUser(null);
     });
-    return()=>subscription.unsubscribe();
+    return function(){sub.data.subscription.unsubscribe();};
   },[]);
 
-  const login=async()=>{
+  function login(){
     setAuthErr("");setAuthBusy(true);
-    const{error}=await sb.auth.signInWithPassword({email,password:pw});
-    if(error)setAuthErr(error.message);
-    else{setScreen("app");setTab("mcq");}
-    setAuthBusy(false);
-  };
-  const signup=async()=>{
+    sb.auth.signInWithPassword({email:email,password:pw}).then(function(res){
+      if(res.error)setAuthErr(res.error.message);
+      else{setScreen("app");setTab("mcq");}
+      setAuthBusy(false);
+    });
+  }
+  function signup(){
     setAuthErr("");setAuthBusy(true);
     if(pw.length<8){setAuthErr("Password must be at least 8 characters");setAuthBusy(false);return;}
-    const{error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:nm}}});
-    if(error)setAuthErr(error.message);
-    else setAuthErr("Check your email to confirm your account, then sign in!");
-    setAuthBusy(false);
-  };
-  const googleLogin=async()=>{
-    await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href}});
-  };
-  const logout=async()=>{
-    await sb.auth.signOut();
-    setUser(null);setScreen("landing");
+    sb.auth.signUp({email:email,password:pw,options:{data:{full_name:nm}}}).then(function(res){
+      if(res.error)setAuthErr(res.error.message);
+      else setAuthErr("Check your email to confirm your account, then sign in!");
+      setAuthBusy(false);
+    });
+  }
+  function googleLogin(){sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href}});}
+  function logout(){
+    sb.auth.signOut();setUser(null);setScreen("landing");
     setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});setQNum(0);
-  };
-  const getPrice=p=>p.period==="year"?p.price:annual?Math.round(p.price*0.8):p.price;
-  const fmtT=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-  const stopT=()=>{clearInterval(tRef.current);setTActive(false);};
-  const revealAll=React.useCallback(questions=>{
-    setRev(p=>{const n={...p};questions.forEach((_,i)=>n[i]=true);return n;});
-  },[]);
-  const startT=(total,questions)=>{
+  }
+  function getPrice(p){return p.period==="year"?p.price:annual?Math.round(p.price*0.8):p.price;}
+  function fmtT(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+  function stopT(){clearInterval(tRef.current);setTActive(false);}
+  function revealAll(questions){setRev(function(p){var n=Object.assign({},p);questions.forEach(function(_,i){n[i]=true;});return n;});}
+  function startT(total,questions){
     setTLeft(total*SECS);setTActive(true);
-    tRef.current=setInterval(()=>{
-      setTLeft(t=>{
+    tRef.current=setInterval(function(){
+      setTLeft(function(t){
         if(t<=1){clearInterval(tRef.current);setTActive(false);revealAll(questions);return 0;}
         return t-1;
       });
     },1000);
-  };
-  const generate=async()=>{
+  }
+  function generate(){
     stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);
-    try{
-      const res=await fetch("/.netlify/functions/generate-mcq",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({topic,level:lvl.v,count:cnt}),
-      });
-      if(!res.ok){const e=await res.json().catch(()=>({error:"Server error"}));throw new Error(e.error||`Server error ${res.status}`);}
-      const data=await res.json();
-      if(!Array.isArray(data))throw new Error("Invalid response format");
-      setQs(data);setScore(s=>({...s,s:s.s+1}));
+    fetch("/.netlify/functions/generate-mcq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic:topic,level:lvl.v,count:1})})
+    .then(function(res){
+      if(!res.ok)return res.json().then(function(e){throw new Error(e.error||"Server error "+res.status);});
+      return res.json();
+    })
+    .then(function(data){
+      if(!Array.isArray(data))throw new Error("Invalid response");
+      setQs(data);setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
       if(examMode)startT(data.length,data);
-    }catch(e){setMcqErr("Failed to generate questions: "+e.message);}
-    setBusy(false);
-  };
-  const nextQuestion=()=>{setQNum(n=>n+1);generate();};
-  const reveal=i=>{
+    })
+    .catch(function(e){setMcqErr("Failed to generate questions: "+e.message);})
+    .finally(function(){setBusy(false);});
+  }
+  function nextQuestion(){setQNum(function(n){return n+1;});generate();}
+  function reveal(i){
     if(!sel[i]||!qs[i])return;
-    const ok=sel[i]===qs[i].correct;
-    setRev(p=>({...p,[i]:true}));
-    setScore(s=>({t:s.t+1,c:s.c+(ok?1:0),s:s.s}));
-  };
-  const fetchDefi=async()=>{
-    setDBusy(true);setDErr("");
-    try{
-      const res=await fetch("https://yields.llama.fi/pools");
-      const data=await res.json();
-      const CH=["Ethereum","Arbitrum","Solana","Polygon","BSC"];
-      setPools(data.data
-        .filter(p=>p.tvlUsd>=1e6&&p.apy>0&&p.apy<300&&CH.some(c=>p.chain?.toLowerCase().includes(c.toLowerCase())))
-        .map(p=>({id:p.pool,proj:p.project,sym:p.symbol,
-          chain:CH.find(c=>p.chain?.toLowerCase().includes(c.toLowerCase()))||p.chain,
-          apy:p.apy,tvl:p.tvlUsd,
-          risk:p.apy>40||p.tvlUsd<1e6?"High":p.apy>15?"Medium":"Low"}))
-        .sort((a,b)=>b.apy-a.apy).slice(0,200));
-    }catch(e){setDErr("Could not load data. Try again.");}
-    setDBusy(false);
-  };
-  const fAPY=n=>`${n.toFixed(2)}%`;
-  const fTVL=n=>n>=1e9?`$${(n/1e9).toFixed(2)}B`:n>=1e6?`$${(n/1e6).toFixed(1)}M`:`$${(n/1e3).toFixed(0)}K`;
-  const rC=r=>r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";
-  const cC=c=>({"Ethereum":"#627EEA","Arbitrum":"#28A0F0","Solana":"#9945FF","Polygon":"#8247E5","BSC":"#F3BA2F"}[c]||"#64748b");
-  const qColor=(i,l)=>{
+    var ok=sel[i]===qs[i].correct;
+    setRev(function(p){var n=Object.assign({},p);n[i]=true;return n;});
+    setScore(function(s){return{t:s.t+1,c:s.c+(ok?1:0),s:s.s};});
+  }
+  function fetchDefi(){
+    setDbusy(true);setDErr("");
+    fetch("https://yields.llama.fi/pools").then(function(r){return r.json();}).then(function(data){
+      var CH=["Ethereum","Arbitrum","Solana","Polygon","BSC"];
+      setPools(data.data.filter(function(p){return p.tvlUsd>=1e6&&p.apy>0&&p.apy<300&&CH.some(function(c){return p.chain&&p.chain.toLowerCase().includes(c.toLowerCase());});})
+        .map(function(p){return{id:p.pool,proj:p.project,sym:p.symbol,chain:CH.find(function(c){return p.chain&&p.chain.toLowerCase().includes(c.toLowerCase());})||p.chain,apy:p.apy,tvl:p.tvlUsd,risk:p.apy>40||p.tvlUsd<1e6?"High":p.apy>15?"Medium":"Low"};})
+        .sort(function(a,b){return b.apy-a.apy;}).slice(0,200));
+    }).catch(function(){setDErr("Could not load data. Try again.");}).finally(function(){setDbusy(false);});
+  }
+  function fAPY(n){return n.toFixed(2)+"%";}
+  function fTVL(n){return n>=1e9?"$"+(n/1e9).toFixed(2)+"B":n>=1e6?"$"+(n/1e6).toFixed(1)+"M":"$"+(n/1e3).toFixed(0)+"K";}
+  function rC(r){return r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";}
+  function cC(c){var m={"Ethereum":"#627EEA","Arbitrum":"#28A0F0","Solana":"#9945FF","Polygon":"#8247E5","BSC":"#F3BA2F"};return m[c]||"#64748b";}
+  function qColor(i,l){
     if(!qs[i])return"transparent";
     if(!rev[i])return sel[i]===l?GOLD:"transparent";
     if(l===qs[i].correct)return"#10b981";
     if(sel[i]===l)return"#ef4444";
     return"transparent";
-  };
-  const uname=user?.user_metadata?.full_name||user?.email?.split("@")[0]||"Doctor";
+  }
+  var uname=user&&user.user_metadata&&user.user_metadata.full_name?user.user_metadata.full_name:user&&user.email?user.email.split("@")[0]:"Doctor";
 
-  const NB=({id,label,icon})=>(
-    <button onClick={()=>{setTab(id);if(id==="defi"&&!pools.length)fetchDefi();}}
-      style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",border:"none",borderRadius:8,cursor:"pointer",
-        background:tab===id?"rgba(201,168,76,0.12)":"transparent",
-        borderBottom:tab===id?"2px solid "+GOLD:"2px solid transparent",
-        color:tab===id?GOLD:"#94a3b8",fontWeight:700,fontSize:12,transition:"all 0.2s",minWidth:52}}>
-      <span style={{fontSize:18}}>{icon}</span>{label}
-    </button>
+  function NB(props){
+    return React.createElement("button",{
+      onClick:function(){setTab(props.id);if(props.id==="defi"&&!pools.length)fetchDefi();},
+      style:{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",border:"none",borderRadius:8,cursor:"pointer",background:tab===props.id?"rgba(201,168,76,0.12)":"transparent",borderBottom:tab===props.id?"2px solid "+GOLD:"2px solid transparent",color:tab===props.id?GOLD:"#94a3b8",fontWeight:700,fontSize:12,minWidth:52}
+    },React.createElement("span",{style:{fontSize:18}},props.icon),props.label);
+  }
+
+  if(showTos)return React.createElement("div",{style:{background:BG,minHeight:"100vh",padding:"40px 5%"}},
+    React.createElement("div",{style:{maxWidth:800,margin:"0 auto"}},
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}},
+        React.createElement("span",{style:{fontWeight:700,fontSize:18,color:"#f1f5f9"}},"MedBoard Pro"),
+        React.createElement("button",{onClick:function(){setShowTos(false);},style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer"}},"Back")
+      ),
+      React.createElement("h1",{style:{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}},"Terms of Service"),
+      React.createElement("p",{style:{color:"#64748b",fontSize:13,marginBottom:32}},"Last updated: April 1, 2026"),
+      TOS_SECTIONS.map(function(s){return React.createElement("div",{key:s.t,style:{marginBottom:24}},
+        React.createElement("h3",{style:{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}},s.t),
+        React.createElement("p",{style:{color:"#94a3b8",lineHeight:1.8,fontSize:14}},s.b)
+      );})
+    )
   );
 
-
-  if(showTos)return(
-    <div style={{background:BG,minHeight:"100vh",padding:"40px 5%"}}>
-      <div style={{maxWidth:800,margin:"0 auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
-            <span style={{fontWeight:700,fontSize:18,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
-          </div>
-          <button onClick={()=>setShowTos(false)} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13}}>Back</button>
-        </div>
-        <h1 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Terms of Service</h1>
-        <p style={{color:"#64748b",fontSize:13,marginBottom:32}}>Last updated: April 1, 2026</p>
-        {[
-          {t:"1. Acceptance of Terms",b:"By accessing or using MedBoard Pro (app-medboardpro-az.netlify.app), you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform. These terms apply to all subscribers, visitors, and users."},
-          {t:"2. Subscription and Payment",b:"MedBoard Pro offers paid subscription plans with a 14-day free trial. Your credit card will not be charged until Day 15 of your trial. Subscriptions automatically renew at the end of each billing period. You may cancel at any time before renewal using the Manage Subscription portal. All payments are processed securely by Stripe. MedBoard Pro does not store your credit card information."},
-          {t:"3. Cancellation Policy",b:"You may cancel your subscription at any time with no penalties or hidden fees. Cancellation takes effect at the end of your current billing period. No refunds are issued for partial billing periods. To cancel, click 'Manage Subscription' inside the app or contact antenehzenebe@gmail.com."},
-          {t:"4. Intellectual Property",b:"All content on MedBoard Pro — including MCQ questions, explanations, curriculum design, study manuals, lab reference panels, and medical calculations — is the intellectual property of Dr. Anteneh Zenebe, MD, FACE. This content is protected by United States copyright law. Subscribers may use the content for personal board preparation only. Reproduction, distribution, or resale of any content is strictly prohibited."},
-          {t:"5. No Medical Advice",b:"MedBoard Pro is an educational platform designed for board examination preparation. The content provided is for educational purposes only and does not constitute medical advice, diagnosis, or treatment. Do not use this platform as a substitute for professional medical judgment. Always consult a qualified healthcare provider for clinical decisions."},
-          {t:"6. No Real Patient Data",b:"MedBoard Pro does not use, store, or display any real patient data. All clinical vignettes are entirely fictional and generated by artificial intelligence for educational purposes. The platform is not a covered entity under HIPAA."},
-          {t:"7. Acceptable Use",b:"You agree to use MedBoard Pro solely for lawful, personal educational purposes. You may not share your account credentials, resell access, scrape or copy content, or use the platform in any manner that violates applicable law or these terms. Violation of this policy will result in immediate termination of your subscription without refund."},
-          {t:"8. Disclaimer of Warranties",b:"MedBoard Pro is provided 'as is' without warranties of any kind. We do not guarantee that the platform will be error-free, uninterrupted, or that it will result in passing any board examination. Use of the platform is at your own risk."},
-          {t:"9. Limitation of Liability",b:"To the maximum extent permitted by law, MedBoard Pro and Dr. Anteneh Zenebe shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the platform, including but not limited to exam failure, loss of data, or loss of income."},
-          {t:"10. Governing Law",b:"These Terms of Service are governed by the laws of the District of Columbia, United States of America. Any disputes shall be resolved in the courts of Washington, DC."},
-          {t:"11. Changes to Terms",b:"We reserve the right to modify these terms at any time. Continued use of the platform after changes are posted constitutes acceptance of the new terms. We will notify subscribers of material changes by email."},
-          {t:"12. Contact",b:"For questions about these terms, contact: Dr. Anteneh Zenebe, MD, FACE — antenehzenebe@gmail.com — Howard University College of Medicine, Washington, DC."},
-        ].map(s=>(
-          <div key={s.t} style={{marginBottom:24}}>
-            <h3 style={{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}}>{s.t}</h3>
-            <p style={{color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{s.b}</p>
-          </div>
-        ))}
-      </div>
-    </div>
+  if(showPrivacy)return React.createElement("div",{style:{background:BG,minHeight:"100vh",padding:"40px 5%"}},
+    React.createElement("div",{style:{maxWidth:800,margin:"0 auto"}},
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}},
+        React.createElement("span",{style:{fontWeight:700,fontSize:18,color:"#f1f5f9"}},"MedBoard Pro"),
+        React.createElement("button",{onClick:function(){setShowPrivacy(false);},style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer"}},"Back")
+      ),
+      React.createElement("h1",{style:{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}},"Privacy Policy"),
+      React.createElement("p",{style:{color:"#64748b",fontSize:13,marginBottom:32}},"Last updated: April 1, 2026"),
+      PRIVACY_SECTIONS.map(function(s){return React.createElement("div",{key:s.t,style:{marginBottom:24}},
+        React.createElement("h3",{style:{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}},s.t),
+        React.createElement("p",{style:{color:"#94a3b8",lineHeight:1.8,fontSize:14}},s.b)
+      );})
+    )
   );
 
-  if(showPrivacy)return(
-    <div style={{background:BG,minHeight:"100vh",padding:"40px 5%"}}>
-      <div style={{maxWidth:800,margin:"0 auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
-            <span style={{fontWeight:700,fontSize:18,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
-          </div>
-          <button onClick={()=>setShowPrivacy(false)} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13}}>Back</button>
-        </div>
-        <h1 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Privacy Policy</h1>
-        <p style={{color:"#64748b",fontSize:13,marginBottom:32}}>Last updated: April 1, 2026</p>
-        {[
-          {t:"1. Information We Collect",b:"MedBoard Pro collects only the minimum information necessary to provide the service: your email address and full name when you create an account, and subscription/payment status (managed by Stripe). We do not collect your credit card number, billing address, or any sensitive financial data — this is handled exclusively by Stripe."},
-          {t:"2. How We Use Your Information",b:"Your email address is used to: create and manage your account, send subscription receipts and renewal notifications via Stripe, and communicate platform updates. We do not use your information for advertising, marketing to third parties, or any purpose beyond operating MedBoard Pro."},
-          {t:"3. Payment Processing",b:"All payment processing is handled by Stripe, Inc. (stripe.com). MedBoard Pro never sees, stores, or has access to your credit card number, CVV, or billing details. Stripe is PCI-DSS Level 1 certified. You can review Stripe's privacy policy at stripe.com/privacy."},
-          {t:"4. Data Storage",b:"Your account data (email, name, subscription status) is stored securely using Supabase (supabase.com), a SOC 2 Type II certified cloud database provider. Data is encrypted at rest and in transit. We retain your data for as long as your account is active and for a reasonable period thereafter for legal compliance."},
-          {t:"5. No Data Selling",b:"MedBoard Pro does not sell, rent, trade, or otherwise transfer your personal information to any third party for commercial purposes. Your data is yours. Period."},
-          {t:"6. No Real Patient Data",b:"MedBoard Pro does not process any real patient health information. All clinical content is fictional and AI-generated for educational purposes. This platform is not subject to HIPAA as it is not a covered entity."},
-          {t:"7. Cookies",b:"MedBoard Pro uses only essential session cookies required to maintain your login state. We do not use tracking cookies, advertising cookies, or third-party analytics cookies."},
-          {t:"8. GDPR Rights (EU Users)",b:"If you are located in the European Union, you have the right to access, correct, or delete your personal data, and the right to data portability. To exercise these rights, contact antenehzenebe@gmail.com. We will respond within 30 days."},
-          {t:"9. CCPA Rights (California Users)",b:"California residents have the right to know what personal information is collected, the right to delete personal information, and the right to opt-out of the sale of personal information. MedBoard Pro does not sell personal information. To exercise your rights, contact antenehzenebe@gmail.com."},
-          {t:"10. Data Security",b:"We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the internet is 100% secure."},
-          {t:"11. Children's Privacy",b:"MedBoard Pro is designed for medical students, residents, and physicians. We do not knowingly collect personal information from anyone under 18 years of age."},
-          {t:"12. Changes to This Policy",b:"We may update this Privacy Policy periodically. We will notify you of material changes by email. Continued use of the platform after changes constitutes acceptance."},
-          {t:"13. Contact Us",b:"For any privacy-related questions or requests, contact: Dr. Anteneh Zenebe, MD, FACE — antenehzenebe@gmail.com — Howard University College of Medicine, Washington, DC 20060."},
-        ].map(s=>(
-          <div key={s.t} style={{marginBottom:24}}>
-            <h3 style={{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}}>{s.t}</h3>
-            <p style={{color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{s.b}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-  if(authLoading)return(
-    <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 14px"}}>M</div>
-        <p style={{color:"#475569",fontSize:14}}>Loading MedBoard Pro...</p>
-      </div>
-    </div>
+  if(authLoading)return React.createElement("div",{style:{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}},
+    React.createElement("div",{style:{textAlign:"center"}},
+      React.createElement("div",{style:{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 14px"}},"M"),
+      React.createElement("p",{style:{color:"#475569",fontSize:14}},"Loading MedBoard Pro...")
+    )
   );
 
   if(screen==="landing")return(
@@ -541,14 +410,8 @@ function App(){
             <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
             <span style={{fontWeight:700,fontSize:18,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
           </div>
-          <div style={{display:"flex",gap:24,fontSize:14}}>
-            {["Features","About","Pricing","FAQ"].map(l=>(
-              <a key={l} href={"#"+l.toLowerCase()} style={{color:"#94a3b8"}}
-                onMouseEnter={e=>e.target.style.color="#f1f5f9"} onMouseLeave={e=>e.target.style.color="#94a3b8"}>{l}</a>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <button onClick={()=>{setAuthView("login");setFromStripe(false);setScreen("auth");}}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{setScreen("auth");}}
               style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
               Subscriber Sign In
             </button>
@@ -559,58 +422,44 @@ function App(){
           </div>
         </div>
       </nav>
-      <section style={{textAlign:"center",padding:"100px 5% 80px",position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",top:"10%",left:"50%",transform:"translateX(-50%)",width:600,height:600,borderRadius:"50%",background:"radial-gradient(circle,rgba(201,168,76,0.08),transparent 70%)",pointerEvents:"none"}}/>
-        <div style={{display:"inline-block",background:"rgba(201,168,76,0.12)",border:"1px solid rgba(201,168,76,0.4)",borderRadius:20,padding:"6px 18px",fontSize:13,color:GOLD,marginBottom:24}}>
-          Created by a Fellowship Associate Program Director at Howard University
-        </div>
+      <section style={{textAlign:"center",padding:"100px 5% 80px"}}>
         <h1 style={{fontSize:"clamp(30px,5vw,58px)",fontWeight:800,lineHeight:1.1,maxWidth:820,margin:"0 auto 20px",color:"#f1f5f9"}}>
           Board Prep That Actually <span style={{color:GOLD}}>Understands Medicine</span>
         </h1>
         <p style={{fontSize:17,color:"#94a3b8",maxWidth:640,margin:"0 auto 12px",lineHeight:1.7}}>
-          USMLE Step 1, 2 & 3 · ABIM Internal Medicine · ABIM Endocrinology Subspecialty
+          USMLE Step 1, 2 and 3 · ABIM Internal Medicine · ABIM Endocrinology Subspecialty
         </p>
         <p style={{fontSize:15,color:"#64748b",maxWidth:640,margin:"0 auto 40px",lineHeight:1.7}}>
-          Built by <strong style={{color:"#e2e8f0"}}>Dr. Anteneh Zenebe, MD, FACE</strong> — Assistant Clinical Professor & Associate Program Director, Howard University College of Medicine
+          Built by <strong style={{color:"#e2e8f0"}}>Dr. Anteneh Zenebe, MD, FACE</strong> -- Assistant Clinical Professor and Associate Program Director, Howard University College of Medicine
         </p>
         <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:14}}>
           <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-            style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16,boxShadow:"0 0 30px rgba(201,168,76,0.2)"}}>
+            style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16}}>
             Start 14-Day Free Trial
           </button>
-          <button onClick={()=>{setAuthView("login");setFromStripe(false);setScreen("auth");}}
+          <button onClick={()=>setScreen("auth")}
             style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:16}}>
             Subscriber Sign In
           </button>
         </div>
-        <p style={{color:"#475569",fontSize:13,marginBottom:8}}>Credit card required · No charge until Day 15 · Cancel anytime</p>
-        <p style={{color:"#334155",fontSize:12,marginBottom:56}}>After payment, you will be redirected to create your account and access the platform immediately.</p>
-        <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
-          {[{e:"USMLE Step 1",w:"M2 Students",c:"#3B82F6"},{e:"USMLE Step 2 CK",w:"M3/M4",c:"#8B5CF6"},{e:"USMLE Step 3",w:"PGY-1/2",c:"#6366f1"},{e:"ABIM IM",w:"Residents",c:"#10b981"},{e:"ABIM Endo",w:"Fellows",c:GOLD}].map(e=>(
-            <div key={e.e} style={{background:CARD,border:"1px solid "+e.c+"44",borderRadius:10,padding:"10px 16px",textAlign:"center",minWidth:100}}>
-              <div style={{fontSize:12,fontWeight:800,color:e.c}}>{e.e}</div>
-              <div style={{fontSize:11,color:"#475569"}}>{e.w}</div>
-            </div>
-          ))}
-        </div>
+        <p style={{color:"#475569",fontSize:13}}>Credit card required · No charge until Day 15 · Cancel anytime</p>
       </section>
       <section id="features" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
         <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:14,color:"#f1f5f9"}}>Everything you need to pass</h2>
-          <p style={{textAlign:"center",color:"#475569",marginBottom:48,fontSize:15}}>From M2 shelf exams to subspecialty boards — one platform covers the full training continuum</p>
+          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Everything you need to pass</h2>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:20}}>
             {[
-              {icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 & 3. Fresh clinical vignettes on demand. Questions never repeat."},
-              {icon:"⏱️",title:"Study & Exam Modes",desc:"Study mode gives instant feedback. Exam mode runs 90 seconds per question with a live countdown timer — just like the real boards."},
-              {icon:"🔬",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US & European societies. Always current evidence."},
-              {icon:"📚",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines — ADA, Endocrine Society, AACE, ACC/AHA, KDIGO, IDSA, NCCN and more."},
-              {icon:"🔬",title:"Lab & Calc Reference",desc:"Comprehensive lab reference values and 26 medical calculations built into the question sidebar — always at your fingertips."},
-              {icon:"💰",title:"DeFi Yield Tracker",desc:"Live yield data from DeFiLlama across Ethereum, Solana, Arbitrum & more. Passive income intelligence for high-earning physicians."},
+              {icon:"T",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 and 3. Fresh clinical vignettes on demand."},
+              {icon:"E",title:"Study and Exam Modes",desc:"Study mode gives instant feedback. Exam mode runs 90 seconds per question with a live countdown timer."},
+              {icon:"G",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US and European societies."},
+              {icon:"R",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines including ADA, Endocrine Society, AACE, ACC/AHA and more."},
+              {icon:"L",title:"Lab and Calc Reference",desc:"Comprehensive lab reference values and 20 medical calculations built into the question sidebar."},
+              {icon:"D",title:"DeFi Yield Tracker",desc:"Live yield data from DeFiLlama across Ethereum, Solana, Arbitrum and more for physician investors."},
             ].map(f=>(
-              <div key={f.title} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:26,transition:"border-color 0.2s",cursor:"default"}}
+              <div key={f.title} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:26}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                <div style={{fontSize:30,marginBottom:14}}>{f.icon}</div>
+                <div style={{width:40,height:40,borderRadius:8,background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:GOLD,marginBottom:14,fontSize:16}}>{f.icon}</div>
                 <h3 style={{fontWeight:700,marginBottom:8,fontSize:16,color:"#f1f5f9"}}>{f.title}</h3>
                 <p style={{color:"#64748b",lineHeight:1.6,fontSize:14}}>{f.desc}</p>
               </div>
@@ -625,13 +474,8 @@ function App(){
             <div style={{width:90,height:90,borderRadius:"50%",background:"linear-gradient(135deg,"+NAVY+",#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:800,color:"#fff",flexShrink:0}}>AZ</div>
             <div style={{flex:1,minWidth:260}}>
               <h3 style={{fontSize:22,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Anteneh Zenebe, MD, FACE</h3>
-              <p style={{color:"#8b5cf6",fontWeight:600,marginBottom:14,fontSize:14}}>Assistant Clinical Professor · Associate Program Director<br/>Endocrinology, Diabetes & Metabolism Fellowship<br/>Howard University College of Medicine / Howard University Hospital</p>
-              <p style={{color:"#94a3b8",lineHeight:1.8,marginBottom:12,fontSize:15}}>Board-certified endocrinologist and Fellow of the American College of Endocrinology. Dedicated to training physicians who serve underserved communities at Howard University.</p>
-              <div style={{display:"flex",gap:8,marginTop:16,flexWrap:"wrap"}}>
-                {["Board-Certified Endocrinologist","FACE Fellow","Associate Program Director","Howard University Faculty"].map(t=>(
-                  <span key={t} style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#a78bfa",borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:600}}>{t}</span>
-                ))}
-              </div>
+              <p style={{color:"#8b5cf6",fontWeight:600,marginBottom:14,fontSize:14}}>Assistant Clinical Professor · Associate Program Director<br/>Endocrinology Fellowship · Howard University College of Medicine</p>
+              <p style={{color:"#94a3b8",lineHeight:1.8,fontSize:15}}>Board-certified endocrinologist and Fellow of the American College of Endocrinology. Dedicated to training physicians who serve underserved communities at Howard University.</p>
             </div>
           </div>
         </div>
@@ -642,7 +486,7 @@ function App(){
           <div style={{display:"flex",justifyContent:"center",marginBottom:40}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:12,background:"#1e293b",borderRadius:30,padding:"6px 16px"}}>
               <span style={{fontSize:14,color:annual?"#475569":"#f1f5f9"}}>Monthly</span>
-              <div onClick={()=>setAnnual(!annual)} style={{width:44,height:24,borderRadius:12,background:annual?"#6366f1":"#334155",cursor:"pointer",position:"relative",transition:"background 0.3s"}}>
+              <div onClick={()=>setAnnual(!annual)} style={{width:44,height:24,borderRadius:12,background:annual?"#6366f1":"#334155",cursor:"pointer",position:"relative"}}>
                 <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:annual?23:3,transition:"left 0.3s"}}/>
               </div>
               <span style={{fontSize:14,color:annual?"#f1f5f9":"#475569"}}>Annual <span style={{color:"#10b981",fontWeight:700}}>-20%</span></span>
@@ -651,15 +495,13 @@ function App(){
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
             {PLANS.map(plan=>(
               <div key={plan.key} style={{background:plan.badge==="MOST POPULAR"?"rgba(99,102,241,0.1)":"rgba(255,255,255,0.03)",border:"2px solid "+(plan.badge==="MOST POPULAR"?"#6366f1":BDR),borderRadius:20,padding:32,position:"relative",display:"flex",flexDirection:"column"}}>
-                {plan.badge&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:plan.badge==="MOST POPULAR"?"#6366f1":"#10b981",color:"#fff",fontSize:11,fontWeight:700,padding:"4px 14px",borderRadius:20,whiteSpace:"nowrap"}}>{plan.badge}</div>}
-                <div style={{color:plan.color,fontSize:13,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{plan.name}</div>
+                {plan.badge&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:plan.badge==="MOST POPULAR"?"#6366f1":"#10b981",color:"#fff",fontSize:11,fontWeight:700,padding:"4px 14px",borderRadius:20}}>{plan.badge}</div>}
+                <div style={{color:plan.color,fontSize:13,fontWeight:600,marginBottom:8,textTransform:"uppercase"}}>{plan.name}</div>
                 <div style={{fontSize:44,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>${getPrice(plan).toLocaleString()}<span style={{fontSize:15,color:"#475569",fontWeight:400}}>/{plan.period}</span></div>
-                {plan.period==="year"&&<div style={{fontSize:13,color:"#10b981",marginBottom:8}}>Flat annual rate ~$250/month</div>}
-                {plan.period!=="year"&&annual&&<div style={{fontSize:13,color:"#10b981",marginBottom:8}}>Billed ${getPrice(plan)*12}/year</div>}
                 <ul style={{listStyle:"none",padding:0,margin:"20px 0",flex:1}}>
                   {plan.features.map(f=>(
-                    <li key={f} style={{padding:"8px 0",fontSize:14,color:"#94a3b8",display:"flex",gap:10,alignItems:"flex-start"}}>
-                      <span style={{color:plan.color,flexShrink:0,marginTop:1}}>✓</span>{f}
+                    <li key={f} style={{padding:"8px 0",fontSize:14,color:"#94a3b8",display:"flex",gap:10}}>
+                      <span style={{color:plan.color,flexShrink:0}}>v</span>{f}
                     </li>
                   ))}
                 </ul>
@@ -686,7 +528,6 @@ function App(){
           ))}
         </div>
       </section>
-      </section>
       <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
         <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine</div>
         <div>2026 MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
@@ -709,13 +550,12 @@ function App(){
         <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:20,padding:28}}>
           {fromStripe&&(
             <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:10,padding:"12px 16px",marginBottom:20,textAlign:"center"}}>
-              <div style={{fontSize:20,marginBottom:4}}>🎉</div>
               <p style={{color:"#10b981",fontWeight:700,fontSize:14,marginBottom:4}}>Payment confirmed! Welcome to MedBoard Pro.</p>
               <p style={{color:"#64748b",fontSize:12}}>Create your account below to access your 14-day free trial.</p>
             </div>
           )}
           <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
-            {fromStripe?"Step 2 — Create Your Account":"Sign In to Your Account"}
+            {fromStripe?"Step 2 -- Create Your Account":"Sign In to Your Account"}
           </h2>
           <button onClick={googleLogin}
             style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
@@ -748,16 +588,16 @@ function App(){
           )}
           <button onClick={fromStripe?signup:login} disabled={authBusy}
             style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
-            {authBusy?"Please wait...":fromStripe?"Create Account & Start Learning":"Sign In & Start Learning"}
+            {authBusy?"Please wait...":fromStripe?"Create Account and Start Learning":"Sign In and Start Learning"}
           </button>
           {!fromStripe&&(
             <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
-              New subscriber? <span onClick={()=>{setScreen("landing");setTimeout(()=>document.getElementById("pricing")&&document.getElementById("pricing").scrollIntoView({behavior:"smooth"}),100);}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>View plans</span>
+              New subscriber? <span onClick={()=>setScreen("landing")} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>View plans</span>
             </p>
           )}
           {fromStripe&&(
             <p style={{textAlign:"center",color:"#475569",fontSize:12,marginBottom:12}}>
-              Already have an account? <span onClick={()=>{setFromStripe(false);}} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>Sign In instead</span>
+              Already have an account? <span onClick={()=>setFromStripe(false)} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>Sign In instead</span>
             </p>
           )}
           <p style={{textAlign:"center"}}>
@@ -771,22 +611,22 @@ function App(){
   return(
     <div style={{background:BG,minHeight:"100vh"}}>
       <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:"100%",margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4,padding:"0 1%"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4}}>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
             <div style={{width:30,height:30,borderRadius:7,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD}}>M</div>
             <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
           </div>
-          <div style={{display:"flex",gap:2,flexShrink:1}}>
-            <NB id="home" label="Home" icon="🏠"/>
-            <NB id="mcq" label="MCQ Bank" icon="🎯"/>
-            <NB id="guides" label="Guides" icon="📚"/>
-            <NB id="progress" label="Progress" icon="📊"/>
-            <NB id="defi" label="DeFi" icon="💰"/>
+          <div style={{display:"flex",gap:2}}>
+            <NB id="home" label="Home" icon="H"/>
+            <NB id="mcq" label="MCQ Bank" icon="Q"/>
+            <NB id="guides" label="Guides" icon="G"/>
+            <NB id="progress" label="Progress" icon="P"/>
+            <NB id="defi" label="DeFi" icon="$"/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:12,fontWeight:600,color:"#f1f5f9"}}>{uname}</div>
-              <div style={{fontSize:10,color:"#475569"}}>{user?.email}</div>
+              <div style={{fontSize:10,color:"#475569"}}>{user&&user.email}</div>
             </div>
             <button onClick={()=>window.open(PORTAL_URL,"_blank")}
               style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600}}>
@@ -796,29 +636,28 @@ function App(){
           </div>
         </div>
       </nav>
-      <div style={{maxWidth:"100%",margin:"0 auto",padding:"18px 2%"}}>
+      <div style={{padding:"18px 2%"}}>
+
         {tab==="home"&&(
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {uname}!</h2>
             <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Howard University College of Medicine · Board Prep Dashboard</p>
             <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid "+GOLD,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>Active</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Email</div><div style={{fontSize:13,fontWeight:600,color:"#f1f5f9"}}>{user?.email}</div></div>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Sessions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.s}</div></div>
               <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Questions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.t}</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?Math.round(score.c/score.t*100)+"%":"—"}</div></div>
+              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?Math.round(score.c/score.t*100)+"%":"--"}</div></div>
               <button onClick={()=>window.open(PORTAL_URL,"_blank")}
                 style={{marginLeft:"auto",background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
                 Manage Subscription
               </button>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:24}}>
-              {[{icon:"🎯",title:"MCQ Bank",desc:"Blueprint-aligned questions",tab:"mcq",color:"#6366f1"},{icon:"📚",title:"Guidelines",desc:"Official society resources",tab:"guides",color:"#10b981"},{icon:"📊",title:"My Progress",desc:"Track performance",tab:"progress",color:"#f59e0b"},{icon:"💰",title:"DeFi Tracker",desc:"Live yield opportunities",tab:"defi",color:GOLD}].map(a=>(
-                <div key={a.tab} onClick={()=>{setTab(a.tab);if(a.tab==="defi"&&!pools.length)fetchDefi();}}
-                  style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:16,cursor:"pointer",transition:"border-color 0.2s"}}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+              {[{icon:"Q",title:"MCQ Bank",desc:"Blueprint-aligned questions",id:"mcq",color:"#6366f1"},{icon:"G",title:"Guidelines",desc:"Official society resources",id:"guides",color:"#10b981"},{icon:"P",title:"My Progress",desc:"Track performance",id:"progress",color:"#f59e0b"},{icon:"$",title:"DeFi Tracker",desc:"Live yield opportunities",id:"defi",color:GOLD}].map(a=>(
+                <div key={a.id} onClick={()=>{setTab(a.id);if(a.id==="defi"&&!pools.length)fetchDefi();}}
+                  style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:16,cursor:"pointer"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                  <div style={{fontSize:24,marginBottom:8}}>{a.icon}</div>
                   <div style={{fontWeight:700,fontSize:13,color:a.color,marginBottom:2}}>{a.title}</div>
                   <div style={{fontSize:11,color:"#475569"}}>{a.desc}</div>
                 </div>
@@ -829,14 +668,14 @@ function App(){
 
         {tab==="mcq"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>🎯 MCQ Bank</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Unlimited · Study or timed exam mode</p>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>MCQ Bank</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Study or timed exam mode</p>
             <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
-              <div style={{width:320,flexShrink:0,background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,position:"sticky",top:70,maxHeight:"calc(100vh - 80px)",overflowY:"auto"}}>
+              <div style={{width:300,flexShrink:0,background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,position:"sticky",top:70,maxHeight:"calc(100vh - 80px)",overflowY:"auto"}}>
                 <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
                 {LEVELS.map(x=>(
                   <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:7,border:"1px solid "+(lvl.l===x.l?GOLD:BDR),background:lvl.l===x.l?"rgba(201,168,76,0.1)":"transparent",color:lvl.l===x.l?GOLD:"#e2e8f0",fontSize:13,fontWeight:lvl.l===x.l?700:500,cursor:"pointer",marginBottom:5,transition:"all 0.2s"}}>
+                    style={{width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:7,border:"1px solid "+(lvl.l===x.l?GOLD:BDR),background:lvl.l===x.l?"rgba(201,168,76,0.1)":"transparent",color:lvl.l===x.l?GOLD:"#e2e8f0",fontSize:13,fontWeight:lvl.l===x.l?700:500,cursor:"pointer",marginBottom:5}}>
                     {x.l}
                   </button>
                 ))}
@@ -844,21 +683,21 @@ function App(){
                 <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:10,letterSpacing:1}}>SPECIALTY</p>
                 {Object.keys(GROUPS).map(g=>(
                   <button key={g} onClick={()=>{setGrp(g);setTopic(GROUPS[g][0]);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"7px 12px",borderRadius:7,border:"1px solid "+(grp===g?GOLD:BDR),background:grp===g?"rgba(201,168,76,0.08)":"transparent",color:grp===g?GOLD:"#e2e8f0",fontSize:12,fontWeight:grp===g?700:500,cursor:"pointer",marginBottom:4,transition:"all 0.2s"}}>
+                    style={{width:"100%",textAlign:"left",padding:"7px 12px",borderRadius:7,border:"1px solid "+(grp===g?GOLD:BDR),background:grp===g?"rgba(201,168,76,0.08)":"transparent",color:grp===g?GOLD:"#e2e8f0",fontSize:12,fontWeight:grp===g?700:500,cursor:"pointer",marginBottom:4}}>
                     {g}
                   </button>
                 ))}
                 {grp&&GROUPS[grp].length>1&&(
-                  <>
+                  <div>
                     <div style={{height:1,background:BDR,margin:"10px 0"}}/>
                     <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8,letterSpacing:1}}>TOPIC</p>
                     {GROUPS[grp].map(t=>(
                       <button key={t} onClick={()=>{setTopic(t);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                        style={{width:"100%",textAlign:"left",padding:"6px 12px",borderRadius:6,border:"none",background:topic===t?"rgba(201,168,76,0.08)":"transparent",color:topic===t?GOLD:"#e2e8f0",fontSize:12,fontWeight:topic===t?700:500,cursor:"pointer",marginBottom:2,transition:"all 0.2s"}}>
+                        style={{width:"100%",textAlign:"left",padding:"6px 12px",borderRadius:6,border:"none",background:topic===t?"rgba(201,168,76,0.08)":"transparent",color:topic===t?GOLD:"#e2e8f0",fontSize:12,fontWeight:topic===t?700:500,cursor:"pointer",marginBottom:2}}>
                         {t}
                       </button>
                     ))}
-                  </>
+                  </div>
                 )}
                 <LabPanel/>
               </div>
@@ -867,16 +706,16 @@ function App(){
                   <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,marginBottom:18}}>
                     <div style={{display:"flex",gap:10,marginBottom:16}}>
                       <button onClick={()=>setExamMode(false)}
-                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(!examMode?"#10b981":BDR),background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                        Study Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>Untimed · Instant feedback</span>
+                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(!examMode?"#10b981":BDR),background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                        Study Mode
                       </button>
                       <button onClick={()=>setExamMode(true)}
-                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(examMode?"#ef4444":BDR),background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13,lineHeight:1.4}}>
-                        Exam Mode<br/><span style={{fontSize:11,fontWeight:400,opacity:0.8}}>90 sec/question · Auto-submit</span>
+                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(examMode?"#ef4444":BDR),background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                        Exam Mode
                       </button>
                     </div>
                     <div style={{background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:9,padding:"10px 14px",marginBottom:14}}>
-                      <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>Selected: <span style={{color:"#f1f5f9"}}>{grp} — {topic}</span></p>
+                      <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>Selected: <span style={{color:"#f1f5f9"}}>{grp} -- {topic}</span></p>
                       <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Level: {lvl.l}</p>
                     </div>
                     <button onClick={generate} disabled={busy}
@@ -887,17 +726,15 @@ function App(){
                 )}
                 {busy&&(
                   <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:40,textAlign:"center",marginBottom:18}}>
-                    <div style={{fontSize:36,marginBottom:16}}>⏳</div>
                     <p style={{color:"#64748b",fontSize:15}}>Generating question...</p>
                   </div>
                 )}
                 {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
                 {score.t>0&&qs.length>0&&(
                   <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,color:"#64748b"}}>Questions answered:</span>
-                    <span style={{fontWeight:800,color:GOLD,fontSize:15}}>{score.t}</span>
+                    <span style={{fontSize:12,color:"#64748b"}}>Answered: {score.t}</span>
                     {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
-                    {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>⏱️ {tLeft!==null?fmtT(tLeft):"--:--"}</span>}
+                    {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>{tLeft!==null?fmtT(tLeft):"--:--"}</span>}
                     <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);setScore({t:0,c:0,s:0});}}
                       style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700,marginLeft:"auto"}}>
                       End Session
@@ -906,11 +743,11 @@ function App(){
                 )}
                 {qs.length>0&&qs[0]&&!busy&&(()=>{
                   try{
-                    const q=qs[0];const i=0;
-                    const answered=!!rev[i];
-                    const correct=answered&&sel[i]===q.correct;
+                    var q=qs[0];var i=0;
+                    var answered=!!rev[i];
+                    var correct=answered&&sel[i]===q.correct;
                     return(
-                      <div style={{background:CARD,border:"1px solid "+(rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR),borderRadius:13,padding:24,transition:"border-color 0.3s"}}>
+                      <div style={{background:CARD,border:"1px solid "+(rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR),borderRadius:13,padding:24}}>
                         <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
                           <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum+1}</span>
                           {answered&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
@@ -920,7 +757,7 @@ function App(){
                         {q.showImageButton&&q.imageUrl&&!answered&&(
                           <a href={q.imageUrl} target="_blank" rel="noopener noreferrer"
                             style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,marginBottom:16,textDecoration:"none"}}>
-                            🩻 View Imaging Study on Radiopaedia
+                            View Imaging Study on Radiopaedia
                           </a>
                         )}
                         <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
@@ -930,7 +767,7 @@ function App(){
                                 border:"1px solid "+(qColor(i,l)==="transparent"?BDR:qColor(i,l)),
                                 background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":qColor(i,l)+"22",
                                 color:answered&&l===q.correct?"#10b981":answered&&sel[i]===l?"#ef4444":"#cbd5e1",
-                                fontWeight:sel[i]===l?700:400,fontSize:14,transition:"all 0.2s"}}>
+                                fontWeight:sel[i]===l?700:400,fontSize:14}}>
                               <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
                               {answered&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}> Correct answer</span>}
                               {answered&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}> Your answer</span>}
@@ -943,10 +780,10 @@ function App(){
                             <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
                             {q.imageUrl&&(
                               <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+BDR}}>
-                                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Further Reading — Reference Imaging</p>
+                                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Further Reading -- Reference Imaging</p>
                                 <a href={q.imageUrl} target="_blank" rel="noopener noreferrer"
                                   style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>
-                                  🩻 View Reference Imaging on Radiopaedia
+                                  View Reference Imaging on Radiopaedia
                                 </a>
                               </div>
                             )}
@@ -954,13 +791,13 @@ function App(){
                         )}
                         <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                           {!answered?(
-                            <>
+                            <div style={{display:"flex",gap:10,alignItems:"center"}}>
                               <button onClick={()=>reveal(i)} disabled={!sel[i]}
-                                style={{background:sel[i]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[i]?GOLD:BDR),color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14,transition:"all 0.2s"}}>
+                                style={{background:sel[i]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[i]?GOLD:BDR),color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
                                 Submit Answer
                               </button>
                               {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}
-                            </>
+                            </div>
                           ):(
                             <button onClick={nextQuestion} disabled={busy}
                               style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
@@ -970,7 +807,7 @@ function App(){
                         </div>
                       </div>
                     );
-                  }catch(e){return <div style={{color:"#ef4444",padding:20}}>Error displaying question. Click End Session and try again.</div>;}
+                  }catch(e){return React.createElement("div",{style:{color:"#ef4444",padding:20}},"Error displaying question. Click End Session and try again.");}
                 })()}
               </div>
             </div>
@@ -979,14 +816,14 @@ function App(){
 
         {tab==="guides"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>📚 Official Guidelines & Resources</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Direct links to official society guidelines — always current, always free</p>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Official Guidelines</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Direct links to official society guidelines</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
               {GUIDES.map(g=>(
-                <div key={g.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10,transition:"border-color 0.2s"}}
+                <div key={g.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                  <div style={{fontSize:28}}>{g.i}</div>
+                  <div style={{width:36,height:36,borderRadius:8,background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:GOLD,fontSize:14}}>{g.i}</div>
                   <div style={{fontWeight:700,fontSize:14,lineHeight:1.4,color:"#f1f5f9"}}>{g.t}</div>
                   <span style={{background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",color:GOLD,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.s}</span>
                   <a href={g.u} target="_blank" rel="noopener noreferrer"
@@ -1001,12 +838,11 @@ function App(){
 
         {tab==="progress"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>📊 Your Progress</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Track your board prep performance across all sessions</p>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Your Progress</h2>
+            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Track your board prep performance</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:22}}>
-              {[{l:"Sessions",v:score.s,i:"📝",c:"#6366f1"},{l:"Questions",v:score.t,i:"❓",c:"#3b82f6"},{l:"Correct",v:score.c,i:"✅",c:"#10b981"},{l:"Accuracy",v:score.t>0?Math.round(score.c/score.t*100)+"%":"—",i:"🎯",c:GOLD}].map(s=>(
+              {[{l:"Sessions",v:score.s,c:"#6366f1"},{l:"Questions",v:score.t,c:"#3b82f6"},{l:"Correct",v:score.c,c:"#10b981"},{l:"Accuracy",v:score.t>0?Math.round(score.c/score.t*100)+"%":"--",c:GOLD}].map(s=>(
                 <div key={s.l} style={{background:CARD,border:"1px solid "+s.c+"44",borderRadius:12,padding:18,textAlign:"center"}}>
-                  <div style={{fontSize:24,marginBottom:7}}>{s.i}</div>
                   <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
                   <div style={{fontSize:11,color:"#475569",marginTop:3}}>{s.l}</div>
                 </div>
@@ -1014,7 +850,6 @@ function App(){
             </div>
             {score.t===0?(
               <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:36,textAlign:"center"}}>
-                <div style={{fontSize:44,marginBottom:12}}>🎯</div>
                 <h3 style={{fontWeight:700,marginBottom:8,color:"#f1f5f9"}}>No questions answered yet</h3>
                 <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Start the MCQ Bank to begin tracking your progress!</p>
                 <button onClick={()=>setTab("mcq")} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 24px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Go to MCQ Bank</button>
@@ -1028,11 +863,11 @@ function App(){
                     <span style={{fontSize:13,fontWeight:700,color:GOLD}}>{Math.round(score.c/score.t*100)}%</span>
                   </div>
                   <div style={{height:10,background:"#1e293b",borderRadius:5,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:Math.round(score.c/score.t*100)+"%",background:"linear-gradient(90deg,"+NAVY+","+GOLD+")",borderRadius:5,transition:"width 0.4s"}}/>
+                    <div style={{height:"100%",width:Math.round(score.c/score.t*100)+"%",background:"linear-gradient(90deg,"+NAVY+","+GOLD+")",borderRadius:5}}/>
                   </div>
                 </div>
                 <p style={{color:"#475569",fontSize:13,lineHeight:1.6}}>
-                  {score.c/score.t>=0.8?"🏆 Excellent! You are well prepared for boards.":score.c/score.t>=0.6?"📈 Good progress! Keep practicing your weak areas.":"💪 Keep going! Consistent practice leads to board success."}
+                  {score.c/score.t>=0.8?"Excellent! You are well prepared for boards.":score.c/score.t>=0.6?"Good progress! Keep practicing your weak areas.":"Keep going! Consistent practice leads to board success."}
                 </p>
               </div>
             )}
@@ -1041,8 +876,8 @@ function App(){
 
         {tab==="defi"&&(
           <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>💰 DeFi Yield Tracker</h2>
-            <p style={{color:"#475569",marginBottom:12,fontSize:13}}>Live yields across Ethereum, Solana, Arbitrum, Polygon & BNB Chain — powered by DeFiLlama</p>
+            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>DeFi Yield Tracker</h2>
+            <p style={{color:"#475569",marginBottom:12,fontSize:13}}>Live yields powered by DeFiLlama</p>
             <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:9,padding:"9px 14px",marginBottom:16,fontSize:12,color:"#fca5a5",lineHeight:1.6}}>
               Educational tool only. DeFi carries real financial risk. Not financial advice.
             </div>
@@ -1052,17 +887,16 @@ function App(){
               ))}
               <button onClick={fetchDefi} style={{marginLeft:"auto",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:600}}>Refresh</button>
             </div>
-            {dBusy&&<div style={{textAlign:"center",padding:"36px",color:"#475569"}}>⏳ Fetching live yield data...</div>}
+            {dBusy&&<div style={{textAlign:"center",padding:"36px",color:"#475569"}}>Loading yield data...</div>}
             {dErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:14,color:"#ef4444"}}>{dErr}</div>}
             {!dBusy&&!dErr&&!pools.length&&(
               <div style={{textAlign:"center",padding:"36px",color:"#475569"}}>
-                <div style={{fontSize:36,marginBottom:10}}>💰</div>
                 <p style={{marginBottom:14,fontSize:14}}>Click Refresh to load live yield data</p>
                 <button onClick={fetchDefi} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 22px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>Load Live Data</button>
               </div>
             )}
             {!dBusy&&pools.filter(p=>dChain==="All"||p.chain===dChain).slice(0,50).map(p=>(
-              <div key={p.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:11,padding:"13px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:9,transition:"border-color 0.2s"}}
+              <div key={p.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:11,padding:"13px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:9}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
                 <div style={{width:9,height:9,borderRadius:"50%",background:cC(p.chain),flexShrink:0}}/>
@@ -1081,7 +915,7 @@ function App(){
                 <span style={{background:rC(p.risk)+"22",border:"1px solid "+rC(p.risk),color:rC(p.risk),borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>{p.risk}</span>
                 <button onClick={()=>setWl(w=>w.includes(p.id)?w.filter(x=>x!==p.id):[...w,p.id])}
                   style={{background:"transparent",border:"1px solid "+(wl.includes(p.id)?GOLD:BDR),color:wl.includes(p.id)?GOLD:"#475569",borderRadius:7,padding:"4px 9px",cursor:"pointer",fontSize:13}}>
-                  {wl.includes(p.id)?"⭐":"☆"}
+                  {wl.includes(p.id)?"*":"o"}
                 </button>
               </div>
             ))}
@@ -1090,7 +924,7 @@ function App(){
 
       </div>
       <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:"1px solid "+BDR}}>
-        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University College of Medicine · antenehzenebe@gmail.com
+        MedBoard Pro · Anteneh Zenebe, MD, FACE · Howard University · antenehzenebe@gmail.com
         <div style={{marginTop:8,display:"flex",gap:16,justifyContent:"center"}}>
           <span onClick={()=>setShowTos(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
           <span onClick={()=>setShowPrivacy(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
@@ -1100,7 +934,7 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
 </script>
 </body>
 </html>
