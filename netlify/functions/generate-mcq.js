@@ -262,7 +262,6 @@ var RADIOPAEDIA_CASES = {
   // Dermatology
   "Melanoma": "https://radiopaedia.org/search?q=melanoma+dermoscopy+CT+staging&lang=us",
 };
-};
 
 // Keywords that flag a topic as image-based
 var IMAGE_KEYWORDS = [
