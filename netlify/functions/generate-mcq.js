@@ -362,7 +362,7 @@ function buildPrompt(level, requestedTopic) {
     explanationLine + "\n\n" +
     "Return ONLY valid JSON, no markdown, no extra text:\n" +
     jsonLine +
-    "\nIMPORTANT: Set showImageButton to true ONLY if the stem explicitly describes imaging findings that the subscriber needs to visualize to answer the question (e.g. the stem says CT shows..., X-ray demonstrates..., MRI reveals..., Ultrasound shows...). Set it to false if imaging is not central to answering the question.";
+    "\nIMPORTANT: Set showImageButton to true ONLY when the question is specifically asking the subscriber to interpret a visual image — for example if the stem says 'The following chest X-ray is shown' or 'Based on the image below, what is the diagnosis?'. Set showImageButton to false in ALL other cases, including when the stem merely describes imaging findings in words (e.g. 'ultrasound shows a hypoechoic nodule' — this is a text description, NOT a visual question). Most questions should have showImageButton: false.";
 }
 
 exports.handler = async function(event) {
