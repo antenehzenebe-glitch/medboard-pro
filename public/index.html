@@ -907,9 +907,10 @@ function App(){
                 )}
                 {busy&&(
                   <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:40,textAlign:"center",marginBottom:18}}>
-                    <div style={{fontSize:36,marginBottom:16}}>⏳</div>
-                    <p style={{color:"#64748b",fontSize:15,marginBottom:8}}>Generating your question...</p>
-                    <p style={{color:"#334155",fontSize:13}}>Powered by AI · ~5 seconds</p>
+                    <div style={{fontSize:36,marginBottom:16}}>🧠</div>
+                    <p style={{color:"#64748b",fontSize:15,marginBottom:8}}>Crafting your board question...</p>
+                    <p style={{color:"#475569",fontSize:13,marginBottom:4}}>AI is writing a clinical vignette with labs, vitals & guideline-based explanation</p>
+                    <p style={{color:"#334155",fontSize:12}}>~5-8 seconds · Worth the wait</p>
                   </div>
                 )}
                 {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
