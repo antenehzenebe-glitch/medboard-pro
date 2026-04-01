@@ -293,9 +293,12 @@ var IMAGE_KEYWORDS = [
 ];
 
 function getRadiopaediaLink(topic) {
+  // Normalize - remove apostrophes and hyphens for matching
+  var topicNorm = topic.toLowerCase().replace(/['\-]/g, " ").replace(/\s+/g, " ");
   // Check direct match first
   for (var key in RADIOPAEDIA_CASES) {
-    if (topic.toLowerCase().includes(key.toLowerCase())) {
+    var keyNorm = key.toLowerCase().replace(/['\-]/g, " ").replace(/\s+/g, " ");
+    if (topicNorm.includes(keyNorm) || keyNorm.includes(topicNorm.split(" ")[0])) {
       return RADIOPAEDIA_CASES[key];
     }
   }
@@ -346,9 +349,9 @@ function buildPrompt(level, requestedTopic) {
     ? " Describe key imaging findings as a clinician would dictate (e.g. chest X-ray shows right lower lobe consolidation with air bronchograms)."
     : "";
 
-  var stemLine = "STEM: 3-4 sentences. Age, sex, symptoms, 2-3 key lab values with units, vital signs." + imagingNote + cgmNote + " End with a clear clinical question such as: Which of the following is the most appropriate next step in management? OR Which of the following is the most likely diagnosis?";
+  var stemLine = "STEM: 4-5 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be a clinical question: Which of the following is the most appropriate next step in management? OR Which of the following is the most likely diagnosis? OR Which of the following is the most appropriate pharmacotherapy?";
   var choicesLine = "CHOICES: Exactly 5 (A-E). One correct per current guidelines. Four plausible distractors representing common clinical errors.";
-  var explanationLine = "EXPLANATION: 4-5 sentences. Why correct answer is right with specific guideline citation (ADA 2025, Endocrine Society, ACC/AHA etc). Why each wrong answer is incorrect. One board pearl.";
+  var explanationLine = "EXPLANATION: 5-6 sentences. (1) State why the correct answer is right and cite the specific guideline by name and year. (2-4) Explain why each wrong answer is incorrect. (5) Give one high-yield board pearl that a fellow or resident must remember.";
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + "}";
 
   return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
