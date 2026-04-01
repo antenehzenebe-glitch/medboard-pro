@@ -352,7 +352,7 @@ function buildPrompt(level, requestedTopic) {
   var stemLine = "STEM: 4-5 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be a clinical question: Which of the following is the most appropriate next step in management? OR Which of the following is the most likely diagnosis? OR Which of the following is the most appropriate pharmacotherapy?";
   var choicesLine = "CHOICES: Exactly 5 (A-E). One correct per current guidelines. Four plausible distractors representing common clinical errors.";
   var explanationLine = "EXPLANATION: 5-6 sentences. (1) State why the correct answer is right and cite the specific guideline by name and year. (2-4) Explain why each wrong answer is incorrect. (5) Give one high-yield board pearl that a fellow or resident must remember.";
-  var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + "}";
+  var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
 
   return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
     topicInstruction + "\n\n" +
@@ -361,7 +361,8 @@ function buildPrompt(level, requestedTopic) {
     choicesLine + "\n" +
     explanationLine + "\n\n" +
     "Return ONLY valid JSON, no markdown, no extra text:\n" +
-    jsonLine;
+    jsonLine +
+    "\nIMPORTANT: Set showImageButton to true ONLY if the stem explicitly describes imaging findings that the subscriber needs to visualize to answer the question (e.g. the stem says CT shows..., X-ray demonstrates..., MRI reveals..., Ultrasound shows...). Set it to false if imaging is not central to answering the question.";
 }
 
 exports.handler = async function(event) {
