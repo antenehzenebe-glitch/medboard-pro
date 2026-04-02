@@ -371,23 +371,139 @@ function buildPrompt(level, requestedTopic) {
     levelNote = "Fellowship-level endocrinology per ADA 2025, Endocrine Society, AACE guidelines. Nuanced distinctions required.";
   }
 
-  // Hard clinical accuracy rules
+  // Hard clinical accuracy rules - society mapping per specialty
   var societyMap = "";
   var topicLower = specificTopic.toLowerCase();
-  if (topicLower.includes("thyroid") || topicLower.includes("hashimoto") || topicLower.includes("graves") || topicLower.includes("hypothyroid") || topicLower.includes("hyperthyroid")) {
-    societyMap = "SOCIETY RULE: Cite ONLY the American Thyroid Association (ATA) and/or Endocrine Society for thyroid disorders. NEVER cite ADA for thyroid management.";
-  } else if (topicLower.includes("diabetes") || topicLower.includes("insulin") || topicLower.includes("cgm") || topicLower.includes("glucose") || topicLower.includes("dka") || topicLower.includes("hhs")) {
-    societyMap = "SOCIETY RULE: Cite ADA 2025 Standards of Care and/or AACE for diabetes management.";
-  } else if (topicLower.includes("osteoporosis") || topicLower.includes("bone") || topicLower.includes("fracture") || topicLower.includes("calcium") || topicLower.includes("vitamin d") || topicLower.includes("parathyroid")) {
-    societyMap = "SOCIETY RULE: Cite Endocrine Society and/or National Osteoporosis Foundation (NOF) for bone and calcium disorders.";
-  } else if (topicLower.includes("adrenal") || topicLower.includes("cushing") || topicLower.includes("aldosteronism") || topicLower.includes("pheochromocytoma") || topicLower.includes("pituitary") || topicLower.includes("acromegaly")) {
-    societyMap = "SOCIETY RULE: Cite Endocrine Society Clinical Practice Guidelines for adrenal and pituitary disorders.";
+
+  // Endocrinology
+  if (topicLower.includes("thyroid") || topicLower.includes("hashimoto") || topicLower.includes("graves") || topicLower.includes("hypothyroid") || topicLower.includes("hyperthyroid") || topicLower.includes("thyroiditis")) {
+    societyMap = "Cite ONLY the American Thyroid Association (ATA) and/or Endocrine Society for thyroid disorders. NEVER cite ADA for thyroid management.";
+  } else if (topicLower.includes("diabetes") || topicLower.includes("insulin") || topicLower.includes("cgm") || topicLower.includes("glucose") || topicLower.includes("dka") || topicLower.includes("hhs") || topicLower.includes("hypoglycemi") || topicLower.includes("gestational") || topicLower.includes("sglt2") || topicLower.includes("glp-1") || topicLower.includes("metformin")) {
+    societyMap = "Cite ADA 2025 Standards of Care and/or AACE for diabetes management. The ADA is the primary authority for all diabetes pharmacotherapy decisions.";
+  } else if (topicLower.includes("osteoporosis") || topicLower.includes("bone density") || topicLower.includes("fracture") || topicLower.includes("bisphosphonat") || topicLower.includes("denosumab") || topicLower.includes("calcium") || topicLower.includes("vitamin d") || topicLower.includes("parathyroid") || topicLower.includes("paget")) {
+    societyMap = "Cite Endocrine Society and/or National Osteoporosis Foundation (NOF/BHOF) for bone and calcium disorders. For hyperparathyroidism cite the Fourth International Workshop guidelines.";
+  } else if (topicLower.includes("adrenal") || topicLower.includes("cushing") || topicLower.includes("aldosteronism") || topicLower.includes("pheochromocytoma") || topicLower.includes("adrenal insufficiency") || topicLower.includes("congenital adrenal")) {
+    societyMap = "Cite Endocrine Society Clinical Practice Guidelines for adrenal disorders. For primary aldosteronism cite the 2016 Endocrine Society PA guidelines.";
+  } else if (topicLower.includes("pituitary") || topicLower.includes("acromegaly") || topicLower.includes("prolactinoma") || topicLower.includes("hypopituitar") || topicLower.includes("diabetes insipidus") || topicLower.includes("pituitary apoplexy")) {
+    societyMap = "Cite Endocrine Society Clinical Practice Guidelines for pituitary disorders. For acromegaly cite the 2014 Endocrine Society acromegaly guidelines (updated 2024).";
+  } else if (topicLower.includes("pcos") || topicLower.includes("polycystic") || topicLower.includes("hypogonadism") || topicLower.includes("testosterone") || topicLower.includes("menopause") || topicLower.includes("hrt") || topicLower.includes("hormone replacement")) {
+    societyMap = "Cite Endocrine Society and/or AACE for reproductive endocrinology. For menopause cite The Menopause Society (formerly NAMS) guidelines.";
+  } else if (topicLower.includes("obesity") || topicLower.includes("weight loss") || topicLower.includes("bariatric") || topicLower.includes("tirzepatide") || topicLower.includes("semaglutide")) {
+    societyMap = "Cite Obesity Society (TOS), AACE, and/or ADA guidelines for obesity management. For GLP-1/GIP agonists in obesity cite the Endocrine Society obesity guidelines.";
+
+  // Cardiology
+  } else if (topicLower.includes("heart failure") || topicLower.includes("hfref") || topicLower.includes("hfpef") || topicLower.includes("cardiomyopathy")) {
+    societyMap = "Cite ACC/AHA 2022 Heart Failure Guidelines and/or ESC 2021 Heart Failure Guidelines.";
+  } else if (topicLower.includes("acs") || topicLower.includes("stemi") || topicLower.includes("nstemi") || topicLower.includes("unstable angina") || topicLower.includes("myocardial infarction")) {
+    societyMap = "Cite ACC/AHA ACS guidelines and ESC NSTE-ACS/STEMI guidelines. For antithrombotic therapy cite ACC/AHA/ACCP guidelines.";
+  } else if (topicLower.includes("atrial fibrillation") || topicLower.includes("afib") || topicLower.includes("flutter")) {
+    societyMap = "Cite 2023 ACC/AHA/ACCP/HRS Atrial Fibrillation Guidelines. For anticoagulation cite CHA2DS2-VASc scoring per these guidelines.";
+  } else if (topicLower.includes("hypertension")) {
+    societyMap = "Cite 2017 ACC/AHA Hypertension Guidelines (BP target <130/80 for most adults) and/or JNC 8 for specific populations.";
   } else if (topicLower.includes("lipid") || topicLower.includes("cholesterol") || topicLower.includes("statin") || topicLower.includes("dyslipidemia")) {
-    societyMap = "SOCIETY RULE: Cite ACC/AHA and/or AACE for lipid management guidelines.";
-  } else if (topicLower.includes("heart") || topicLower.includes("cardiac") || topicLower.includes("acs") || topicLower.includes("atrial") || topicLower.includes("hypertension") || topicLower.includes("coronary")) {
-    societyMap = "SOCIETY RULE: Cite ACC/AHA and/or ESC for cardiovascular guidelines.";
-  } else if (topicLower.includes("kidney") || topicLower.includes("renal") || topicLower.includes("ckd") || topicLower.includes("aki")) {
-    societyMap = "SOCIETY RULE: Cite KDIGO guidelines for kidney disease management.";
+    societyMap = "Cite 2018 ACC/AHA Cholesterol Guidelines and/or AACE/ACE Dyslipidemia Guidelines. LDL targets vary by risk category.";
+  } else if (topicLower.includes("valvular") || topicLower.includes("aortic stenosis") || topicLower.includes("mitral") || topicLower.includes("endocarditis")) {
+    societyMap = "Cite 2021 ACC/AHA Valvular Heart Disease Guidelines. For endocarditis cite AHA/IDSA infective endocarditis guidelines.";
+  } else if (topicLower.includes("pulmonary embolism") || topicLower.includes("dvt") || topicLower.includes("venous thromboembolism") || topicLower.includes("anticoagul")) {
+    societyMap = "Cite ACCP/ASH VTE guidelines and/or ESC PE guidelines. For DOAC selection cite ACC/AHA guidance.";
+
+  // Pulmonology
+  } else if (topicLower.includes("copd") || topicLower.includes("emphysema") || topicLower.includes("chronic obstructive")) {
+    societyMap = "Cite GOLD (Global Initiative for Chronic Obstructive Lung Disease) guidelines for COPD staging and management.";
+  } else if (topicLower.includes("asthma")) {
+    societyMap = "Cite GINA (Global Initiative for Asthma) guidelines and/or NAEPP EPR-4 for asthma step therapy.";
+  } else if (topicLower.includes("pneumonia") || topicLower.includes("community acquired") || topicLower.includes("hospital acquired") || topicLower.includes("ventilator associated")) {
+    societyMap = "Cite IDSA/ATS 2019 Community-Acquired Pneumonia Guidelines. For HAP/VAP cite 2016 IDSA/ATS guidelines.";
+  } else if (topicLower.includes("interstitial lung") || topicLower.includes("ipf") || topicLower.includes("sarcoidosis") || topicLower.includes("pulmonary fibrosis")) {
+    societyMap = "Cite ATS/ERS/JRS/ALAT IPF guidelines. For sarcoidosis cite ATS/ERS/WASOG statement.";
+  } else if (topicLower.includes("pulmonary hypertension")) {
+    societyMap = "Cite ESC/ERS 2022 Pulmonary Hypertension Guidelines and WHO PH classification.";
+  } else if (topicLower.includes("sleep apnea") || topicLower.includes("obstructive sleep")) {
+    societyMap = "Cite AASM (American Academy of Sleep Medicine) clinical practice guidelines for OSA diagnosis and management.";
+  } else if (topicLower.includes("ards") || topicLower.includes("acute respiratory distress")) {
+    societyMap = "Cite Berlin Definition of ARDS and ATS/ESICM guidelines for lung-protective ventilation.";
+
+  // Nephrology
+  } else if (topicLower.includes("kidney") || topicLower.includes("renal") || topicLower.includes("ckd") || topicLower.includes("aki") || topicLower.includes("glomerulo") || topicLower.includes("nephrotic") || topicLower.includes("nephritic")) {
+    societyMap = "Cite KDIGO (Kidney Disease Improving Global Outcomes) guidelines. For AKI cite KDIGO 2012 AKI guidelines. For CKD cite KDIGO 2024 CKD guidelines.";
+  } else if (topicLower.includes("electrolyte") || topicLower.includes("hyponatremia") || topicLower.includes("hyperkalemia") || topicLower.includes("hypokalemia") || topicLower.includes("acid-base") || topicLower.includes("acidosis") || topicLower.includes("alkalosis")) {
+    societyMap = "Cite KDIGO guidelines and/or published expert consensus for electrolyte and acid-base disorders management.";
+
+  // Gastroenterology and Hepatology
+  } else if (topicLower.includes("ibd") || topicLower.includes("crohn") || topicLower.includes("ulcerative colitis") || topicLower.includes("inflammatory bowel")) {
+    societyMap = "Cite ACG (American College of Gastroenterology) and/or AGA (American Gastroenterological Association) IBD guidelines.";
+  } else if (topicLower.includes("cirrhosis") || topicLower.includes("hepatitis") || topicLower.includes("liver") || topicLower.includes("nafld") || topicLower.includes("nash") || topicLower.includes("masld")) {
+    societyMap = "Cite AASLD (American Association for the Study of Liver Diseases) guidelines. For MASLD/NASH cite AASLD/EASL/APASL guidelines.";
+  } else if (topicLower.includes("pancreatitis")) {
+    societyMap = "Cite ACG Clinical Guideline for Acute Pancreatitis. Severity classified per Revised Atlanta Classification.";
+  } else if (topicLower.includes("gi bleeding") || topicLower.includes("gastrointestinal bleeding") || topicLower.includes("peptic ulcer") || topicLower.includes("h. pylori")) {
+    societyMap = "Cite ACG and/or ASGE guidelines for GI bleeding management. For H. pylori cite ACG H. pylori guidelines.";
+
+  // Rheumatology
+  } else if (topicLower.includes("rheumatoid arthritis")) {
+    societyMap = "Cite ACR (American College of Rheumatology) 2021 Rheumatoid Arthritis Treatment Guidelines. Treat-to-target approach per ACR/EULAR recommendations.";
+  } else if (topicLower.includes("sle") || topicLower.includes("lupus")) {
+    societyMap = "Cite ACR 2019 SLE Classification Criteria and EULAR/ACR recommendations for SLE management.";
+  } else if (topicLower.includes("gout") || topicLower.includes("pseudogout") || topicLower.includes("uric acid")) {
+    societyMap = "Cite ACR 2020 Gout Management Guidelines. ULT target uric acid <6 mg/dL (or <5 mg/dL in tophaceous gout).";
+  } else if (topicLower.includes("giant cell arteritis") || topicLower.includes("polymyalgia") || topicLower.includes("vasculitis")) {
+    societyMap = "Cite ACR/EULAR 2022 Giant Cell Arteritis Classification Criteria and ACR vasculitis guidelines.";
+  } else if (topicLower.includes("ankylosing") || topicLower.includes("spondyloarthritis") || topicLower.includes("psoriatic arthritis")) {
+    societyMap = "Cite ACR/NPF 2018 Psoriatic Arthritis Guidelines and ASAS/EULAR recommendations for axial spondyloarthritis.";
+  } else if (topicLower.includes("osteoarthritis")) {
+    societyMap = "Cite ACR 2019 Osteoarthritis Management Guidelines and OARSI recommendations.";
+
+  // Infectious Disease
+  } else if (topicLower.includes("sepsis") || topicLower.includes("septic shock")) {
+    societyMap = "Cite Surviving Sepsis Campaign (SSC) 2021 International Guidelines. Sepsis-3 definition: SOFA score increase >=2.";
+  } else if (topicLower.includes("hiv") || topicLower.includes("antiretroviral")) {
+    societyMap = "Cite DHHS Guidelines for the Use of Antiretroviral Agents in Adults and Adolescents (updated regularly at aidsinfo.nih.gov).";
+  } else if (topicLower.includes("tuberculosis") || topicLower.includes("tb ")) {
+    societyMap = "Cite ATS/CDC/IDSA 2016 Treatment of Drug-Susceptible Tuberculosis guidelines and CDC TB resources.";
+  } else if (topicLower.includes("endocarditis")) {
+    societyMap = "Cite 2015 AHA Infective Endocarditis Guidelines and IDSA/ESC endocarditis recommendations.";
+  } else if (topicLower.includes("c. difficile") || topicLower.includes("cdiff") || topicLower.includes("clostridioides")) {
+    societyMap = "Cite IDSA/SHEA 2021 C. difficile Clinical Practice Guidelines.";
+  } else if (topicLower.includes("uti") || topicLower.includes("urinary tract infection")) {
+    societyMap = "Cite IDSA guidelines for uncomplicated and complicated UTI management.";
+  } else if (topicLower.includes("covid") || topicLower.includes("sars-cov")) {
+    societyMap = "Cite NIH COVID-19 Treatment Guidelines (covid19treatmentguidelines.nih.gov) and IDSA COVID-19 guidelines.";
+
+  // Hematology and Oncology
+  } else if (topicLower.includes("anemia") || topicLower.includes("iron deficiency") || topicLower.includes("b12") || topicLower.includes("folate") || topicLower.includes("hemolytic")) {
+    societyMap = "Cite ASH (American Society of Hematology) guidelines for anemia management and transfusion thresholds.";
+  } else if (topicLower.includes("anticoagulat") || topicLower.includes("warfarin") || topicLower.includes("doac") || topicLower.includes("heparin") || topicLower.includes("hit")) {
+    societyMap = "Cite ACCP/ASH anticoagulation guidelines. For HIT cite ASH 2018 HIT guidelines. For reversal agents cite ACC/AHA guidance.";
+  } else if (topicLower.includes("myeloma") || topicLower.includes("lymphoma") || topicLower.includes("leukemia")) {
+    societyMap = "Cite NCCN (National Comprehensive Cancer Network) Oncology Guidelines for the specific malignancy.";
+  } else if (topicLower.includes("sickle cell")) {
+    societyMap = "Cite ASH 2020 Sickle Cell Disease Guidelines and NHLBI evidence-based management recommendations.";
+  } else if (topicLower.includes("thrombocytopenia") || topicLower.includes("itp") || topicLower.includes("ttp") || topicLower.includes("hit")) {
+    societyMap = "Cite ASH guidelines for ITP management and TTP/HIT per respective ASH guidelines.";
+
+  // Neurology
+  } else if (topicLower.includes("stroke") || topicLower.includes("tia") || topicLower.includes("cerebrovascular")) {
+    societyMap = "Cite AHA/ASA 2019 Acute Ischemic Stroke Guidelines and 2021 TIA/stroke prevention guidelines.";
+  } else if (topicLower.includes("seizure") || topicLower.includes("epilepsy")) {
+    societyMap = "Cite AES (American Epilepsy Society) and ILAE guidelines for seizure and epilepsy management.";
+  } else if (topicLower.includes("multiple sclerosis")) {
+    societyMap = "Cite AAN (American Academy of Neurology) Practice Guidelines for Multiple Sclerosis disease-modifying therapy.";
+  } else if (topicLower.includes("parkinson") || topicLower.includes("parkinsonism")) {
+    societyMap = "Cite AAN Practice Guidelines for Parkinson Disease and MDS (Movement Disorder Society) recommendations.";
+  } else if (topicLower.includes("dementia") || topicLower.includes("alzheimer")) {
+    societyMap = "Cite AAN Practice Guidelines for dementia and Alzheimer disease. For new anti-amyloid therapies cite FDA approval criteria and AAN guidance.";
+  } else if (topicLower.includes("headache") || topicLower.includes("migraine")) {
+    societyMap = "Cite AHS (American Headache Society) and AAN guidelines for migraine acute and preventive treatment.";
+
+  // Preventive Medicine and Ethics
+  } else if (topicLower.includes("screening") || topicLower.includes("preventive") || topicLower.includes("uspstf") || topicLower.includes("cancer screening")) {
+    societyMap = "Cite USPSTF recommendations as the primary authority for preventive care and cancer screening intervals.";
+  } else if (topicLower.includes("biostatistics") || topicLower.includes("sensitivity") || topicLower.includes("specificity") || topicLower.includes("nnt") || topicLower.includes("likelihood ratio")) {
+    societyMap = "Use standard biostatistics definitions. Sensitivity = TP/(TP+FN). Specificity = TN/(TN+FP). PPV and NPV depend on prevalence.";
+  } else if (topicLower.includes("ethics") || topicLower.includes("informed consent") || topicLower.includes("advance directive") || topicLower.includes("capacity")) {
+    societyMap = "Cite AMA Code of Medical Ethics and standard bioethics principles (autonomy, beneficence, non-maleficence, justice) per Beauchamp and Childress.";
+  } else {
+    societyMap = "Cite the most relevant and current specialty society guidelines for this topic.";
   }
 
   var hardRules = "CLINICAL ACCURACY RULES (MANDATORY):\n" +
@@ -413,7 +529,30 @@ function buildPrompt(level, requestedTopic) {
   var explanationLine = "EXPLANATION: 5-6 sentences. (1) State why the correct answer is right and cite the specific guideline by name and year. (2-4) Explain why each wrong answer is incorrect. (5) Give one high-yield board pearl that a fellow or resident must remember.";
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
 
-  return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" + hardRules + "\n" +
+  var nbmeAbimRules = "NBME/ABIM MCQ QUALITY STANDARDS (MANDATORY):\n" +
+    "STEM REQUIREMENTS:\n" +
+    "1. Present a clear patient-based clinical vignette with individual patient history, exam findings, vitals, labs, and risk factors.\n" +
+    "2. The lead-in must be a single closed-ended question that a competent physician can answer by reading the stem alone WITHOUT looking at the options (cover-the-options rule).\n" +
+    "3. Use ONLY positive phrasing. NEVER use negatively worded lead-ins such as 'EXCEPT', 'NOT', or 'all of the following except'.\n" +
+    "4. Lead-in must be one of these ABIM-approved task types: most likely diagnosis / most appropriate next step in management / most appropriate pharmacotherapy / most appropriate diagnostic study / mechanism of action / most likely underlying cause / best initial treatment / prognosis / preventive recommendation / most appropriate response to patient.\n" +
+    "5. Avoid trivial, obscure, or overly specific details. Test knowledge a physician should know without external references.\n" +
+    "6. Prioritize life-threatening or function-threatening conditions and key management decisions.\n" +
+    "7. Vignette must simulate authentic clinical practice and reflect conditions seen in real clinical encounters.\n\n" +
+    "ANSWER CHOICES REQUIREMENTS:\n" +
+    "8. Provide exactly 5 options (A-E). ONE clearly best correct answer. Four plausible, homogeneous distractors.\n" +
+    "9. All options must be rank-orderable on a SINGLE dimension (e.g., all diagnoses OR all treatments -- never mix).\n" +
+    "10. Distractors must represent common clinical errors or misconceptions that would appear correct to less knowledgeable candidates but NOT to experts.\n" +
+    "11. All options must have PARALLEL grammatical structure and SIMILAR length. No option should stand out as obviously longer or uniquely phrased.\n" +
+    "12. NEVER use vague terms in options such as 'often', 'usually', 'sometimes'. NEVER use absolute terms such as 'always' or 'never'.\n" +
+    "13. NEVER use 'none of the above' or 'all of the above' as an option.\n" +
+    "14. Avoid word repetition between the stem and the correct answer (clang clues that cue test-wise examinees).\n" +
+    "15. The correct answer must be ABSOLUTELY accurate per current guidelines. It must be defensible and not tricky.\n\n" +
+    "EXPLANATION REQUIREMENTS:\n" +
+    "16. Explain WHY the correct answer is right using specific guideline citation.\n" +
+    "17. Explain WHY each wrong answer is incorrect -- describe the specific misconception or error each distractor targets.\n" +
+    "18. End with one high-yield board pearl that reflects synthesis and clinical judgment, not mere recall.\n";
+
+    return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" + hardRules + "\n" + nbmeAbimRules + "\n" +
     topicInstruction + "\n\n" +
     "Write ONE high-quality clinical vignette MCQ.\n" +
     stemLine + "\n" +
