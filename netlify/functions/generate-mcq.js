@@ -6,10 +6,12 @@ async function sleep(ms) {
   return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-async function callClaude(prompt) {
-  console.log("Calling Claude, prompt length:", prompt.length);
+async function callClaude(systemText, userText) {
+  var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 100000);
+  var finalUserText = userText + "\n\n[Internal Generator Seed: " + entropySeed + " - Ensure a completely unique vignette.]";
+  console.log("Calling Claude, system length:", systemText.length, "user length:", finalUserText.length);
   var maxRetries = 3;
-  var retryDelays = [1000, 2000, 3000]; // 1s, 2s, 3s between retries
+  var retryDelays = [1000, 2000, 3000];
 
   for (var attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) {
@@ -21,13 +23,21 @@ async function callClaude(prompt) {
       headers: {
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31"
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1500,
         temperature: 0.85,
-        messages: [{ role: "user", content: prompt }]
+        system: [
+          {
+            type: "text",
+            text: systemText,
+            cache_control: { type: "ephemeral" }
+          }
+        ],
+        messages: [{ role: "user", content: finalUserText }]
       })
     });
 
@@ -585,15 +595,26 @@ function buildPrompt(level, requestedTopic) {
     "17. Explain WHY each wrong answer is incorrect -- describe the specific misconception or error each distractor targets.\n" +
     "18. End with one high-yield board pearl that reflects synthesis and clinical judgment, not mere recall.\n";
 
-    return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" + hardRules + "\n" + nbmeAbimRules + "\n" +
-    topicInstruction + "\n\n" +
+    // SYSTEM: static cacheable instructions (rules + formatting)
+  var systemText =
+    "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
+    hardRules + "\n" +
+    nbmeAbimRules + "\n\n" +
+    "FORMATTING REQUIREMENTS:\n" +
     "Write ONE high-quality clinical vignette MCQ.\n" +
     stemLine + "\n" +
     choicesLine + "\n" +
     explanationLine + "\n\n" +
     "Return ONLY valid JSON, no markdown, no extra text:\n" +
-    jsonLine +
-    "\nSet showImageButton:true ONLY if the question asks subscriber to look at an actual image (e.g. See image below). Set false if stem just describes findings in words. Default is false.";
+    jsonLine + "\n" +
+    "Set showImageButton:true ONLY if the question asks subscriber to look at an actual image. Default is false.";
+
+  // USER: dynamic topic-specific instruction
+  var userText =
+    topicInstruction + "\n\n" +
+    "Please generate the specific MCQ for this topic now.";
+
+  return { systemText: systemText, userText: userText };
 }
 
 exports.handler = async function(event) {
@@ -618,10 +639,20 @@ exports.handler = async function(event) {
   }
 
   try {
-    var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 100000);
-    var prompt = buildPrompt(level, topic);
-    prompt += "\n\n[Generator Seed: " + entropySeed + " -- Use this to generate a completely unique clinical vignette different from any previous question on this topic.]";
-    var raw = await callClaude(prompt);
+    // Generate random patient demographics to force unique vignettes every time
+    var ages = [22, 26, 29, 31, 34, 37, 39, 42, 45, 48, 51, 54, 57, 61, 64, 67, 71, 74, 78];
+    var sexes = ["man", "woman", "woman", "man", "woman", "man"];
+    var races = ["White", "Black", "Hispanic", "Asian", "Native American", "Middle Eastern", "South Asian", "White", "Black", "Hispanic"];
+    var settings = ["outpatient primary care clinic", "endocrinology outpatient clinic", "emergency department", "inpatient medicine ward", "urgent care center", "internal medicine resident clinic", "endocrine subspecialty consult service"];
+    var randAge = ages[Math.floor(Math.random() * ages.length)];
+    var randSex = sexes[Math.floor(Math.random() * sexes.length)];
+    var randRace = races[Math.floor(Math.random() * races.length)];
+    var randSetting = settings[Math.floor(Math.random() * settings.length)];
+    var patientSeed = "MANDATORY: This patient MUST be a " + randAge + "-year-old " + randRace + " " + randSex + " presenting to a " + randSetting + ". Use exactly these demographics.";
+
+    var promptData = buildPrompt(level, topic);
+    var enrichedUserText = patientSeed + "\n\n" + promptData.userText;
+    var raw = await callClaude(promptData.systemText, enrichedUserText);
 
     var cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 
