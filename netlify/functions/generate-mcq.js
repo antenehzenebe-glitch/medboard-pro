@@ -509,9 +509,8 @@ function buildPrompt(level, requestedTopic) {
   var hardRules = "CLINICAL ACCURACY RULES (MANDATORY):\n" +
     "1. NEVER use the word 'pathognomonic' for ultrasound or imaging findings. Use 'highly characteristic' or 'consistent with' instead.\n" +
     "2. NEVER cite the ADA for non-diabetes conditions such as thyroid, adrenal, pituitary, or bone disorders.\n" +
-    "3. Starting levothyroxine dose for healthy patients under 50 with overt hypothyroidism is 1.6 mcg/kg/day (full replacement), NOT 50-75 mcg.\n" +
-    "4. Levothyroxine titration increments are 12.5-25 mcg every 6-8 weeks, NOT 25-50 mcg.\n" +
-    "5. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease.\n" +
+    "3. Levothyroxine dosing must follow current ATA/Endocrine Society guidelines exactly as published. Do not fabricate doses or titration schedules.\n" +
+    "4. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease per ATA guidelines.\n" +
     "6. Always cite the correct society for each topic. " + (societyMap || "Cite the most relevant specialty society.") + "\n" +
     "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n" +
     "8. LAB VALUE INTERNAL CONSISTENCY (CRITICAL): All laboratory values in the stem must be internally consistent with the diagnosis being tested. Examples:\n" +
@@ -548,6 +547,21 @@ function buildPrompt(level, requestedTopic) {
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
 
   var nbmeAbimRules = "NBME/ABIM MCQ QUALITY STANDARDS (MANDATORY):\n" +
+    "RANDOMIZATION (CRITICAL -- EVERY QUESTION MUST BE UNIQUE):\n" +
+    "- Randomly vary the patient age (20s, 30s, 40s, 50s, 60s, 70s), sex, and race/ethnicity.\n" +
+    "- Randomly vary the clinical setting: outpatient clinic, emergency department, inpatient ward, endocrine consult.\n" +
+    "- Randomly vary the specific testing point for this topic. For hypothyroidism rotate through:\n" +
+    "  * Initial diagnosis and workup\n" +
+    "  * Initial pharmacotherapy selection\n" +
+    "  * Monitoring and follow-up\n" +
+    "  * Management in pregnancy\n" +
+    "  * Management in elderly or cardiac patients\n" +
+    "  * Subclinical vs overt distinction and management decision\n" +
+    "  * Drug interactions affecting levothyroxine absorption\n" +
+    "  * Central vs primary hypothyroidism differentiation\n" +
+    "- Randomly vary presenting symptoms and chief complaint.\n" +
+    "- Randomly vary which lab values are abnormal and by how much.\n" +
+    "- NEVER generate a question identical or nearly identical to a previous one on this topic.\n\n" +
     "STEM REQUIREMENTS:\n" +
     "1. Present a clear patient-based clinical vignette with individual patient history, exam findings, vitals, labs, and risk factors.\n" +
     "2. The lead-in must be a single closed-ended question that a competent physician can answer by reading the stem alone WITHOUT looking at the options (cover-the-options rule).\n" +
