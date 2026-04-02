@@ -513,7 +513,18 @@ function buildPrompt(level, requestedTopic) {
     "4. Levothyroxine titration increments are 12.5-25 mcg every 6-8 weeks, NOT 25-50 mcg.\n" +
     "5. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease.\n" +
     "6. Always cite the correct society for each topic. " + (societyMap || "Cite the most relevant specialty society.") + "\n" +
-    "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n";
+    "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n" +
+    "8. LAB VALUE INTERNAL CONSISTENCY (CRITICAL): All laboratory values in the stem must be internally consistent with the diagnosis being tested. Examples:\n" +
+    "   - Overt hypothyroidism requires free T4 BELOW the reference range (e.g., 0.3-0.6 ng/dL), not at the lower limit of normal.\n" +
+    "   - Subclinical hypothyroidism has elevated TSH with NORMAL free T4 within reference range.\n" +
+    "   - Overt hyperthyroidism requires free T4 ABOVE reference range with suppressed TSH <0.1 mIU/L.\n" +
+    "   - Subclinical hyperthyroidism has suppressed TSH with NORMAL free T4.\n" +
+    "   - DKA requires glucose typically >250 mg/dL with pH <7.3 and bicarbonate <18 mEq/L.\n" +
+    "   - Primary adrenal insufficiency has LOW cortisol with HIGH ACTH. Secondary has LOW cortisol with LOW/normal ACTH.\n" +
+    "   - Primary aldosteronism has HIGH aldosterone with LOW renin (ARR >30).\n" +
+    "   - Cushing syndrome requires UFC >3x ULN or midnight cortisol >1.8 mcg/dL or failed LDDST (post-dex cortisol >1.8 mcg/dL).\n" +
+    "   - NEVER write lab values that contradict the diagnosis in the explanation. The stem data must support the correct answer.\n" +
+    "9. If the stem describes a condition as overt (e.g., overt hypothyroidism), the relevant lab value(s) MUST be clearly outside the reference range, not borderline or at the limit of normal.\n";
 
   var cgmNote = "";
   if (specificTopic.toLowerCase().includes("cgm") || specificTopic.toLowerCase().includes("aid") || specificTopic.toLowerCase().includes("insulin pump")) {
