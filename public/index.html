@@ -682,7 +682,7 @@ function App(){
                   </button>
                 ))}
                 {grp&&GROUPS[grp].length>1&&(
-                  <div>
+                  <React.Fragment>
                     <div style={{height:1,background:BDR,margin:"10px 0"}}/>
                     <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8,letterSpacing:1}}>TOPIC</p>
                     {GROUPS[grp].map(t=>(
@@ -691,7 +691,7 @@ function App(){
                         {t}
                       </button>
                     ))}
-                  </div>
+                  </React.Fragment>
                 )}
                 <LabPanel/>
               </div>
@@ -869,8 +869,6 @@ function App(){
               </div>
             )}
           </div>
-        )}
-
         )}
 
       </div>
