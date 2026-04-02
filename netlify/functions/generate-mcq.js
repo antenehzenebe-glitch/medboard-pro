@@ -24,7 +24,7 @@ async function callClaude(prompt) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "claude-sonnet-4-6",
         max_tokens: 1500,
         messages: [{ role: "user", content: prompt }]
       })
@@ -524,7 +524,14 @@ function buildPrompt(level, requestedTopic) {
     "   - Primary aldosteronism has HIGH aldosterone with LOW renin (ARR >30).\n" +
     "   - Cushing syndrome requires UFC >3x ULN or midnight cortisol >1.8 mcg/dL or failed LDDST (post-dex cortisol >1.8 mcg/dL).\n" +
     "   - NEVER write lab values that contradict the diagnosis in the explanation. The stem data must support the correct answer.\n" +
-    "9. If the stem describes a condition as overt (e.g., overt hypothyroidism), the relevant lab value(s) MUST be clearly outside the reference range, not borderline or at the limit of normal.\n";
+    "9. If the stem describes a condition as overt (e.g., overt hypothyroidism), the relevant lab value(s) MUST be clearly outside the reference range, not borderline or at the limit of normal.\n" +
+    "10. DIAGNOSIS-FIRST RULE: Before writing the stem, decide EXACTLY which condition you are testing. Then generate lab values that unambiguously match that diagnosis:\n" +
+    "    - Testing OVERT hypothyroidism: TSH must be >10 mIU/L AND free T4 must be BELOW 0.8 ng/dL (e.g., 0.3-0.6 ng/dL).\n" +
+    "    - Testing SUBCLINICAL hypothyroidism: TSH must be 4.5-10 mIU/L AND free T4 must be WITHIN normal range (0.8-1.8 ng/dL).\n" +
+    "    - Testing OVERT hyperthyroidism: TSH must be <0.01 mIU/L AND free T4 must be ABOVE 1.8 ng/dL (e.g., 2.8-4.2 ng/dL).\n" +
+    "    - Testing SUBCLINICAL hyperthyroidism: TSH must be <0.4 mIU/L AND free T4 must be WITHIN normal range.\n" +
+    "    - The explanation MUST match the diagnosis defined by the labs in the stem. NEVER call a patient with normal free T4 an overt case.\n" +
+    "    - The lead-in question and correct answer MUST be appropriate for the actual diagnosis defined by the lab values.\n";
 
   var cgmNote = "";
   if (specificTopic.toLowerCase().includes("cgm") || specificTopic.toLowerCase().includes("aid") || specificTopic.toLowerCase().includes("insulin pump")) {
