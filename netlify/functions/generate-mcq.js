@@ -371,6 +371,34 @@ function buildPrompt(level, requestedTopic) {
     levelNote = "Fellowship-level endocrinology per ADA 2025, Endocrine Society, AACE guidelines. Nuanced distinctions required.";
   }
 
+  // Hard clinical accuracy rules
+  var societyMap = "";
+  var topicLower = specificTopic.toLowerCase();
+  if (topicLower.includes("thyroid") || topicLower.includes("hashimoto") || topicLower.includes("graves") || topicLower.includes("hypothyroid") || topicLower.includes("hyperthyroid")) {
+    societyMap = "SOCIETY RULE: Cite ONLY the American Thyroid Association (ATA) and/or Endocrine Society for thyroid disorders. NEVER cite ADA for thyroid management.";
+  } else if (topicLower.includes("diabetes") || topicLower.includes("insulin") || topicLower.includes("cgm") || topicLower.includes("glucose") || topicLower.includes("dka") || topicLower.includes("hhs")) {
+    societyMap = "SOCIETY RULE: Cite ADA 2025 Standards of Care and/or AACE for diabetes management.";
+  } else if (topicLower.includes("osteoporosis") || topicLower.includes("bone") || topicLower.includes("fracture") || topicLower.includes("calcium") || topicLower.includes("vitamin d") || topicLower.includes("parathyroid")) {
+    societyMap = "SOCIETY RULE: Cite Endocrine Society and/or National Osteoporosis Foundation (NOF) for bone and calcium disorders.";
+  } else if (topicLower.includes("adrenal") || topicLower.includes("cushing") || topicLower.includes("aldosteronism") || topicLower.includes("pheochromocytoma") || topicLower.includes("pituitary") || topicLower.includes("acromegaly")) {
+    societyMap = "SOCIETY RULE: Cite Endocrine Society Clinical Practice Guidelines for adrenal and pituitary disorders.";
+  } else if (topicLower.includes("lipid") || topicLower.includes("cholesterol") || topicLower.includes("statin") || topicLower.includes("dyslipidemia")) {
+    societyMap = "SOCIETY RULE: Cite ACC/AHA and/or AACE for lipid management guidelines.";
+  } else if (topicLower.includes("heart") || topicLower.includes("cardiac") || topicLower.includes("acs") || topicLower.includes("atrial") || topicLower.includes("hypertension") || topicLower.includes("coronary")) {
+    societyMap = "SOCIETY RULE: Cite ACC/AHA and/or ESC for cardiovascular guidelines.";
+  } else if (topicLower.includes("kidney") || topicLower.includes("renal") || topicLower.includes("ckd") || topicLower.includes("aki")) {
+    societyMap = "SOCIETY RULE: Cite KDIGO guidelines for kidney disease management.";
+  }
+
+  var hardRules = "CLINICAL ACCURACY RULES (MANDATORY):\n" +
+    "1. NEVER use the word 'pathognomonic' for ultrasound or imaging findings. Use 'highly characteristic' or 'consistent with' instead.\n" +
+    "2. NEVER cite the ADA for non-diabetes conditions such as thyroid, adrenal, pituitary, or bone disorders.\n" +
+    "3. Starting levothyroxine dose for healthy patients under 50 with overt hypothyroidism is 1.6 mcg/kg/day (full replacement), NOT 50-75 mcg.\n" +
+    "4. Levothyroxine titration increments are 12.5-25 mcg every 6-8 weeks, NOT 25-50 mcg.\n" +
+    "5. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease.\n" +
+    "6. Always cite the correct society for each topic. " + (societyMap || "Cite the most relevant specialty society.") + "\n" +
+    "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n";
+
   var cgmNote = "";
   if (specificTopic.toLowerCase().includes("cgm") || specificTopic.toLowerCase().includes("aid") || specificTopic.toLowerCase().includes("insulin pump")) {
     cgmNote = " Include CGM metrics: TIR%, TBR%, TAR%, GMI, CV%, mean glucose.";
@@ -385,7 +413,7 @@ function buildPrompt(level, requestedTopic) {
   var explanationLine = "EXPLANATION: 5-6 sentences. (1) State why the correct answer is right and cite the specific guideline by name and year. (2-4) Explain why each wrong answer is incorrect. (5) Give one high-yield board pearl that a fellow or resident must remember.";
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
 
-  return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
+  return "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" + hardRules + "\n" +
     topicInstruction + "\n\n" +
     "Write ONE high-quality clinical vignette MCQ.\n" +
     stemLine + "\n" +
