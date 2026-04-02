@@ -374,15 +374,15 @@ function buildPrompt(level, requestedTopic) {
 
   var levelNote = "";
   if (level.includes("Step 1")) {
-    levelNote = "Focus on basic science mechanisms, pathophysiology, pharmacology. Test WHY not just WHAT.";
+    levelNote = "Focus on basic science mechanisms, pathophysiology, and pharmacology. Frame the vignette to test WHY a process occurs (e.g., the underlying cellular pathways or receptor-level mechanisms), not just WHAT it is. Test understanding of convergent pathways across systems.";
   } else if (level.includes("Step 2")) {
-    levelNote = "Focus on clinical decision making - diagnosis, next best step, management. Include vitals, labs, exam.";
+    levelNote = "Focus on clinical decision-making. Require the learner to differentiate between closely related conditions using subtle clues in the physical exam or lab panels before choosing the next best step. Avoid obvious presentations -- use realistic, complex clinical scenarios.";
   } else if (level.includes("Step 3")) {
-    levelNote = "Focus on outpatient management, chronic disease, preventive care, ethics, biostatistics.";
+    levelNote = "Focus on outpatient management, chronic disease progression, and high-value preventive care. Emphasize complex multi-system patient presentations and transitions of care. Test population health and chronic disease management decisions.";
   } else if (level.includes("ABIM Internal Medicine")) {
-    levelNote = "Diagnosis and management per ACC/AHA, ADA, IDSA, ACR, KDIGO guidelines with specific thresholds.";
+    levelNote = "Diagnosis and management must adhere strictly to ACC/AHA, ADA, IDSA, ACR, and KDIGO guidelines. Test the specific thresholds and contraindications that separate a competent resident from a master clinician. Include scenarios where subtle lab findings (e.g., borderline AKI, mild hyperkalemia) change the management decision.";
   } else if (level.includes("ABIM Endocrinology")) {
-    levelNote = "Fellowship-level endocrinology per ADA 2025, Endocrine Society, AACE guidelines. Nuanced distinctions required.";
+    levelNote = "This is for advanced Endocrinology Fellows. Require highly nuanced distinctions per ADA 2025, Endocrine Society, and AACE guidelines. Where relevant, integrate advanced metabolic concepts such as the converging pathways of insulin resistance, diabetes, and atherosclerosis (metabolic vasculopathy), or the impact of the gut microbiome on incretin-based pharmacotherapy. Challenge them as if they are on clinical rounds with an academic program director. Test synthesis and clinical judgment, not memorization.";
   }
 
   // Hard clinical accuracy rules - society mapping per specialty
@@ -527,6 +527,14 @@ function buildPrompt(level, requestedTopic) {
     "4. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease per ATA guidelines.\n" +
     "6. Always cite the correct society for each topic. " + (societyMap || "Cite the most relevant specialty society.") + "\n" +
     "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n" +
+    "DISTRACTOR QUALITY RULE: Distractors must not be random or obviously wrong. Each distractor must represent a common resident or fellow pitfall such as:\n" +
+    "   - Premature closure (stopping at the first plausible diagnosis without considering all data)\n" +
+    "   - Anchoring bias (fixating on one diagnosis and ignoring contradictory findings)\n" +
+    "   - Failure to adjust drug dosing for renal or hepatic impairment\n" +
+    "   - Applying the correct drug for the wrong disease subtype\n" +
+    "   - Confusing subclinical with overt disease management thresholds\n" +
+    "   - Applying a guideline correctly but in the wrong clinical context\n" +
+    "   - Choosing a reasonable but outdated or guideline-discordant approach\n" +
     "8. LAB VALUE INTERNAL CONSISTENCY (CRITICAL): All laboratory values in the stem must be internally consistent with the diagnosis being tested. Examples:\n" +
     "   - Overt hypothyroidism requires free T4 BELOW the reference range (e.g., 0.3-0.6 ng/dL), not at the lower limit of normal.\n" +
     "   - Subclinical hypothyroidism has elevated TSH with NORMAL free T4 within reference range.\n" +
@@ -557,29 +565,58 @@ function buildPrompt(level, requestedTopic) {
 
   // JAVASCRIPT-FORCED TASK ROTATION — guarantees varied question types
   // Weighted toward most common ABIM/USMLE task types
-  var boardTasks = [
-    "most appropriate next step in management",
-    "most appropriate initial pharmacotherapy",
-    "most likely diagnosis",
-    "most appropriate diagnostic study",
-    "best long-term monitoring strategy",
-    "most appropriate next step in management",       // weighted higher
-    "most likely underlying mechanism or etiology",
-    "most appropriate initial pharmacotherapy",       // weighted higher
-    "most likely diagnosis",                          // weighted higher
-    "most appropriate next step in management",       // weighted higher
-    "most appropriate response to the patient",
-    "most appropriate preventive recommendation",
-    "most likely complication of this condition",
-    "most appropriate change in management",
-    "most likely cause of this patient's presentation",
-  ];
+  // Level-specific task rotation matching real exam blueprints
+  var boardTasks;
+  if (level.includes("Step 1")) {
+    // Step 1 heavily tests mechanisms and pathophysiology
+    boardTasks = [
+      "most likely underlying mechanism of this patient's condition",
+      "most likely diagnosis",
+      "most appropriate diagnostic study",
+      "most likely underlying mechanism of this patient's condition",  // weighted higher
+      "most likely pathophysiologic explanation for these findings",
+      "most likely cause of this patient's presentation",
+      "most likely diagnosis",                                          // weighted higher
+      "most likely adverse effect of this medication",
+    ];
+  } else if (level.includes("Step 3")) {
+    // Step 3 focuses on outpatient, chronic disease, prevention
+    boardTasks = [
+      "most appropriate next step in management",
+      "most appropriate long-term management strategy",
+      "most appropriate preventive recommendation",
+      "most appropriate change in management",
+      "most appropriate next step in management",    // weighted higher
+      "most appropriate monitoring strategy",
+      "most likely diagnosis",
+      "most appropriate response to the patient",
+    ];
+  } else {
+    // ABIM IM, ABIM Endo, Step 2 - full balanced spectrum
+    boardTasks = [
+      "most appropriate next step in management",
+      "most appropriate initial pharmacotherapy",
+      "most likely diagnosis",
+      "most appropriate diagnostic study",
+      "best long-term monitoring strategy",
+      "most appropriate next step in management",       // weighted higher
+      "most likely underlying mechanism or etiology",
+      "most appropriate initial pharmacotherapy",       // weighted higher
+      "most likely diagnosis",                          // weighted higher
+      "most appropriate next step in management",       // weighted higher
+      "most appropriate response to the patient",
+      "most appropriate preventive recommendation",
+      "most likely complication of this condition",
+      "most appropriate change in management",
+      "most likely cause of this patient's presentation",
+    ];
+  }
   var selectedTask = boardTasks[Math.floor(Math.random() * boardTasks.length)];
   console.log("Selected board task:", selectedTask);
 
   var stemLine = "STEM: 4-5 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be EXACTLY this clinical question: Which of the following is the " + selectedTask + "?";
   var choicesLine = "CHOICES: Exactly 5 (A-E). One correct per current guidelines. Four plausible distractors representing common clinical errors.";
-  var explanationLine = "EXPLANATION: 5-6 sentences. (1) State why the correct answer is right and cite the specific guideline by name and year. (2-4) Explain why each wrong answer is incorrect. (5) Give one high-yield board pearl that a fellow or resident must remember.";
+  var explanationLine = "EXPLANATION: 5-6 sentences. (1) State definitively why the correct answer is right, citing the specific guideline by name and year. (2-4) Deconstruct why each wrong answer is incorrect, specifically naming the clinical trap or cognitive error each distractor represents -- for example: anchoring bias, premature closure, failure to adjust for renal impairment, or confusing subclinical with overt disease thresholds. (5) Provide one high-yield clinical pearl that synthesizes the core concept, reflecting the deep insight of an academic endocrinologist or fellowship program director.";
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
 
   var nbmeAbimRules = "NBME/ABIM MCQ QUALITY STANDARDS (MANDATORY):\n" +
