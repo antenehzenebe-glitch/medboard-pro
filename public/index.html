@@ -770,8 +770,10 @@ function App(){
                         </div>
                         {answered&&(
                           <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginBottom:16}}>
-                            <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>Explanation</p>
-                            <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
+                            <p style={{margin:"0 0 12px",fontSize:12,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}}>Attending Explanation</p>
+                            {q.explanation.split(/(?<=\.)\s+(?=[A-Z(])/).map(function(sentence,idx){return(
+                              React.createElement("p",{key:idx,style:{margin:"0 0 8px",color:"#e2e8f0",lineHeight:1.8,fontSize:14}},sentence)
+                            );})}
                             <p style={{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}}>
                               Always verify with current society guidelines. Inaccuracies? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span>
                             </p>
