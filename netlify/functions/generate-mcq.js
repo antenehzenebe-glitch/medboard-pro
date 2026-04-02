@@ -26,6 +26,7 @@ async function callClaude(prompt) {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1500,
+        temperature: 0.85,
         messages: [{ role: "user", content: prompt }]
       })
     });
@@ -617,7 +618,9 @@ exports.handler = async function(event) {
   }
 
   try {
+    var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 100000);
     var prompt = buildPrompt(level, topic);
+    prompt += "\n\n[Generator Seed: " + entropySeed + " -- Use this to generate a completely unique clinical vignette different from any previous question on this topic.]";
     var raw = await callClaude(prompt);
 
     var cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
