@@ -7,17 +7,21 @@ async function sleep(ms) {
 }
 
 async function callClaude(systemText, userText) {
-  var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 100000);
-  var finalUserText = userText + "\n\n[Internal Generator Seed: " + entropySeed + " - Ensure a completely unique vignette.]";
-  console.log("Calling Claude, system length:", systemText.length, "user length:", finalUserText.length);
   var maxRetries = 3;
   var retryDelays = [1000, 2000, 3000];
+
+  // Entropy seed goes ONLY in userText so it never breaks the system cache
+  var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
+  var randomizedUserText = userText + "\n\n[Internal Generator Seed (Ignore): " + entropySeed + " - Ensure this specific vignette is completely unique.]";
+
+  console.log("Calling Claude | system:", systemText.length, "chars | user:", randomizedUserText.length, "chars");
 
   for (var attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) {
       console.log("Retry attempt " + attempt + " after overload...");
       await sleep(retryDelays[attempt - 1]);
     }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -37,11 +41,10 @@ async function callClaude(systemText, userText) {
             cache_control: { type: "ephemeral" }
           }
         ],
-        messages: [{ role: "user", content: finalUserText }]
+        messages: [{ role: "user", content: randomizedUserText }]
       })
     });
 
-    // Retry on 529 overloaded or 529 server errors
     if (response.status === 529 || response.status === 503 || response.status === 502) {
       console.log("API overloaded (status " + response.status + "), will retry...");
       if (attempt === maxRetries - 1) {
@@ -61,7 +64,7 @@ async function callClaude(systemText, userText) {
       console.error("Unexpected API response:", JSON.stringify(data));
       throw new Error("Unexpected API response format");
     }
-    console.log("Claude response length:", data.content[0].text.length, "stop_reason:", data.stop_reason);
+    console.log("Response length:", data.content[0].text.length, "| stop_reason:", data.stop_reason);
     return data.content[0].text;
   }
 }
@@ -595,12 +598,10 @@ function buildPrompt(level, requestedTopic) {
     "17. Explain WHY each wrong answer is incorrect -- describe the specific misconception or error each distractor targets.\n" +
     "18. End with one high-yield board pearl that reflects synthesis and clinical judgment, not mere recall.\n";
 
-    // SYSTEM: static cacheable instructions (rules + formatting)
-  var systemText =
-    "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
+    // STATIC CACHED PART - all heavy rules and formatting
+  var systemText = "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
     hardRules + "\n" +
     nbmeAbimRules + "\n\n" +
-    "FORMATTING REQUIREMENTS:\n" +
     "Write ONE high-quality clinical vignette MCQ.\n" +
     stemLine + "\n" +
     choicesLine + "\n" +
@@ -609,10 +610,8 @@ function buildPrompt(level, requestedTopic) {
     jsonLine + "\n" +
     "Set showImageButton:true ONLY if the question asks subscriber to look at an actual image. Default is false.";
 
-  // USER: dynamic topic-specific instruction
-  var userText =
-    topicInstruction + "\n\n" +
-    "Please generate the specific MCQ for this topic now.";
+  // DYNAMIC PART - topic specific, changes every call
+  var userText = topicInstruction + "\n\nPlease generate the specific MCQ for this topic now.";
 
   return { systemText: systemText, userText: userText };
 }
