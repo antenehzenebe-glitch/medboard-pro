@@ -555,7 +555,29 @@ function buildPrompt(level, requestedTopic) {
     ? " Describe key imaging findings as a clinician would dictate (e.g. chest X-ray shows right lower lobe consolidation with air bronchograms)."
     : "";
 
-  var stemLine = "STEM: 4-5 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be a clinical question: Which of the following is the most appropriate next step in management? OR Which of the following is the most likely diagnosis? OR Which of the following is the most appropriate pharmacotherapy?";
+  // JAVASCRIPT-FORCED TASK ROTATION — guarantees varied question types
+  // Weighted toward most common ABIM/USMLE task types
+  var boardTasks = [
+    "most appropriate next step in management",
+    "most appropriate initial pharmacotherapy",
+    "most likely diagnosis",
+    "most appropriate diagnostic study",
+    "best long-term monitoring strategy",
+    "most appropriate next step in management",       // weighted higher
+    "most likely underlying mechanism or etiology",
+    "most appropriate initial pharmacotherapy",       // weighted higher
+    "most likely diagnosis",                          // weighted higher
+    "most appropriate next step in management",       // weighted higher
+    "most appropriate response to the patient",
+    "most appropriate preventive recommendation",
+    "most likely complication of this condition",
+    "most appropriate change in management",
+    "most likely cause of this patient's presentation",
+  ];
+  var selectedTask = boardTasks[Math.floor(Math.random() * boardTasks.length)];
+  console.log("Selected board task:", selectedTask);
+
+  var stemLine = "STEM: 4-5 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be EXACTLY this clinical question: Which of the following is the " + selectedTask + "?";
   var choicesLine = "CHOICES: Exactly 5 (A-E). One correct per current guidelines. Four plausible distractors representing common clinical errors.";
   var explanationLine = "EXPLANATION: 5-6 sentences. (1) State why the correct answer is right and cite the specific guideline by name and year. (2-4) Explain why each wrong answer is incorrect. (5) Give one high-yield board pearl that a fellow or resident must remember.";
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
