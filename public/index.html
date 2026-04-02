@@ -78,6 +78,8 @@ const GUIDES=[
   {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"N",u:"https://www.nccn.org/guidelines/guidelines-detail"},
   {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"R",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
   {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"P",u:"https://www.thoracic.org/statements"},
+  {id:13,t:"American Thyroid Association Guidelines",s:"Endocrinology",i:"T",u:"https://www.thyroid.org/professionals/ata-professional-guidelines"},
+  {id:14,t:"National Osteoporosis Foundation Guidelines",s:"Bone",i:"B",u:"https://www.bonehealthandosteoporosis.org/clinicians/guidelines"},
 ];
 const FAQS=[
   {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE -- Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
@@ -258,11 +260,7 @@ function App(){
   const [rev,setRev]=React.useState({});
   const [score,setScore]=React.useState({t:0,c:0,s:0});
   const [qNum,setQNum]=React.useState(0);
-  const [pools,setPools]=React.useState([]);
-  const [dBusy,setDbusy]=React.useState(false);
-  const [dErr,setDErr]=React.useState("");
-  const [dChain,setDChain]=React.useState("All");
-  const [wl,setWl]=React.useState([]);
+
   const tRef=React.useRef(null);
 
   React.useEffect(function(){
@@ -336,19 +334,7 @@ function App(){
     setRev(function(p){var n=Object.assign({},p);n[i]=true;return n;});
     setScore(function(s){return{t:s.t+1,c:s.c+(ok?1:0),s:s.s};});
   }
-  function fetchDefi(){
-    setDbusy(true);setDErr("");
-    fetch("https://yields.llama.fi/pools").then(function(r){return r.json();}).then(function(data){
-      var CH=["Ethereum","Arbitrum","Solana","Polygon","BSC"];
-      setPools(data.data.filter(function(p){return p.tvlUsd>=1e6&&p.apy>0&&p.apy<300&&CH.some(function(c){return p.chain&&p.chain.toLowerCase().includes(c.toLowerCase());});})
-        .map(function(p){return{id:p.pool,proj:p.project,sym:p.symbol,chain:CH.find(function(c){return p.chain&&p.chain.toLowerCase().includes(c.toLowerCase());})||p.chain,apy:p.apy,tvl:p.tvlUsd,risk:p.apy>40||p.tvlUsd<1e6?"High":p.apy>15?"Medium":"Low"};})
-        .sort(function(a,b){return b.apy-a.apy;}).slice(0,200));
-    }).catch(function(){setDErr("Could not load data. Try again.");}).finally(function(){setDbusy(false);});
-  }
-  function fAPY(n){return n.toFixed(2)+"%";}
-  function fTVL(n){return n>=1e9?"$"+(n/1e9).toFixed(2)+"B":n>=1e6?"$"+(n/1e6).toFixed(1)+"M":"$"+(n/1e3).toFixed(0)+"K";}
-  function rC(r){return r==="Low"?"#10b981":r==="Medium"?"#f59e0b":"#ef4444";}
-  function cC(c){var m={"Ethereum":"#627EEA","Arbitrum":"#28A0F0","Solana":"#9945FF","Polygon":"#8247E5","BSC":"#F3BA2F"};return m[c]||"#64748b";}
+
   function qColor(i,l){
     if(!qs[i])return"transparent";
     if(!rev[i])return sel[i]===l?GOLD:"transparent";
@@ -360,7 +346,7 @@ function App(){
 
   function NB(props){
     return React.createElement("button",{
-      onClick:function(){setTab(props.id);if(props.id==="defi"&&!pools.length)fetchDefi();},
+      onClick:function(){setTab(props.id);},
       style:{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",border:"none",borderRadius:8,cursor:"pointer",background:tab===props.id?"rgba(201,168,76,0.12)":"transparent",borderBottom:tab===props.id?"2px solid "+GOLD:"2px solid transparent",color:tab===props.id?GOLD:"#94a3b8",fontWeight:700,fontSize:12,minWidth:52}
     },React.createElement("span",{style:{fontSize:18}},props.icon),props.label);
   }
@@ -454,7 +440,7 @@ function App(){
               {icon:"G",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US and European societies."},
               {icon:"R",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines including ADA, Endocrine Society, AACE, ACC/AHA and more."},
               {icon:"L",title:"Lab and Calc Reference",desc:"Comprehensive lab reference values and 20 medical calculations built into the question sidebar."},
-              {icon:"D",title:"DeFi Yield Tracker",desc:"Live yield data from DeFiLlama across Ethereum, Solana, Arbitrum and more for physician investors."},
+
             ].map(f=>(
               <div key={f.title} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:26}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
@@ -630,7 +616,6 @@ function App(){
             <NB id="mcq" label="MCQ Bank" icon="Q"/>
             <NB id="guides" label="Guides" icon="G"/>
             <NB id="progress" label="Progress" icon="P"/>
-            <NB id="defi" label="DeFi" icon="$"/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             <div style={{textAlign:"right"}}>
@@ -662,8 +647,8 @@ function App(){
               </button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
-              {[{icon:"Q",title:"MCQ Bank",desc:"Blueprint-aligned questions",id:"mcq",color:"#6366f1"},{icon:"G",title:"Guidelines",desc:"Official society resources",id:"guides",color:"#10b981"},{icon:"P",title:"My Progress",desc:"Track performance",id:"progress",color:"#f59e0b"},{icon:"$",title:"DeFi Tracker",desc:"Live yield opportunities",id:"defi",color:GOLD}].map(a=>(
-                <div key={a.id} onClick={()=>{setTab(a.id);if(a.id==="defi"&&!pools.length)fetchDefi();}}
+              {[{icon:"Q",title:"MCQ Bank",desc:"Blueprint-aligned questions",id:"mcq",color:"#6366f1"},{icon:"G",title:"Guidelines",desc:"Official society resources",id:"guides",color:"#10b981"},{icon:"P",title:"My Progress",desc:"Track performance",id:"progress",color:"#f59e0b"}].map(a=>(
+                <div key={a.id} onClick={()=>{setTab(a.id);}}
                   style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:16,cursor:"pointer"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
@@ -787,6 +772,9 @@ function App(){
                           <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginBottom:16}}>
                             <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:GOLD}}>Explanation</p>
                             <p style={{margin:0,color:"#94a3b8",lineHeight:1.8,fontSize:14}}>{q.explanation}</p>
+                            <p style={{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}}>
+                              Always verify with current society guidelines. Inaccuracies? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span>
+                            </p>
                             {q.imageUrl&&(
                               <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+BDR}}>
                                 <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Further Reading -- Reference Imaging</p>
@@ -883,52 +871,6 @@ function App(){
           </div>
         )}
 
-        {tab==="defi"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>DeFi Yield Tracker</h2>
-            <p style={{color:"#475569",marginBottom:12,fontSize:13}}>Live yields powered by DeFiLlama</p>
-            <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:9,padding:"9px 14px",marginBottom:16,fontSize:12,color:"#fca5a5",lineHeight:1.6}}>
-              Educational tool only. DeFi carries real financial risk. Not financial advice.
-            </div>
-            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-              {["All","Ethereum","Arbitrum","Solana","Polygon","BSC"].map(c=>(
-                <button key={c} onClick={()=>setDChain(c)} style={{padding:"6px 14px",border:"1px solid "+(dChain===c?GOLD:BDR),borderRadius:20,cursor:"pointer",background:dChain===c?"rgba(201,168,76,0.15)":"transparent",color:dChain===c?GOLD:"#64748b",fontSize:12,fontWeight:600}}>{c}</button>
-              ))}
-              <button onClick={fetchDefi} style={{marginLeft:"auto",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:600}}>Refresh</button>
-            </div>
-            {dBusy&&<div style={{textAlign:"center",padding:"36px",color:"#475569"}}>Loading yield data...</div>}
-            {dErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:14,color:"#ef4444"}}>{dErr}</div>}
-            {!dBusy&&!dErr&&!pools.length&&(
-              <div style={{textAlign:"center",padding:"36px",color:"#475569"}}>
-                <p style={{marginBottom:14,fontSize:14}}>Click Refresh to load live yield data</p>
-                <button onClick={fetchDefi} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 22px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>Load Live Data</button>
-              </div>
-            )}
-            {!dBusy&&pools.filter(p=>dChain==="All"||p.chain===dChain).slice(0,50).map(p=>(
-              <div key={p.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:11,padding:"13px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:9}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                <div style={{width:9,height:9,borderRadius:"50%",background:cC(p.chain),flexShrink:0}}/>
-                <div style={{flex:2,minWidth:130}}>
-                  <div style={{fontWeight:700,fontSize:13,color:"#f1f5f9"}}>{p.sym}</div>
-                  <div style={{fontSize:10,color:"#475569"}}>{p.proj} · {p.chain}</div>
-                </div>
-                <div style={{textAlign:"center",minWidth:65}}>
-                  <div style={{fontSize:16,fontWeight:800,color:p.apy>20?"#f59e0b":"#10b981"}}>{fAPY(p.apy)}</div>
-                  <div style={{fontSize:9,color:"#475569"}}>APY</div>
-                </div>
-                <div style={{textAlign:"center",minWidth:65}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#94a3b8"}}>{fTVL(p.tvl)}</div>
-                  <div style={{fontSize:9,color:"#475569"}}>TVL</div>
-                </div>
-                <span style={{background:rC(p.risk)+"22",border:"1px solid "+rC(p.risk),color:rC(p.risk),borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:700}}>{p.risk}</span>
-                <button onClick={()=>setWl(w=>w.includes(p.id)?w.filter(x=>x!==p.id):[...w,p.id])}
-                  style={{background:"transparent",border:"1px solid "+(wl.includes(p.id)?GOLD:BDR),color:wl.includes(p.id)?GOLD:"#475569",borderRadius:7,padding:"4px 9px",cursor:"pointer",fontSize:13}}>
-                  {wl.includes(p.id)?"*":"o"}
-                </button>
-              </div>
-            ))}
-          </div>
         )}
 
       </div>
