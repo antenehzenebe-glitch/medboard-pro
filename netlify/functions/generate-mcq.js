@@ -32,7 +32,7 @@ async function callClaude(systemText, userText) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1800,
+        max_tokens: 1200,
         temperature: 0.8,
         system: [
           {
@@ -658,19 +658,21 @@ function buildPrompt(level, requestedTopic) {
     "18. End with one high-yield board pearl that reflects synthesis and clinical judgment, not mere recall.\n";
 
     // STATIC CACHED PART - all heavy rules and formatting
-  var systemText = "You are a rigorous medical board exam question writer for " + level + ". " + levelNote + "\n\n" +
+  var systemText =
+    "You are a rigorous medical board exam question writer.\n\n" +
     hardRules + "\n" +
-    nbmeAbimRules + "\n\n" +
+    nbmeAbimRules;
+
+  var userText =
+    "BOARD LEVEL: " + level + ". " + levelNote + "\n\n" +
+    topicInstruction + "\n\n" +
     "Write ONE high-quality clinical vignette MCQ.\n" +
     stemLine + "\n" +
     choicesLine + "\n" +
     explanationLine + "\n\n" +
-    "Return ONLY valid JSON matching this exact schema (no markdown, no extra text, no commentary before or after):\n" +
+    "Return ONLY valid JSON matching this exact schema (no markdown, no extra text):\n" +
     jsonLine + "\n" +
-    "Set showImageButton:true ONLY if the question asks subscriber to look at an actual image. Default is false.";
-
-  // DYNAMIC PART - topic specific, changes every call
-  var userText = topicInstruction + "\n\nPlease generate the specific MCQ for this topic now.";
+    "Set showImageButton:true ONLY if the stem explicitly asks the subscriber to interpret a visual image. Default is false.";
 
   return { systemText: systemText, userText: userText, radiopaediaLink: radiopaediaLink, specificTopic: specificTopic };
 }
