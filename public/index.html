@@ -314,7 +314,7 @@ function App(){
       setAuthBusy(false);
     });
   }
-  function googleLogin(){sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:"https://app-medboardpro-az.netlify.app"}});}
+  function googleLogin(){sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:"https://medboardpro.org"}});}
   function logout(){
     sb.auth.signOut();setUser(null);setScreen("landing");
     setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});setQNum(0);
