@@ -661,7 +661,8 @@ function buildPrompt(level, requestedTopic) {
   var systemText =
     "You are a rigorous medical board exam question writer.\n\n" +
     hardRules + "\n" +
-    nbmeAbimRules;
+    nbmeAbimRules + "\n\n" +
+    FEW_SHOT_PROMPT;
 
   var userText =
     "BOARD LEVEL: " + level + ". " + levelNote + "\n\n" +
@@ -673,8 +674,7 @@ function buildPrompt(level, requestedTopic) {
     explanationLine + "\n\n" +
     "Return ONLY valid JSON matching this exact schema (no markdown, no extra text):\n" +
     jsonLine + "\n" +
-    "Set showImageButton:true ONLY if the stem explicitly asks the subscriber to interpret a visual image. Default is false.\n\n" +
-    FEW_SHOT_PROMPT;
+    "Set showImageButton:true ONLY if the stem explicitly asks the subscriber to interpret a visual image. Default is false.";
 
   return { systemText: systemText, userText: userText, radiopaediaLink: radiopaediaLink, specificTopic: specificTopic };
 }
