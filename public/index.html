@@ -61,7 +61,7 @@ const GROUPS={
 const LEVELS=[
   {l:"USMLE Step 1",v:"USMLE Step 1 (M2 basic science and pathophysiology)"},
   {l:"USMLE Step 2 CK",v:"USMLE Step 2 CK (M3/M4 clinical decision-making)"},
-  {l:"USMLE Step 3",v:"USMLE Step 3 (PGY-1/2 clinical management and CCS)"},
+  {l:"USMLE Step 3",v:"USMLE Step 3 (PGY-1/2 clinical management -- MCQ only)"},
   {l:"ABIM Internal Medicine",v:"ABIM Internal Medicine boards (residents)"},
   {l:"ABIM Endocrinology",v:"ABIM Endocrinology and Metabolism subspecialty (fellows)"},
 ];
@@ -262,6 +262,23 @@ function App(){
   const [qNum,setQNum]=React.useState(0);
 
   const tRef=React.useRef(null);
+
+  // Keyboard shortcut: N = next question, Enter = submit answer
+  React.useEffect(function(){
+    function handleKey(e){
+      if(e.key==="n"||e.key==="N"){
+        var answered=rev&&rev[0];
+        if(answered&&!busy)nextQuestion();
+      }
+      if(e.key==="Enter"){
+        var answered=rev&&rev[0];
+        var selected=sel&&sel[0];
+        if(!answered&&selected)reveal(0);
+      }
+    }
+    window.addEventListener("keydown",handleKey);
+    return function(){window.removeEventListener("keydown",handleKey);};
+  },[rev,sel,busy,qs]);
 
   React.useEffect(function(){
     var params=new URLSearchParams(window.location.search);
@@ -516,7 +533,7 @@ function App(){
       </section>
       <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
         <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE</div>
-        <div>2026 MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
+        <div>{new Date().getFullYear()} MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
         <div style={{marginTop:10,display:"flex",gap:20,justifyContent:"center"}}>
           <span onClick={()=>setShowTos(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Terms of Service</span>
           <span onClick={()=>setShowPrivacy(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Privacy Policy</span>
@@ -608,7 +625,7 @@ function App(){
       <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4}}>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div style={{width:30,height:30,borderRadius:7,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD}}>M</div>
+            <div onClick={()=>setTab("home")} style={{width:30,height:30,borderRadius:7,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD,cursor:"pointer"}}>M</div>
             <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
           </div>
           <div style={{display:"flex",gap:2}}>
@@ -795,12 +812,12 @@ function App(){
                                 style={{background:sel[i]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[i]?GOLD:BDR),color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
                                 Submit Answer
                               </button>
-                              {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}
+                              {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}<span style={{fontSize:11,color:"#334155",marginLeft:8}}>Enter to submit</span>
                             </div>
                           ):(
                             <button onClick={nextQuestion} disabled={busy}
                               style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                              {busy?"Generating...":"Next Question"}
+                              {busy?"Generating...":"Next Question (N)"}
                             </button>
                           )}
                         </div>
