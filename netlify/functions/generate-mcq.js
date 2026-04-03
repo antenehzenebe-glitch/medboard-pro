@@ -32,7 +32,7 @@ async function callClaude(systemText, userText) {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 450,
+        max_tokens: 800,
         temperature: 0.5,
         system: systemText,
         messages: [{ role: "user", content: randomizedUserText }]
@@ -709,7 +709,7 @@ function buildPrompt(level, requestedTopic) {
     stemLine + "\n" +
     choicesLine + "\n" +
     explanationLine + "\n\n" +
-    "Return ONLY valid JSON matching this exact schema (no markdown, no extra text):\n" +
+    "CRITICAL: Return ONLY valid JSON. No markdown. No text before or after. The JSON MUST be complete with all closing brackets. Schema:\n" +
     jsonLine + "\n" +
     "Set showImageButton:true ONLY if the stem explicitly asks the subscriber to interpret a visual image. Default is false.";
 
