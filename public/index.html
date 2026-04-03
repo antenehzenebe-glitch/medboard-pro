@@ -14,7 +14,7 @@ body{font-family:'Segoe UI',sans-serif;background:#0a0a0f;color:#f1f5f9}
 button,select,input{font-family:inherit}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
 a{text-decoration:none}
 </style>
 </head>
@@ -233,42 +233,6 @@ function LabPanel(){
     )
   );
 }
-function LoadingBar(){
-  const facts=[
-    "TSH is the most sensitive test for primary thyroid dysfunction.",
-    "SGLT2 inhibitors reduce HF hospitalization independent of glycemic control.",
-    "The diagnosis-first rule: labs must match the diagnosis being tested.",
-    "CHA2DS2-VASc score guides anticoagulation decisions in atrial fibrillation.",
-    "GLP-1 receptor agonists reduce MACE in established ASCVD per CVOT data.",
-    "Primary aldosteronism: elevated PAC/PRA ratio >30 is the screening threshold.",
-    "Overt hypothyroidism: TSH >10 AND free T4 below reference range.",
-    "Surviving Sepsis: antibiotics within 1 hour, 30mL/kg IV crystalloid bolus.",
-    "FRAX score guides treatment decisions in osteoporosis management.",
-    "Metanephrines are the most sensitive test for pheochromocytoma.",
-    "DKA: glucose >250, pH <7.3, bicarbonate <18, ketonemia.",
-    "KDIGO 2024: SGLT2i recommended for CKD with albuminuria regardless of diabetes.",
-    "Cushing: UFC >3x ULN or failed LDDST (post-dex cortisol >1.8 mcg/dL).",
-    "Cover-the-options rule: stem alone should suggest the correct answer.",
-    "ADA 2025: GLP-1 RA preferred in T2DM with ASCVD or high CV risk.",
-  ];
-  const [idx,setIdx]=React.useState(0);
-  const [width,setWidth]=React.useState(0);
-  React.useEffect(function(){
-    var factTimer=setInterval(function(){setIdx(function(i){return(i+1)%facts.length;});},3000);
-    var barTimer=setInterval(function(){setWidth(function(w){return w>=95?95:w+2;});},300);
-    return function(){clearInterval(factTimer);clearInterval(barTimer);};
-  },[]);
-  return React.createElement("div",null,
-    React.createElement("div",{style:{background:"#1e293b",borderRadius:6,overflow:"hidden",marginBottom:14,height:4}},
-      React.createElement("div",{style:{height:"100%",width:width+"%",background:"linear-gradient(90deg,"+NAVY+","+GOLD+")",borderRadius:6,transition:"width 0.3s ease"}})
-    ),
-    React.createElement("div",{style:{background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.2)",borderRadius:8,padding:"10px 14px"}},
-      React.createElement("p",{style:{fontSize:11,color:"#64748b",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:1,fontWeight:700}},"Board Pearl"),
-      React.createElement("p",{style:{fontSize:13,color:"#c9a84c",margin:0,lineHeight:1.6}},facts[idx])
-    )
-  );
-}
-
 function App(){
   const [screen,setScreen]=React.useState("landing");
   const [user,setUser]=React.useState(null);
@@ -773,15 +737,9 @@ function App(){
                   </div>
                 )}
                 {busy&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-                      <div style={{width:36,height:36,borderRadius:8,background:"rgba(201,168,76,0.15)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,animation:"spin 1.5s linear infinite"}}>⚕</div>
-                      <div>
-                        <p style={{color:"#f1f5f9",fontSize:14,fontWeight:700,margin:0}}>Generating your question...</p>
-                        <p style={{color:"#475569",fontSize:12,margin:"2px 0 0"}}>AI applying NBME/ABIM standards · Verifying guideline accuracy</p>
-                      </div>
-                    </div>
-                    <LoadingBar/>
+                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,textAlign:"center",marginBottom:18}}>
+                    <p style={{color:"#f1f5f9",fontSize:15,fontWeight:600,margin:"0 0 6px"}}>Generating your question...</p>
+                    <p style={{color:"#475569",fontSize:12,margin:0}}>This may take a few seconds</p>
                   </div>
                 )}
                 {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
