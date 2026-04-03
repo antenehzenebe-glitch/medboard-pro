@@ -262,6 +262,7 @@ function App(){
   const [rev,setRev]=React.useState({});
   const [score,setScore]=React.useState({t:0,c:0,s:0});
   const [qNum,setQNum]=React.useState(0);
+  const [sidebarOpen,setSidebarOpen]=React.useState(false);
 
   const tRef=React.useRef(null);
 
@@ -700,8 +701,13 @@ function App(){
           <div>
             <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>MCQ Bank</h2>
             <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Study or timed exam mode</p>
-            <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
-              <div style={{width:300,flexShrink:0,background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,position:"sticky",top:70,maxHeight:"calc(100vh - 80px)",overflowY:"auto"}}>
+            <div style={{display:"flex",gap:16,alignItems:"flex-start",flexDirection:"column"}}>
+              <button onClick={()=>setSidebarOpen(!sidebarOpen)}
+                style={{display:"flex",alignItems:"center",gap:8,background:CARD,border:"1px solid "+(sidebarOpen?GOLD:BDR),color:sidebarOpen?GOLD:"#94a3b8",padding:"8px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,width:"100%",justifyContent:"space-between"}}>
+                <span>⚙ {grp} — {topic} · {lvl.l}</span>
+                <span>{sidebarOpen?"▲ Hide":"▼ Options"}</span>
+              </button>
+              {sidebarOpen&&<div style={{width:"100%",background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,maxHeight:"60vh",overflowY:"auto"}}>
                 <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
                 {LEVELS.map(x=>(
                   <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
@@ -730,8 +736,8 @@ function App(){
                   </React.Fragment>
                 )}
                 <LabPanel/>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
+              </div>}
+              <div style={{width:"100%"}}>
                 {revealText&&!busy&&qs.length===0&&(
                   <div style={{background:CARD,border:"1px solid "+GOLD,borderRadius:13,padding:24,marginBottom:18}}>
                     <p style={{fontSize:11,color:GOLD,fontWeight:700,margin:"0 0 10px",letterSpacing:1}}>GENERATING QUESTION</p>
