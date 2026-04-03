@@ -32,7 +32,7 @@ async function callClaude(systemText, userText) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-5-20250929",
-        max_tokens: 1200,
+        max_tokens: 1000,
         temperature: 0.8,
         system: [
           {
@@ -525,7 +525,7 @@ function buildPrompt(level, requestedTopic) {
     "2. NEVER cite the ADA for non-diabetes conditions such as thyroid, adrenal, pituitary, or bone disorders.\n" +
     "3. Levothyroxine dosing must follow current ATA/Endocrine Society guidelines exactly as published. Do not fabricate doses or titration schedules.\n" +
     "4. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease per ATA guidelines.\n" +
-    "6. Always cite the correct society for each topic. " + (societyMap || "Cite the most relevant specialty society.") + "\n" +
+    "6. Always cite the correct society guideline for each clinical topic.\n" +
     "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n" +
     "DISTRACTOR QUALITY RULE: Distractors must not be random or obviously wrong. Each distractor must represent a common resident or fellow pitfall such as:\n" +
     "   - Premature closure (stopping at the first plausible diagnosis without considering all data)\n" +
@@ -665,6 +665,7 @@ function buildPrompt(level, requestedTopic) {
 
   var userText =
     "BOARD LEVEL: " + level + ". " + levelNote + "\n\n" +
+    (societyMap ? "SOCIETY RULE FOR THIS TOPIC: " + societyMap + "\n\n" : "") +
     topicInstruction + "\n\n" +
     "Write ONE high-quality clinical vignette MCQ.\n" +
     stemLine + "\n" +
