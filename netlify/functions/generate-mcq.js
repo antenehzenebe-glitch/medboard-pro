@@ -28,19 +28,13 @@ async function callClaude(systemText, userText) {
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "prompt-caching-2024-07-31"
+        "anthropic-version": "2023-06-01" // caching disabled - serverless node routing prevents cache hits
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1200,
-        temperature: 0.8,
-        system: [
-          {
-            type: "text",
-            text: systemText,
-            cache_control: { type: "ephemeral" }
-          }
-        ],
+        max_tokens: 450,
+        temperature: 0.5,
+        system: systemText,
         messages: [{ role: "user", content: randomizedUserText }]
       })
     });
@@ -357,156 +351,66 @@ function getRadiopaediaLink(topic) {
   return null;
 }
 
-// ─── FEW-SHOT EXEMPLARS (Dr. Anteneh Zenebe, MD, FACE) ───────────────────────
-// These 8 fellowship-level questions define the quality standard for all output.
-// 4 ABIM Endocrinology + 4 ABIM Internal Medicine exemplars.
+// ─── FEW-SHOT EXEMPLARS (Compact - Dr. Anteneh Zenebe, MD, FACE) ─────────────
+// 8 exemplars compressed to essential structure for speed
+var FEW_SHOT_PROMPT =
+  "QUALITY STANDARD — Match these 8 exemplar questions exactly in depth and style:\n\n" +
 
-var FEW_SHOT_EXAMPLES = [
+  "EXEMPLAR 1 (ABIM Endo — Adrenal): 54yo man, resistant HTN, 15kg gain, DM, bruising, " +
+  "3.8cm left adrenal mass, atrophic right adrenal, aldosterone 14/renin<0.6. " +
+  "Q: Best next step? CORRECT: Plasma metanephrines + 1mg DST. " +
+  "WHY: Large adrenal tumor (>2.4cm) requires excluding pheochromocytoma AND hypercortisolism before surgery — " +
+  "contralateral atrophy suggests ACTH-independent Cushing. Adrenalectomy without cortisol testing risks adrenal crisis. " +
+  "PEARL: Tumors >2.4cm mandate complete hormonal evaluation — coproduction of aldosterone and cortisol is well documented.\n\n" +
 
-  // ── ENDO Q1: Adrenal mass with virilization ──
-  {
-    "stem": "A 54-year-old man has had difficult-to-control hypertension for 3 years. He has gained 15 kg in the last 3 years and diabetes mellitus was diagnosed 1 year ago. His medications include metformin, amlodipine, valsartan, and hydrochlorothiazide. On physical examination, his BMI is 35 kg/m2 and blood pressure is 148/92 mmHg. He has scattered 1-2 cm bruises on his extremities, no dorsocervical fat pad, striae, or proximal muscle weakness. Laboratory studies: sodium 139 mEq/L, potassium 3.5 mEq/L, serum aldosterone 14 ng/dL (4-21 ng/dL), plasma renin activity less than 0.6 ng/mL per hour, fasting glucose 165 mg/dL. Abdominal CT demonstrates a 3.8-cm left adrenal mass and an atrophic right adrenal gland. Which of the following is the best next step in this patient's management?",
-    "choices": {
-      "A": "Prescribe spironolactone 50 mg daily",
-      "B": "Measure plasma metanephrines and perform a 1-mg overnight dexamethasone suppression test",
-      "C": "Schedule adrenal venous sampling to measure aldosterone and cortisol",
-      "D": "Perform left adrenalectomy",
-      "E": "Measure serum aldosterone after administration of 2 L normal saline"
-    },
-    "correct": "B",
-    "explanation": "Per Endocrine Society guidelines, adrenal tumors larger than 2.4 cm require complete hormonal evaluation before surgery — specifically excluding both pheochromocytoma and hypercortisolism. This patient's weight gain, hyperglycemia, bruising, and contralateral adrenal atrophy suggest ACTH-independent hypercortisolism from the adrenal tumor; proceeding to adrenalectomy without cortisol testing risks life-threatening adrenal crisis postoperatively. Spironolactone (A) treats mineralocorticoid excess but ignores the glucocorticoid manifestations and does not address the need for complete evaluation. Adrenal venous sampling (C) and saline infusion testing (E) are steps in the primary aldosteronism workup but are premature before excluding hypercortisolism and pheochromocytoma. Immediate adrenalectomy (D) without hormonal workup risks perioperative adrenal crisis if occult Cushing syndrome is present. Board pearl: When evaluating a large adrenal tumor suspected of causing primary aldosteronism, always exclude hypercortisolism and pheochromocytoma first — coproduction of aldosterone and cortisol from adrenal cortical adenomas, particularly those larger than 2.4 cm, is well documented.",
-    "topic": "Adrenal Disorders",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 2 (ABIM Endo — Pituitary): 28yo woman, 9mm pituitary incidentaloma abutting optic chiasm, " +
+  "normal labs (prolactin 28, IGF-1 normal, TSH normal), wants pregnancy. " +
+  "Q: Best management? CORRECT: Refer for pituitary surgery. " +
+  "WHY: Pituitary enlarges 3-fold in pregnancy — chiasm compression risk mandates surgical referral per ES guidelines. " +
+  "Cabergoline/octreotide not studied for nonfunctioning incidentalomas. Repeat MRI in 6-12 months not 2 years. " +
+  "PEARL: Nonfunctioning adenoma near chiasm + planned pregnancy = surgical referral before conception.\n\n" +
 
-  // ── ENDO Q2: Pituitary incidentaloma and pregnancy ──
-  {
-    "stem": "A 28-year-old woman is referred for evaluation of a pituitary adenoma incidentally discovered on cranial MRI performed to investigate headache. She reports no change in appearance or weight. Her menstrual cycles are regular and she wishes to become pregnant as soon as possible. On physical examination, she has no features of GH or cortisol excess; BMI is 22.5 kg/m2. Laboratory studies: TSH 1.8 mIU/L, free T4 1.1 ng/dL, cortisol 8 AM 18 mcg/dL, estradiol 315 pg/mL (follicular phase 10-180 pg/mL), IGF-1 168 ng/mL (normal), prolactin 28 ng/mL (upper limit of normal). MRI shows a 9-mm lesion in the pituitary gland abutting and minimally compressing the left optic chiasm. Visual field assessment is normal. Which of the following is the best management option?",
-    "choices": {
-      "A": "Refer for consideration of pituitary surgery",
-      "B": "Commence cabergoline therapy",
-      "C": "Commence octreotide therapy",
-      "D": "Perform another pituitary-directed MRI in 2 years",
-      "E": "Advise routine pituitary-directed MRI in the first trimester of pregnancy"
-    },
-    "correct": "A",
-    "explanation": "Per Endocrine Society Clinical Practice Guidelines for pituitary incidentalomas, surgical referral is recommended when a nonfunctioning adenoma abuts the optic chiasm in a patient planning pregnancy — because the anterior pituitary enlarges up to 3-fold during gestation due to lactotroph hyperplasia, creating significant risk of visual compromise. Cabergoline (B) and octreotide (C) have not been systematically studied for nonfunctioning incidentalomas; evidence for tumor shrinkage is limited to post-surgical debulking scenarios, and these agents are not routinely recommended. Waiting 2 years for repeat MRI (D) is incorrect — follow-up imaging should occur 6 to 12 months after initial MRI for lesions near the optic chiasm. Routine first-trimester MRI (E) is not indicated; pituitary MRI during pregnancy should be reserved only for new visual field defects or worsening headache. Board pearl: The anterior pituitary enlarges up to 3-fold during pregnancy — a nonfunctioning adenoma abutting the optic chiasm requires surgical discussion before conception to prevent visual compromise during gestation.",
-    "topic": "Pituitary Disorders",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 3 (ABIM Endo — Thyroid): 42yo man, TSH 12.1 with normal free T4, negative TPO/TG antibodies, " +
+  "normal thyroid US, child has same labs. " +
+  "Q: Most likely diagnosis? CORRECT: TSH receptor resistance (TSHR inactivating variant). " +
+  "WHY: Negative antibodies + normal US + normal T4 + family pattern excludes Hashimoto. " +
+  "RTH causes elevated T4 not normal T4. Adrenal insufficiency does not cause TSH this high. " +
+  "PEARL: Subclinical hypothyroidism pattern + negative antibodies + family history = think TSHR gene mutation.\n\n" +
 
-  // ── ENDO Q3: TSH resistance vs Hashimoto ──
-  {
-    "stem": "A 42-year-old man is noted to have a serum TSH of 12.1 mIU/L (0.5-5.0 mIU/L). He is asymptomatic and physical examination findings are normal. Further laboratory studies: free T4 1.3 ng/dL (normal), TPO antibodies negative, thyroglobulin antibodies negative. Thyroid ultrasonography is normal with homogeneous echotexture and no nodules. One of the patient's two children has similar laboratory test results. Which of the following is the most likely source of this patient's thyroid abnormality?",
-    "choices": {
-      "A": "TSH resistance",
-      "B": "Hashimoto thyroiditis",
-      "C": "Adrenal insufficiency",
-      "D": "Resistance to thyroid hormone",
-      "E": "Excess selenium exposure"
-    },
-    "correct": "A",
-    "explanation": "This patient has elevated TSH with normal free T4, negative thyroid antibodies, normal thyroid ultrasound, and a family history of identical biochemical findings in a child — this constellation is classic for TSH receptor resistance due to an inactivating pathogenic variant in the TSHR gene, inherited in an autosomal dominant pattern with variable expression. Hashimoto thyroiditis (B) is the most common cause of subclinical hypothyroidism but is excluded by the absence of TPO and thyroglobulin antibodies, normal gland size, and homogeneous echotexture on ultrasound. Adrenal insufficiency (C) can cause mild TSH elevation due to loss of cortisol-mediated TSH suppression, but not to this degree and without clinical signs of adrenal insufficiency. Resistance to thyroid hormone (D) causes elevated thyroid hormone levels, not normal levels — the pattern here is the opposite. Selenium excess (E) does not cause TSH receptor resistance or this biochemical pattern. Board pearl: When subclinical hypothyroidism presents with negative thyroid antibodies, normal ultrasound, and a family history of elevated TSH — think TSH receptor gene mutation (TSHR inactivating variant), not Hashimoto thyroiditis.",
-    "topic": "Thyroid Disorders",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 4 (ABIM Endo — Diabetes): 21yo woman, T1DM x3 years, HbA1c 6.8%, two eye exams no retinopathy, " +
+  "BP 116/72, eGFR 91. Q: What is indicated now? CORRECT: Fasting lipid profile. " +
+  "WHY: ADA recommends annual lipids from diagnosis. Neuropathy/nephropathy screening starts at 5 years in T1DM. " +
+  "Third eye exam not needed — extend to 2 years when two consecutive normal exams. ECG not indicated in asymptomatic young. " +
+  "PEARL: T1DM microvascular screening (nephropathy, neuropathy) begins 5 years post-diagnosis; lipids from day one.\n\n" +
 
-  // ── ENDO Q4: T1DM complication screening timelines ──
-  {
-    "stem": "A 21-year-old woman with a 3-year history of type 1 diabetes returns for follow-up. She uses multiple daily injections with mealtime dosing based on carbohydrate counting and measures blood glucose 3-4 times daily with no clinically significant hypoglycemia. She does not smoke. She has undergone two comprehensive dilated eye examinations with no retinopathy detected; the most recent was 1 year ago. Blood pressure is 116/72 mmHg. Laboratory studies from last year: HbA1c 6.8%, creatinine 0.8 mg/dL, eGFR 91 mL/min per 1.73 m2, TSH 1.4 mIU/L. You plan to perform a physical examination and repeat HbA1c. Which of the following is also indicated now?",
-    "choices": {
-      "A": "Screening for distal polyneuropathy using a 10-g monofilament and 128-Hz tuning fork",
-      "B": "Measurement of the urinary albumin-to-creatinine ratio",
-      "C": "Repeated comprehensive dilated eye examination",
-      "D": "Performance of baseline resting electrocardiography",
-      "E": "Measurement of fasting lipid profile"
-    },
-    "correct": "E",
-    "explanation": "Per ADA 2025 Standards of Medical Care in Diabetes, adults with diabetes should undergo fasting lipid profile measurement at diagnosis and annually thereafter — or every 2 years if values remain at optimal targets. Screening for distal polyneuropathy with monofilament and tuning fork (A) begins 5 years after type 1 diabetes diagnosis, not at 3 years. Similarly, urinary albumin-to-creatinine ratio screening for nephropathy (B) begins 5 years after diagnosis of type 1 diabetes — serum creatinine with eGFR should be checked annually but albuminuria screening is not yet due. Repeated dilated eye examination (C) is not required now — when two consecutive examinations show no retinopathy, the ADA recommends extending the interval to every 2 years; her last examination was 1 year ago. Routine baseline ECG (D) is not recommended in asymptomatic young patients with diabetes and no cardiovascular risk factors. Board pearl: In type 1 diabetes, microvascular complication screening (nephropathy and neuropathy) begins 5 years after diagnosis — but lipid profile and annual serum creatinine with eGFR should be checked from the time of diagnosis regardless of duration.",
-    "topic": "Diabetes Mellitus and Hypoglycemia",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 5 (ABIM IM — Adrenal/Virilization): 38yo woman, 9-month rapid virilization, " +
+  "deepening voice, clitoromegaly, DHEAS 910 mcg/dL, testosterone 97 ng/dL. " +
+  "Q: Next step? CORRECT: Abdominal CT. " +
+  "WHY: DHEAS >700 mcg/dL = adrenal source. CT before any venous sampling. " +
+  "Pelvic US for ovarian source only when testosterone >200 with normal DHEAS. " +
+  "PEARL: DHEAS >700 mcg/dL with rapid virilization = adrenal carcinoma until proven otherwise — CT first.\n\n" +
 
-  // ── IM Q1: Virilization with elevated DHEAS ──
-  {
-    "stem": "A 38-year-old woman is evaluated for a 9-month history of oligomenorrhea, deepening voice, and increased body hair. Her last menses was 3 months ago. She takes no medications. On physical examination, vital signs are normal. She has frontal hair loss and coarse dark hairs on the chin and chest. The larynx appears larger than normal. Clitoromegaly is present on pelvic examination. Laboratory studies: negative pregnancy test, DHEAS 910 mcg/dL (normal up to 350 mcg/dL), total testosterone 97 ng/dL. Which of the following is the most appropriate next step in evaluation?",
-    "choices": {
-      "A": "Abdominal CT",
-      "B": "Adrenal vein sampling",
-      "C": "Ovarian vein sampling",
-      "D": "Pelvic ultrasonography",
-      "E": "Pituitary MRI"
-    },
-    "correct": "A",
-    "explanation": "Per Endocrine Society guidelines, a markedly elevated DHEAS above 700 mcg/dL with rapid-onset virilization strongly localizes the androgen source to the adrenal gland — most likely an adrenal cortical carcinoma or adenoma — and mandates abdominal CT as the first imaging step. Pelvic ultrasonography (D) is the appropriate first study when an ovarian source is suspected, which occurs when total testosterone exceeds 200 ng/dL with normal or mildly elevated DHEAS — this patient's testosterone of 97 ng/dL with dramatically elevated DHEAS points away from the ovary. Adrenal vein sampling (B) and ovarian vein sampling (C) are localization procedures performed after cross-sectional imaging identifies a mass, not as primary evaluation tools. Pituitary MRI (E) would be indicated if ACTH-dependent bilateral adrenal hyperplasia were suspected, but there is no clinical evidence to support this here. Board pearl: DHEAS above 700 mcg/dL with rapid virilization means adrenal source until proven otherwise — begin with abdominal CT before any venous sampling.",
-    "topic": "Adrenal Disorders",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 6 (ABIM IM — Thyroid): 83yo woman, overt hyperthyroidism (TSH 0.05, FT4 2.1), " +
+  "confirmed x2, toxic MNG on scan, CAD and osteoporosis. " +
+  "Q: Management? CORRECT: Start methimazole. " +
+  "WHY: Overt hyperthyroidism worsens CAD and bone loss — must treat per ATA 2016. " +
+  "Achieve euthyroidism with methimazole before RAI to prevent thyroid storm. " +
+  "Prednisone for subacute thyroiditis only. Teprotumumab for thyroid eye disease only. " +
+  "PEARL: Never proceed to RAI in elderly CAD patients with overt hyperthyroidism without methimazole first.\n\n" +
 
-  // ── IM Q2: Toxic multinodular goiter in elderly patient with CAD ──
-  {
-    "stem": "An 83-year-old woman is noted to have a low TSH level during evaluation of osteoporosis. She is asymptomatic. Medical history is significant for chronic stable angina and osteoporosis. Medications are metoprolol, lisinopril, simvastatin, aspirin, vitamin D3, and alendronate. On physical examination, blood pressure is 130/66 mmHg, pulse 74/min, BMI 20. The thyroid is firm and enlarged with the right lobe larger than the left. Laboratory studies: TSH 0.05 mU/L (confirmed on repeat testing 2 months ago), free T4 2.1 ng/dL (elevated), total T3 90 ng/dL. Thyroid scan shows asymmetric uptake with radioactive iodine uptake of 22% at 24 hours. Which of the following is the most appropriate management?",
-    "choices": {
-      "A": "Repeat TSH in 6 weeks",
-      "B": "Start methimazole",
-      "C": "Start prednisone",
-      "D": "Start teprotumumab"
-    },
-    "correct": "B",
-    "explanation": "Per ATA 2016 Hyperthyroidism Guidelines, overt hyperthyroidism confirmed on two separate measurements requires treatment in elderly patients with comorbidities — this patient has both coronary artery disease and osteoporosis, both of which are directly worsened by untreated hyperthyroidism. The clinical picture of an asymmetric nodular goiter with elevated radioiodine uptake of 22% is consistent with toxic multinodular goiter, and methimazole is the appropriate first-line agent to achieve euthyroidism before definitive therapy with radioiodine ablation or surgery. Repeating TSH in 6 weeks (A) is inappropriate when overt hyperthyroidism is confirmed on serial testing — watchful waiting risks atrial fibrillation, further bone loss, and precipitation of angina. Prednisone (C) is used for subacute granulomatous thyroiditis, which presents with a painful thyroid and very low radioiodine uptake — not the clinical picture here. Teprotumumab (D) is an IGF-1 receptor monoclonal antibody approved specifically for thyroid eye disease and has no role in hyperthyroidism management. Board pearl: Never proceed directly to radioiodine ablation in elderly patients with coronary artery disease and overt hyperthyroidism — always achieve euthyroidism with methimazole first to prevent thyroid storm from radiation-induced thyroiditis.",
-    "topic": "Thyroid Disorders",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 7 (ABIM IM — Diabetes): 45yo man, T2DM, HbA1c 8.5%, symptomatic hypoglycemia at unpredictable times, " +
+  "on metformin + glargine + lispro. Q: Management? CORRECT: Initiate CGM. " +
+  "WHY: ADA 2025 — CGM for all insulin users with hypoglycemia or above-target HbA1c. " +
+  "Increasing glargine worsens hypoglycemia. Reducing glargine worsens HbA1c. Metformin does not cause hypoglycemia. " +
+  "PEARL: Above-target HbA1c + hypoglycemia on insulin = CGM first, never adjust insulin blindly.\n\n" +
 
-  // ── IM Q3: CGM for T2DM with hypoglycemia ──
-  {
-    "stem": "A 45-year-old man is evaluated for follow-up management of type 2 diabetes mellitus. He reports intermittent hypoglycemia. Fasting glucose values range from 120-160 mg/dL; daily glucose levels range from 140-180 mg/dL with symptomatic values as low as 60 mg/dL at various times of day. Medications are metformin, insulin glargine, insulin lispro, and atorvastatin. Laboratory studies: HbA1c 8.5%, serum creatinine 0.9 mg/dL. Which of the following is the most appropriate management to improve glucose control?",
-    "choices": {
-      "A": "Discontinue metformin",
-      "B": "Increase insulin glargine",
-      "C": "Initiate continuous glucose monitoring",
-      "D": "Reduce insulin glargine"
-    },
-    "correct": "C",
-    "explanation": "Per ADA 2025 Standards of Medical Care, CGM is recommended for all patients with diabetes using insulin who experience hypoglycemia or have HbA1c above target — CGM provides time-in-range data and identifies the timing and pattern of hypoglycemia episodes, enabling precise and safe insulin titration. This patient has both above-target HbA1c of 8.5% and symptomatic hypoglycemia occurring at unpredictable times, making blind insulin dose adjustment dangerous without first understanding the glucose pattern. Increasing insulin glargine (B) without understanding when hypoglycemia occurs risks worsening an already dangerous hypoglycemia pattern. Reducing insulin glargine (D) might reduce hypoglycemia episodes but would further elevate an already suboptimal HbA1c without addressing the underlying variability. Discontinuing metformin (A) has no rationale — metformin does not cause hypoglycemia, has cardiovascular benefit in type 2 diabetes, and should be continued unless contraindicated by renal function. Board pearl: When a patient has simultaneous above-target HbA1c and symptomatic hypoglycemia on insulin therapy, CGM is always the next step — never adjust insulin doses blindly without understanding the glucose pattern by time of day.",
-    "topic": "Diabetes Mellitus and Hypoglycemia",
-    "imageUrl": null,
-    "showImageButton": false
-  },
+  "EXEMPLAR 8 (ABIM IM — Thyroid): 81yo man, CAD, overt hypothyroidism (TSH 25, FT4 0.5), " +
+  "bradycardia, delayed reflexes. Q: Treatment? CORRECT: Levothyroxine 25 mcg/day. " +
+  "WHY: ATA 2016 — start low go slow in elderly CAD patients. Rapid correction increases cardiac O2 demand. " +
+  "100 mcg/day = full replacement, contraindicated with CAD. Desiccated thyroid has T3 — cardiac risk. T3 monotherapy never indicated. " +
+  "PEARL: Elderly + CAD + hypothyroidism = levothyroxine 25 mcg/day regardless of TSH severity — start low go slow is non-negotiable.\n\n" +
 
-  // ── IM Q4: Hypothyroidism in elderly patient with CAD ──
-  {
-    "stem": "An 81-year-old man is evaluated for a 3-month history of fatigue, constipation, cognitive symptoms, and cold intolerance with a 10-lb weight gain over the past year. Medical history is significant for coronary artery disease. Medications are rosuvastatin, lisinopril, metoprolol, and aspirin. On physical examination, pulse rate is 54/min, weight 65 kg, thyroid is firm but not enlarged, skin is cool and dry, hair is coarse, and deep tendon reflexes are delayed. Laboratory studies: TSH 25 mU/L, free T4 0.5 ng/dL. Which of the following is the most appropriate treatment?",
-    "choices": {
-      "A": "Levothyroxine 25 mcg/day",
-      "B": "Levothyroxine 100 mcg/day",
-      "C": "Desiccated thyroid 60 mg/day",
-      "D": "Triiodothyronine 50 mcg/day"
-    },
-    "correct": "A",
-    "explanation": "Per ATA 2016 Guidelines for the Treatment of Hypothyroidism, elderly patients with coronary artery disease and overt hypothyroidism must be started on levothyroxine at a low dose of 25 mcg/day with slow upward titration every 6-8 weeks — rapid correction of hypothyroidism increases cardiac oxygen demand and can precipitate angina, myocardial infarction, or arrhythmia in patients with underlying coronary disease. Full replacement dosing with levothyroxine 100 mcg/day (B) is appropriate for young healthy patients without cardiac disease but is contraindicated here and could precipitate an acute coronary event. Desiccated thyroid (C) contains both T4 and T3; the T3 component has a rapid onset with greater cardiac stimulatory effect, making it inappropriate in elderly patients with CAD. Triiodothyronine monotherapy 50 mcg/day (D) causes large rapid fluctuations in thyroid hormone levels and is never indicated for routine hypothyroidism treatment, particularly in patients with coronary artery disease. Board pearl: In elderly patients with coronary artery disease and hypothyroidism, always start levothyroxine at 25 mcg/day regardless of how severe the TSH elevation appears — the start low, go slow rule is non-negotiable in cardiac patients.",
-    "topic": "Thyroid Disorders",
-    "imageUrl": null,
-    "showImageButton": false
-  }
-
-];
-
-var FEW_SHOT_PROMPT = "Here are 8 exemplary board-level MCQs that define the exact quality standard you must match. Study the clinical reasoning, distractor logic, guideline citations, and board pearl style:\n\n" +
-  FEW_SHOT_EXAMPLES.map(function(q, i) {
-    return "EXEMPLAR " + (i+1) + ":\n" +
-      "Stem: " + q.stem + "\n" +
-      "Choices: A) " + q.choices.A + " B) " + q.choices.B + " C) " + q.choices.C + " D) " + q.choices.D + (q.choices.E ? " E) " + q.choices.E : "") + "\n" +
-      "Correct: " + q.correct + "\n" +
-      "Explanation: " + q.explanation;
-  }).join("\n\n") +
-  "\n\nNow generate ONE new MCQ of identical quality for the topic specified. Match the clinical depth, distractor sophistication, guideline citation accuracy, and board pearl style of these exemplars exactly.";
+  "Now generate ONE new MCQ of identical clinical depth, distractor sophistication, and guideline accuracy for the specified topic.";
 
 function buildPrompt(level, requestedTopic) {
   var result = getBlueprintCategory(level, requestedTopic);
@@ -671,39 +575,18 @@ function buildPrompt(level, requestedTopic) {
     societyMap = "Cite the most relevant and current specialty society guidelines for this topic.";
   }
 
-  var hardRules = "CLINICAL ACCURACY RULES (MANDATORY):\n" +
-    "1. NEVER use the word 'pathognomonic' for ultrasound or imaging findings. Use 'highly characteristic' or 'consistent with' instead.\n" +
-    "2. NEVER cite the ADA for non-diabetes conditions such as thyroid, adrenal, pituitary, or bone disorders.\n" +
-    "3. Levothyroxine dosing must follow current ATA/Endocrine Society guidelines exactly as published. Do not fabricate doses or titration schedules.\n" +
-    "4. 'Start low and go slow' for levothyroxine applies ONLY to elderly patients (>65) or those with coronary artery disease per ATA guidelines.\n" +
-    "6. Always cite the correct society guideline for each clinical topic.\n" +
-    "7. Drug doses, lab thresholds, and guideline citations must be accurate and current. Do not hallucinate guideline recommendations.\n" +
-    "DISTRACTOR QUALITY RULE: Distractors must not be random or obviously wrong. Each distractor must represent a common resident or fellow pitfall such as:\n" +
-    "   - Premature closure (stopping at the first plausible diagnosis without considering all data)\n" +
-    "   - Anchoring bias (fixating on one diagnosis and ignoring contradictory findings)\n" +
-    "   - Failure to adjust drug dosing for renal or hepatic impairment\n" +
-    "   - Applying the correct drug for the wrong disease subtype\n" +
-    "   - Confusing subclinical with overt disease management thresholds\n" +
-    "   - Applying a guideline correctly but in the wrong clinical context\n" +
-    "   - Choosing a reasonable but outdated or guideline-discordant approach\n" +
-    "8. LAB VALUE INTERNAL CONSISTENCY (CRITICAL): All laboratory values in the stem must be internally consistent with the diagnosis being tested. Examples:\n" +
-    "   - Overt hypothyroidism requires free T4 BELOW the reference range (e.g., 0.3-0.6 ng/dL), not at the lower limit of normal.\n" +
-    "   - Subclinical hypothyroidism has elevated TSH with NORMAL free T4 within reference range.\n" +
-    "   - Overt hyperthyroidism requires free T4 ABOVE reference range with suppressed TSH <0.1 mIU/L.\n" +
-    "   - Subclinical hyperthyroidism has suppressed TSH with NORMAL free T4.\n" +
-    "   - DKA requires glucose typically >250 mg/dL with pH <7.3 and bicarbonate <18 mEq/L.\n" +
-    "   - Primary adrenal insufficiency has LOW cortisol with HIGH ACTH. Secondary has LOW cortisol with LOW/normal ACTH.\n" +
-    "   - Primary aldosteronism has HIGH aldosterone with LOW renin (ARR >30).\n" +
-    "   - Cushing syndrome requires UFC >3x ULN or midnight cortisol >1.8 mcg/dL or failed LDDST (post-dex cortisol >1.8 mcg/dL).\n" +
-    "   - NEVER write lab values that contradict the diagnosis in the explanation. The stem data must support the correct answer.\n" +
-    "9. If the stem describes a condition as overt (e.g., overt hypothyroidism), the relevant lab value(s) MUST be clearly outside the reference range, not borderline or at the limit of normal.\n" +
-    "10. DIAGNOSIS-FIRST RULE: Before writing the stem, decide EXACTLY which condition you are testing. Then generate lab values that unambiguously match that diagnosis:\n" +
-    "    - Testing OVERT hypothyroidism: TSH must be >10 mIU/L AND free T4 must be BELOW 0.8 ng/dL (e.g., 0.3-0.6 ng/dL).\n" +
-    "    - Testing SUBCLINICAL hypothyroidism: TSH must be 4.5-10 mIU/L AND free T4 must be WITHIN normal range (0.8-1.8 ng/dL).\n" +
-    "    - Testing OVERT hyperthyroidism: TSH must be <0.01 mIU/L AND free T4 must be ABOVE 1.8 ng/dL (e.g., 2.8-4.2 ng/dL).\n" +
-    "    - Testing SUBCLINICAL hyperthyroidism: TSH must be <0.4 mIU/L AND free T4 must be WITHIN normal range.\n" +
-    "    - The explanation MUST match the diagnosis defined by the labs in the stem. NEVER call a patient with normal free T4 an overt case.\n" +
-    "    - The lead-in question and correct answer MUST be appropriate for the actual diagnosis defined by the lab values.\n";
+  var hardRules =
+    "CLINICAL ACCURACY RULES:\n" +
+    "1. NEVER say 'pathognomonic' for imaging. Use 'characteristic' or 'consistent with'.\n" +
+    "2. NEVER cite ADA for thyroid, adrenal, pituitary, or bone disorders.\n" +
+    "3. Levothyroxine dosing per ATA/ES guidelines. Start low go slow for elderly/CAD only.\n" +
+    "4. Lab values MUST match diagnosis: overt hypo = TSH>10 + FT4 below range. Subclinical = TSH 4.5-10 + normal FT4.\n" +
+    "5. Overt hyper = TSH<0.01 + FT4 above range. Subclinical hyper = suppressed TSH + normal FT4.\n" +
+    "6. DKA: glucose>250, pH<7.3, HCO3<18. Primary AI: low cortisol + high ACTH. Secondary AI: low cortisol + low ACTH.\n" +
+    "7. DIAGNOSIS-FIRST: Decide the exact diagnosis, THEN write labs that unambiguously match it.\n" +
+    "8. Distractors must represent real cognitive errors: anchoring bias, premature closure, wrong disease subtype.\n" +
+    "9. No EXCEPT/NOT phrasing. No 'always'/'never' in options. No 'none of the above'.\n" +
+    "10. Cover-the-options rule: stem + lead-in must suggest correct answer without seeing choices.\n";
 
   var cgmNote = "";
   if (specificTopic.toLowerCase().includes("cgm") || specificTopic.toLowerCase().includes("aid") || specificTopic.toLowerCase().includes("insulin pump")) {
@@ -765,9 +648,9 @@ function buildPrompt(level, requestedTopic) {
   var selectedTask = boardTasks[Math.floor(Math.random() * boardTasks.length)];
   console.log("Selected board task:", selectedTask);
 
-  var stemLine = "STEM: 4-5 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be EXACTLY this clinical question: Which of the following is the " + selectedTask + "?";
+  var stemLine = "STEM: 3-4 sentences. Include patient age, sex, specific symptoms with duration, complete vital signs (BP, HR, RR, Temp, BMI), and 3-4 key laboratory values with exact numbers and units. Include relevant physical exam findings." + imagingNote + cgmNote + " The final sentence MUST be EXACTLY this clinical question: Which of the following is the " + selectedTask + "?";
   var choicesLine = "CHOICES: Exactly 5 (A-E). One correct per current guidelines. Four plausible distractors representing common clinical errors.";
-  var explanationLine = "EXPLANATION: 5-6 sentences. (1) State definitively why the correct answer is right, citing the specific guideline by name and year. (2-4) Deconstruct why each wrong answer is incorrect, specifically naming the clinical trap or cognitive error each distractor represents -- for example: anchoring bias, premature closure, failure to adjust for renal impairment, or confusing subclinical with overt disease thresholds. (5) Provide one high-yield clinical pearl that synthesizes the core concept, reflecting the deep insight of an academic endocrinologist or fellowship program director.";
+  var explanationLine = "EXPLANATION: 3-4 concise sentences MAXIMUM. (1) State why the correct answer is right with ONE guideline citation. (2-3) Briefly explain why the TOP 2 most tempting wrong answers are incorrect, naming the specific cognitive trap. (4) One high-yield board pearl. Be concise -- every sentence must add unique value.";
   var jsonLine = "{\"stem\":\"...\",\"choices\":{\"A\":\"...\",\"B\":\"...\",\"C\":\"...\",\"D\":\"...\",\"E\":\"...\"},\"correct\":\"A\",\"explanation\":\"...\",\"topic\":\"" + specificTopic + "\",\"imageUrl\":" + (radiopaediaLink ? "\"" + radiopaediaLink + "\"" : "null") + ",\"showImageButton\":false}";
 
   var nbmeAbimRules = "NBME/ABIM MCQ QUALITY STANDARDS (MANDATORY):\n" +
