@@ -1,7 +1,12 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+  edge_functions = "netlify/edge-functions"
 
 [functions]
   node_bundler = "esbuild"
   timeout = 30
+
+[[edge_functions]]
+  path = "/.netlify/edge-functions/generate-mcq-stream"
+  function = "generate-mcq-stream"
