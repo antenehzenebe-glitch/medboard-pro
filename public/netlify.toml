@@ -8,5 +8,5 @@
   timeout = 30
 
 [[edge_functions]]
-  path = "/.netlify/edge-functions/generate-mcq-stream"
+  path = "/api/mcq-stream"
   function = "generate-mcq-stream"
