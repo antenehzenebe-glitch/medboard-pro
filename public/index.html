@@ -331,81 +331,38 @@ function App(){
       });
     },1000);
   }
-  const [streamText,setStreamText]=React.useState("");
+  const [revealText,setRevealText]=React.useState("");
 
   async function generate(){
-    stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);setStreamText("");
-
-    try {
-      const res = await fetch("/api/mcq-stream",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({topic:topic,level:lvl.v,count:1})
-      });
-
-      if(!res.ok){
-        const e = await res.json();
-        throw new Error(e.error||"Server error "+res.status);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-      let radiopaediaLink = null;
-      let specificTopic = null;
-
-      while(true){
-        const {done, value} = await reader.read();
-        if(done) break;
-
-        buffer += decoder.decode(value, {stream:true});
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for(const line of lines){
-          if(!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          try {
-            const event = JSON.parse(data);
-            if(event.error) throw new Error(event.error);
-            if(event.done){
-              radiopaediaLink = event.radiopaediaLink;
-              specificTopic = event.specificTopic;
-              break;
-            }
-            if(event.text){
-              fullText += event.text;
-              setStreamText(fullText);
-            }
-          } catch(e) {
-            if(e.message && e.message !== "Unexpected end of JSON input")
-              throw e;
-          }
-        }
-      }
-
-      // Parse complete JSON
-      let cleaned = fullText.replace(/^```json\s*/i,"").replace(/```\s*$/i,"").trim();
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if(jsonMatch) cleaned = jsonMatch[0];
-      const parsed = JSON.parse(cleaned);
-      parsed.imageUrl = parsed.imageUrl || radiopaediaLink || null;
-      parsed.topic = parsed.topic || specificTopic;
-      if(!parsed.showImageButton) parsed.showImageButton = false;
-
-      const data = [parsed];
-      setQs(data);
-      setStreamText("");
-      setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
-      if(examMode) startT(data.length, data);
-
-    } catch(e){
-      setMcqErr("Failed to generate question: "+e.message);
-    } finally {
+    stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);setRevealText("");
+    fetch("/.netlify/functions/generate-mcq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic:topic,level:lvl.v,count:1})})
+    .then(function(res){
+      if(!res.ok)return res.json().then(function(e){throw new Error(e.error||"Server error "+res.status);});
+      return res.json();
+    })
+    .then(function(data){
+      if(!Array.isArray(data))throw new Error("Invalid response");
       setBusy(false);
-    }
+      var words=data[0].stem.split(" ");
+      var i=0;
+      setRevealText("");
+      var timer=setInterval(function(){
+        if(i>=words.length){
+          clearInterval(timer);
+          setQs(data);
+          setRevealText("");
+          setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
+          if(examMode)startT(data.length,data);
+          return;
+        }
+        setRevealText(function(t){return t+(i===0?"": " ")+words[i];});
+        i++;
+      },20);
+    })
+    .catch(function(e){setMcqErr("Failed to generate questions: "+e.message);setBusy(false);});
   }
+
+
   function nextQuestion(){setQNum(function(n){return n+1;});generate();}
   function reveal(i){
     if(!sel[i]||!qs[i])return;
@@ -775,7 +732,13 @@ function App(){
                 <LabPanel/>
               </div>
               <div style={{flex:1,minWidth:0}}>
-                {qs.length===0&&!busy&&(
+                {revealText&&!busy&&qs.length===0&&(
+                  <div style={{background:CARD,border:"1px solid "+GOLD,borderRadius:13,padding:24,marginBottom:18}}>
+                    <p style={{fontSize:11,color:GOLD,fontWeight:700,margin:"0 0 10px",letterSpacing:1}}>GENERATING QUESTION</p>
+                    <p style={{color:"#e2e8f0",fontSize:15,lineHeight:1.9,margin:0}}>{revealText}<span style={{display:"inline-block",width:2,height:14,background:GOLD,marginLeft:3,animation:"pulse 0.7s infinite",verticalAlign:"middle"}}/></p>
+                  </div>
+                )}
+                {qs.length===0&&!busy&&!revealText&&(
                   <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,marginBottom:18}}>
                     <div style={{display:"flex",gap:10,marginBottom:16}}>
                       <button onClick={()=>setExamMode(false)}
@@ -798,16 +761,11 @@ function App(){
                   </div>
                 )}
                 {busy&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:24,marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:streamText?16:0}}>
+                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,textAlign:"center",marginBottom:18}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
                       <p style={{color:"#f1f5f9",fontSize:14,fontWeight:600,margin:0}}>Generating your question...</p>
                       <div style={{width:8,height:8,borderRadius:"50%",background:GOLD,animation:"pulse 1s infinite"}}/>
                     </div>
-                    {streamText&&(
-                      <div style={{background:"rgba(255,255,255,0.02)",borderRadius:8,padding:14,maxHeight:300,overflowY:"auto"}}>
-                        <p style={{color:"#94a3b8",fontSize:13,lineHeight:1.8,margin:0,whiteSpace:"pre-wrap",fontFamily:"inherit"}}>{streamText}</p>
-                      </div>
-                    )}
                   </div>
                 )}
                 {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
