@@ -8,7 +8,7 @@ async function sleep(ms) {
 
 async function callClaude(systemText, userText) {
   var maxRetries = 3;
-  var retryDelays = [1000, 2000, 3000];
+  var retryDelays = [800, 1500, 2500];
 
   // Entropy seed goes ONLY in userText so it never breaks the system cache
   var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
@@ -32,8 +32,8 @@ async function callClaude(systemText, userText) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1500,
-        temperature: 0.85,
+        max_tokens: 1800,
+        temperature: 0.8,
         system: [
           {
             type: "text",
@@ -665,14 +665,14 @@ function buildPrompt(level, requestedTopic) {
     stemLine + "\n" +
     choicesLine + "\n" +
     explanationLine + "\n\n" +
-    "Return ONLY valid JSON, no markdown, no extra text:\n" +
+    "Return ONLY valid JSON matching this exact schema (no markdown, no extra text, no commentary before or after):\n" +
     jsonLine + "\n" +
     "Set showImageButton:true ONLY if the question asks subscriber to look at an actual image. Default is false.";
 
   // DYNAMIC PART - topic specific, changes every call
   var userText = topicInstruction + "\n\nPlease generate the specific MCQ for this topic now.";
 
-  return { systemText: systemText, userText: userText };
+  return { systemText: systemText, userText: userText, radiopaediaLink: radiopaediaLink, specificTopic: specificTopic };
 }
 
 exports.handler = async function(event) {
@@ -714,17 +714,21 @@ exports.handler = async function(event) {
 
     var cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 
+    // Fallback: extract JSON if Claude added extra text around it
+    var jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) cleaned = jsonMatch[0];
+
     var parsed;
     try {
       parsed = JSON.parse(cleaned);
     } catch (e) {
-      console.error("JSON parse error:", cleaned);
+      console.error("JSON parse error:", cleaned.substring(0, 300));
       return { statusCode: 500, body: JSON.stringify({ error: "AI returned invalid JSON. Please try again." }) };
     }
 
     var required = ["stem", "choices", "correct", "explanation", "topic"];
-    // imageUrl is optional - set to null if missing
-    if (!parsed.imageUrl) parsed.imageUrl = null;
+    // imageUrl: use AI value, fallback to Radiopaedia link, then null
+    parsed.imageUrl = parsed.imageUrl || promptData.radiopaediaLink || null;
     for (var i = 0; i < required.length; i++) {
       if (!parsed[required[i]]) {
         return { statusCode: 500, body: JSON.stringify({ error: "Missing field: " + required[i] }) };
