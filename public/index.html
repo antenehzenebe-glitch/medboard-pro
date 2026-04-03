@@ -337,7 +337,7 @@ function App(){
     stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);setStreamText("");
 
     try {
-      const res = await fetch("/.netlify/edge-functions/generate-mcq-stream",{
+      const res = await fetch("/api/mcq-stream",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({topic:topic,level:lvl.v,count:1})
