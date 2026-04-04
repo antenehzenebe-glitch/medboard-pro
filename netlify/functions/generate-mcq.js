@@ -246,6 +246,11 @@ var FEW_SHOT_PROMPT =
   "CORRECT: IV Normal Saline 1-1.5 L/hr FIRST, then insulin infusion 0.1 units/kg/hr after K+ confirmed >=3.5, hold SGLT2i until full DKA resolution, blood cultures for sepsis workup. " +
   "WHY: ADA 2025 DKA protocol mandates fluid resuscitation BEFORE insulin. K+ must be >=3.5 before insulin or fatal arrhythmia risk. SGLT2i held entire episode not just 24 hours. Hypotonic saline contraindicated in hyperosmolar state. " +
   "PEARL: In DKA — fluids first, check potassium before insulin, never restart SGLT2i until full biochemical resolution.\n\n" +
+  "EX10(ABIM-IM/Lipids): 54yo Black man, T2DM HbA1c 7.2%, BMI 34, LDL 118, TG 285, HDL 38, Lp(a) 62 nmol/L, eGFR 68, no prior statin. " +
+  "Q: Most appropriate next step? " +
+  "CORRECT: High-intensity statin (atorvastatin 40-80mg) plus lifestyle modification, recheck lipids in 4-12 weeks, THEN add icosapent ethyl only if TG remains above 150 mg/dL on stable statin. " +
+  "WHY: REDUCE-IT required stable statin x4 weeks before adding IPE - cannot diagnose persistent hypertriglyceridemia without first treating with statin. Starting IPE simultaneously (Choice A) jumps the gun on the evidence. Lp(a) 62 nmol/L is mildly elevated - threshold for high risk is 125 nmol/L per ESC/EAS - does not justify PCSK9i yet. Rosuvastatin monotherapy alone (Choice B) misses the opportunity for high-intensity statin in a high-risk T2DM patient with multiple risk factors. " +
+  "PEARL: In diabetic dyslipidemia - statin plus lifestyle FIRST, recheck at 4-12 weeks, add icosapent ethyl only if triglycerides remain above 150 mg/dL on stable statin. Never start IPE simultaneously with statin at first visit.\n\n" +
   "Now generate ONE new MCQ matching this exact depth and quality for the specified topic.";
 
 // ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
@@ -357,6 +362,11 @@ function buildPrompt(level, requestedTopic) {
     "1. Labs MUST match diagnosis: overt hypothyroidism = TSH>10 AND free T4 below reference range. Subclinical = TSH 4.5-10 AND normal free T4.\n" +
     "2. Overt hyperthyroidism = TSH<0.01 AND free T4 above reference range.\n" +
     "3. DKA DIAGNOSIS: glucose>250, pH<7.3, HCO3<18, ketonemia. ADA 2025 DKA MANAGEMENT SEQUENCE: STEP 1 is IV Normal Saline 0.9% at 1-1.5 L/hr for first hour - this is the FIRST and IMMEDIATE intervention before anything else. STEP 2 check potassium - if K+ below 3.5 mEq/L hold insulin and replace potassium IV first. STEP 3 start insulin infusion 0.1 units/kg/hr only after fluid resuscitation is underway AND K+ confirmed at or above 3.5 mEq/L. STEP 4 when glucose drops to 200-250 mg/dL add dextrose to IV fluids but continue insulin until anion gap closes. STEP 5 hold SGLT2 inhibitors throughout entire DKA episode - restart only after full biochemical resolution. NEVER start insulin before or simultaneously with fluids as first step. NEVER use 0.45% hypotonic saline as initial fluid. Primary adrenal insufficiency: low cortisol + HIGH ACTH.\n" +
+    "LIPID MANAGEMENT SEQUENCE (ACC/AHA + ADA 2025 - CRITICAL):\n" +
+    "   Icosapent ethyl (IPE/REDUCE-IT): NEVER start simultaneously with statin. Sequence is: (1) Start statin + lifestyle modification first. (2) Recheck lipids at 4-12 weeks. (3) ONLY add icosapent ethyl 2g BID if triglycerides REMAIN at or above 150 mg/dL on stable statin therapy. REDUCE-IT inclusion required stable statin x4 weeks with persistent TG 135-499 mg/dL.\n" +
+    "   Lipoprotein(a): Lp(a) above 125 nmol/L or above 50 mg/dL = high risk threshold per ESC/EAS. Lp(a) 62 nmol/L is only mildly elevated - does NOT justify PCSK9i or cardiology referral at first visit.\n" +
+    "   Statin intensity in T2DM age 40+: Moderate-to-high intensity statin (atorvastatin 40-80mg or rosuvastatin 20-40mg) is standard. No race-based statin avoidance - statin efficacy is not race-dependent.\n" +
+    "   Lipid recheck after statin initiation: 4-12 weeks per ACC/AHA - NOT 4 weeks alone which is the absolute minimum.\n" +
     "4. NEVER say 'pathognomonic'. NEVER use EXCEPT/NOT phrasing. NEVER use 'always'/'never' in options.\n" +
     "5. One clearly correct answer. Four plausible distractors representing real clinical cognitive errors (anchoring bias, premature closure, wrong subtype).\n" +
     "6. All 5 options must be same type (all diagnoses OR all treatments — never mix).\n" +
