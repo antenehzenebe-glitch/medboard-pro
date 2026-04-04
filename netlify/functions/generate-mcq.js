@@ -1,6 +1,7 @@
 // generate-mcq.js — MedBoard Pro
 // Model: claude-sonnet-4-6
-// Updated: April 2026
+// Rebuilt: April 2026 — Dr. Anteneh Zenebe, MD, FACE
+// Howard University College of Medicine
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -12,7 +13,7 @@ async function callClaude(systemText, userText) {
   var maxRetries = 3;
   var retryDelays = [800, 1500, 2500];
   var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
-  var finalUserText = userText + "\n\n[Seed: " + entropySeed + " - Generate a completely unique vignette.]";
+  var finalUserText = userText + "\n\n[Seed: " + entropySeed + " — Generate a completely unique vignette.]";
 
   for (var attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) await sleep(retryDelays[attempt - 1]);
@@ -29,6 +30,27 @@ async function callClaude(systemText, userText) {
         max_tokens: 900,
         temperature: 0.6,
         system: systemText,
+        tools: [
+          {
+            type: "web_search_20260209",
+            name: "web_search",
+            max_uses: 2,
+            allowed_domains: [
+              "diabetes.org", "ada.org", "endocrine.org", "thyroid.org",
+              "acc.org", "heart.org", "chest.org", "thoracic.org",
+              "kdigo.org", "rheumatology.org", "aasld.org", "gi.org",
+              "idsa.org", "aafp.org", "acponline.org", "aace.com",
+              "nof.org", "aasm.org", "hematology.org", "asco.org",
+              "nccn.org", "aan.com", "survivingsepsis.org",
+              "shm.org", "hospitalmedicine.org",
+              "nejm.org", "jamanetwork.com", "thelancet.com",
+              "annals.org", "bmj.com",
+              "pubmed.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov",
+              "nih.gov", "cdc.gov", "fda.gov",
+              "uptodate.com", "medscape.com"
+            ]
+          }
+        ],
         messages: [{ role: "user", content: finalUserText }]
       })
     });
@@ -44,10 +66,17 @@ async function callClaude(systemText, userText) {
     }
 
     var data = await response.json();
-    if (!data.content || !data.content[0] || !data.content[0].text) {
+    if (!data.content || !data.content.length) {
       throw new Error("Unexpected API response format");
     }
-    return data.content[0].text;
+
+    var textBlock = data.content.find(function(block) {
+      return block.type === "text";
+    });
+    if (!textBlock || !textBlock.text) {
+      throw new Error("No text content in response");
+    }
+    return textBlock.text;
   }
 }
 
@@ -69,9 +98,9 @@ var ABIM_IM_BLUEPRINT = [
 ];
 
 var ABIM_ENDO_BLUEPRINT = [
-  { weight:24, category:"Diabetes Mellitus and Hypoglycemia", topics:["ADA 2025 Standards - glycemic targets","Type 2 diabetes - GLP-1 RA, SGLT2i, DPP-4i, tirzepatide","Type 1 diabetes - MDI vs AID systems and CGM","DKA and HHS - diagnosis and management","Hypoglycemia unawareness - prevention","Inpatient glycemic management","CVOT data - GLP-1 RA and SGLT2i in ASCVD, HF, CKD","Gestational diabetes - HAPO trial","MODY and LADA - genetic testing"] },
+  { weight:24, category:"Diabetes Mellitus and Hypoglycemia", topics:["ADA Standards - glycemic targets","Type 2 diabetes - GLP-1 RA, SGLT2i, DPP-4i, tirzepatide","Type 1 diabetes - MDI vs AID systems and CGM","DKA and HHS - diagnosis and management","Hypoglycemia unawareness - prevention","Inpatient glycemic management","CVOT data - GLP-1 RA and SGLT2i in ASCVD, HF, CKD","Gestational diabetes - HAPO trial","MODY and LADA - genetic testing"] },
   { weight:15, category:"Thyroid Disorders", topics:["Hypothyroidism - primary vs central, TSH interpretation","Hashimoto thyroiditis - TPO antibodies, subclinical management","Hyperthyroidism - Graves disease, toxic nodular goiter","Thyroid storm - Burch-Wartofsky score","Thyroid nodule - ATA ultrasound risk stratification and FNA","Thyroid cancer - RAI and TSH suppression","Thyroid disease in pregnancy - TSH targets","Amiodarone-induced thyroid disease","Central hypothyroidism"] },
-  { weight:15, category:"Calcium and Bone Disorders", topics:["Hypercalcemia - PTH vs PTHrP vs vitamin D mediated","Primary hyperparathyroidism - surgical criteria","Hypoparathyroidism - post-surgical management","Osteoporosis - DXA, FRAX, bisphosphonates, denosumab, romosozumab","Vitamin D deficiency - supplementation protocols","Paget disease of bone","Hypocalcemia - acute IV calcium and chronic management"] },
+  { weight:15, category:"Calcium and Bone Disorders", topics:["Hypercalcemia - PTH vs PTHrP vs vitamin D mediated","Primary hyperparathyroidism - surgical criteria","Hypoparathyroidism - palopegteriparatide (Yorvipath)","Osteoporosis - DXA, FRAX, bisphosphonates, denosumab, romosozumab","Vitamin D deficiency - supplementation protocols","Paget disease of bone","Hypocalcemia - acute IV calcium and chronic management"] },
   { weight:12, category:"Lipids, Obesity, and Nutrition", topics:["Dyslipidemia - ACC/AHA risk calculator and statin intensity","PCSK9 inhibitors - indications and CVOT evidence","Familial hypercholesterolemia","Hypertriglyceridemia - fibrates and omega-3","Obesity management - GLP-1 RA for weight loss","Bariatric surgery - metabolic outcomes","Metabolic syndrome"] },
   { weight:10, category:"Adrenal Disorders", topics:["Primary adrenal insufficiency - autoimmune and stress dosing","Secondary adrenal insufficiency - ACTH stimulation test","Adrenal crisis - recognition and IV hydrocortisone","Cushing syndrome - UFC, late-night salivary cortisol, LDDST","Cushing disease vs ectopic ACTH - HDDST and IPSS","Primary aldosteronism - PAC/PRA ratio, CT, adrenal vein sampling","Pheochromocytoma - plasma metanephrines, alpha then beta blockade","Adrenal incidentaloma - imaging characterization and hormonal workup","Congenital adrenal hyperplasia - 21-hydroxylase deficiency"] },
   { weight:10, category:"Pituitary Disorders", topics:["Pituitary adenoma - micro vs macro, functioning vs nonfunctional","Prolactinoma - cabergoline vs bromocriptine and pregnancy","Acromegaly - IGF-1, OGTT GH suppression, somatostatin analogs","Cushing disease - ACTH-dependent, petrosal sinus sampling","Central diabetes insipidus - water deprivation test and desmopressin","SIADH - euvolemic hyponatremia and vaptans","Hypopituitarism - replacement priorities","Pituitary apoplexy - emergency management"] },
@@ -158,7 +187,7 @@ var RADIOPAEDIA_CASES = {
   "Multiple Sclerosis": "https://radiopaedia.org/search?q=multiple+sclerosis+MRI+lesions&lang=us",
   "Thyroid Nodule Evaluation": "https://radiopaedia.org/search?q=thyroid+nodule+ultrasound&lang=us",
   "Thyroid Cancer": "https://radiopaedia.org/search?q=thyroid+cancer+papillary+ultrasound&lang=us",
-  "Cushing's Syndrome": "https://radiopaedia.org/search?q=adrenal+adenoma+cushing+CT&lang=us",
+  "Cushing Syndrome": "https://radiopaedia.org/search?q=adrenal+adenoma+cushing+CT&lang=us",
   "Primary Aldosteronism": "https://radiopaedia.org/search?q=adrenal+adenoma+CT+aldosteronoma&lang=us",
   "Pheochromocytoma": "https://radiopaedia.org/search?q=pheochromocytoma+adrenal+MRI&lang=us",
   "Acromegaly": "https://radiopaedia.org/search?q=pituitary+macroadenoma+acromegaly+MRI&lang=us",
@@ -174,8 +203,8 @@ var RADIOPAEDIA_CASES = {
   "Tuberculosis": "https://radiopaedia.org/search?q=tuberculosis+chest+xray+cavitation&lang=us",
   "HIV": "https://radiopaedia.org/search?q=HIV+AIDS+opportunistic+infection+CT+PCP&lang=us",
   "PCOS": "https://radiopaedia.org/search?q=polycystic+ovary+syndrome+ultrasound&lang=us",
-  "Hypothyroidism and Hashimotos": "https://radiopaedia.org/search?q=hashimoto+thyroiditis+ultrasound+heterogeneous&lang=us",
-  "Hyperthyroidism and Graves": "https://radiopaedia.org/search?q=graves+disease+thyroid+scan+diffuse+uptake&lang=us",
+  "Hypothyroidism": "https://radiopaedia.org/search?q=hashimoto+thyroiditis+ultrasound+heterogeneous&lang=us",
+  "Hyperthyroidism": "https://radiopaedia.org/search?q=graves+disease+thyroid+scan+diffuse+uptake&lang=us",
 };
 
 function getRadiopaediaLink(topic) {
@@ -187,129 +216,6 @@ function getRadiopaediaLink(topic) {
   }
   return null;
 }
-
-// ─── FEW-SHOT EXEMPLARS (Dr. Anteneh Zenebe, MD, FACE) ───────────────────────
-
-var FEW_SHOT_PROMPT =
-  "Study these 8 exemplars for clinical depth, distractor logic, and guideline citation style:\n\n" +
-
-  "EX1(ABIM-Endo/Adrenal): 54yo man, resistant HTN, 15kg gain, DM, bruising, 3.8cm left adrenal mass, atrophic right adrenal, aldosterone 14/renin<0.6. " +
-  "Q:Best next step? A:Spironolactone B:Plasma metanephrines+1mg DST C:Adrenal venous sampling D:Left adrenalectomy E:Saline infusion test. " +
-  "CORRECT:B. WHY:Large adrenal tumor(>2.4cm) requires excluding pheochromocytoma AND hypercortisolism before surgery — contralateral atrophy suggests ACTH-independent Cushing. " +
-  "Surgery without cortisol testing risks adrenal crisis. Spironolactone(A) treats mineralocorticoid excess only. Venous sampling(C)/saline test(E) premature before full hormonal workup. Adrenalectomy(D) contraindicated without ruling out Cushing and pheo. " +
-  "PEARL:Adrenal tumors>2.4cm mandate complete hormonal evaluation(pheo+Cushing) before any intervention.\n\n" +
-
-  "EX2(ABIM-Endo/Pituitary): 28yo woman, 9mm pituitary incidentaloma abutting optic chiasm, normal labs(prolactin 28, IGF-1 normal), wants pregnancy soon. " +
-  "Q:Best management? A:Pituitary surgery referral B:Start cabergoline C:Start octreotide D:MRI in 2 years E:Routine MRI first trimester. " +
-  "CORRECT:A. WHY:Pituitary enlarges 3-fold in pregnancy — chiasm compression risk requires surgical referral per ES guidelines. " +
-  "Cabergoline/octreotide(B,C) not studied for nonfunctioning incidentalomas. MRI in 2 years(D) too long — repeat at 6-12 months for chiasm-adjacent lesions. Routine pregnancy MRI(E) not indicated. " +
-  "PEARL:Nonfunctioning adenoma near optic chiasm + planned pregnancy = surgical referral before conception.\n\n" +
-
-  "EX3(ABIM-Endo/Thyroid): 42yo man, TSH 12.1 mIU/L, free T4 normal, TPO/TG antibodies negative, normal thyroid US, child has same labs. " +
-  "Q:Most likely diagnosis? A:TSH receptor resistance B:Hashimoto thyroiditis C:Adrenal insufficiency D:Resistance to thyroid hormone E:Selenium excess. " +
-  "CORRECT:A. WHY:Elevated TSH+normal T4+negative antibodies+normal US+family pattern = TSHR inactivating variant. " +
-  "Hashimoto(B) excluded by negative antibodies+normal US. Adrenal insufficiency(C) causes mild TSH elevation not this degree. RTH(D) causes elevated T4 not normal T4. Selenium(E) does not cause this. " +
-  "PEARL:Subclinical hypothyroidism pattern + negative antibodies + family history = think TSHR gene mutation.\n\n" +
-
-  "EX4(ABIM-Endo/T1DM): 21yo woman, T1DM x3 years, HbA1c 6.8%, two normal eye exams(last 1 year ago), BP 116/72, eGFR 91. " +
-  "Q:What is indicated now? A:Neuropathy screening(monofilament) B:Urinary albumin/creatinine ratio C:Repeat dilated eye exam D:Resting ECG E:Fasting lipid profile. " +
-  "CORRECT:E. WHY:ADA recommends annual lipid profile from T1DM diagnosis. " +
-  "Neuropathy(A) and nephropathy(B) screening begin 5 years after T1DM diagnosis. Two consecutive normal eye exams extend to 2-year intervals(C not needed now). ECG(D) not indicated in asymptomatic young patient. " +
-  "PEARL:T1DM microvascular screening(nephropathy+neuropathy) begins 5 years post-diagnosis; lipid profile from day one.\n\n" +
-
-  "EX5(ABIM-IM/Adrenal): 38yo woman, 9-month rapid virilization, deepening voice, clitoromegaly, DHEAS 910 mcg/dL, testosterone 97 ng/dL. " +
-  "Q:Best next step? A:Abdominal CT B:Adrenal vein sampling C:Ovarian vein sampling D:Pelvic US E:Pituitary MRI. " +
-  "CORRECT:A. WHY:DHEAS>700 mcg/dL = adrenal source — abdominal CT is first step. " +
-  "Pelvic US(D) for ovarian source only when testosterone>200 with normal/mildly elevated DHEAS. Venous sampling(B,C) after imaging not before. Pituitary MRI(E) for ACTH-dependent adrenal hyperplasia only. " +
-  "PEARL:DHEAS>700 mcg/dL with rapid virilization = adrenal carcinoma until proven otherwise — CT first.\n\n" +
-
-  "EX6(ABIM-IM/Thyroid): 83yo woman, confirmed overt hyperthyroidism(TSH 0.05 x2, FT4 2.1), toxic MNG on scan, CAD and osteoporosis. " +
-  "Q:Management? A:Repeat TSH 6 weeks B:Start methimazole C:Start prednisone D:Start teprotumumab. " +
-  "CORRECT:B. WHY:Overt hyperthyroidism confirmed on serial testing + CAD/osteoporosis = must treat. " +
-  "Methimazole to achieve euthyroidism before RAI per ATA 2016. Watchful waiting(A) risks AFib and bone loss. Prednisone(C) for subacute thyroiditis only. Teprotumumab(D) for thyroid eye disease only. " +
-  "PEARL:Elderly CAD patient with overt hyperthyroidism — methimazole first, never RAI without achieving euthyroidism.\n\n" +
-
-  "EX7(ABIM-IM/Diabetes): 45yo man, T2DM, HbA1c 8.5%, symptomatic hypoglycemia at unpredictable times, on metformin+glargine+lispro. " +
-  "Q:Management? A:Discontinue metformin B:Increase glargine C:Initiate CGM D:Reduce glargine. " +
-  "CORRECT:C. WHY:ADA 2025 — CGM for all insulin users with hypoglycemia or above-target HbA1c. " +
-  "Increasing glargine(B) worsens hypoglycemia without knowing timing. Reducing glargine(D) worsens HbA1c. Metformin(A) does not cause hypoglycemia — no reason to stop. " +
-  "PEARL:Above-target HbA1c + hypoglycemia on insulin = CGM first — never adjust insulin blindly.\n\n" +
-
-  "EX8(ABIM-IM/Thyroid): 81yo man, CAD, overt hypothyroidism(TSH 25, FT4 0.5), bradycardia, delayed reflexes. " +
-  "Q:Treatment? A:Levothyroxine 25 mcg/day B:Levothyroxine 100 mcg/day C:Desiccated thyroid 60 mg/day D:Triiodothyronine 50 mcg/day. " +
-  "CORRECT:A. WHY:ATA 2016 — start low go slow in elderly CAD patients. Rapid correction increases cardiac O2 demand and risks MI. " +
-  "Full dose 100 mcg/day(B) contraindicated with CAD. Desiccated thyroid(C) has T3 component — cardiac risk. T3 monotherapy(D) causes rapid fluctuations — never for routine hypothyroidism. " +
-  "PEARL:Elderly + CAD + hypothyroidism = levothyroxine 25 mcg/day — start low go slow regardless of TSH severity.\n\n" +
-
-  "EX9(ABIM-IM/DKA): Patient with DKA, BP 92/58, K+ 5.8, glucose 487, pH 7.22, on SGLT2i. " +
-  "Q:Most appropriate next step? " +
-  "CORRECT: IV Normal Saline 1-1.5 L/hr FIRST, then insulin infusion 0.1 units/kg/hr after K+ confirmed >=3.5, hold SGLT2i until full DKA resolution, blood cultures for sepsis workup. " +
-  "WHY: ADA 2025 DKA protocol mandates fluid resuscitation BEFORE insulin. K+ must be >=3.5 before insulin or fatal arrhythmia risk. SGLT2i held entire episode not just 24 hours. Hypotonic saline contraindicated in hyperosmolar state. " +
-  "PEARL: In DKA — fluids first, check potassium before insulin, never restart SGLT2i until full biochemical resolution.\n\n" +
-  "EX10(ABIM-IM/Lipids): 54yo Black man, T2DM HbA1c 7.2%, BMI 34, LDL 118, TG 285, HDL 38, Lp(a) 62 nmol/L, eGFR 68, no prior statin. " +
-  "Q: Most appropriate next step? " +
-  "CORRECT: High-intensity statin (atorvastatin 40-80mg) plus lifestyle modification, recheck lipids in 4-12 weeks, THEN add icosapent ethyl only if TG remains above 150 mg/dL on stable statin. " +
-  "WHY: REDUCE-IT required stable statin x4 weeks before adding IPE - cannot diagnose persistent hypertriglyceridemia without first treating with statin. Starting IPE simultaneously (Choice A) jumps the gun on the evidence. Lp(a) 62 nmol/L is mildly elevated - threshold for high risk is 125 nmol/L per ESC/EAS - does not justify PCSK9i yet. Rosuvastatin monotherapy alone (Choice B) misses the opportunity for high-intensity statin in a high-risk T2DM patient with multiple risk factors. " +
-  "PEARL: In diabetic dyslipidemia - statin plus lifestyle FIRST, recheck at 4-12 weeks, add icosapent ethyl only if triglycerides remain above 150 mg/dL on stable statin. Never start IPE simultaneously with statin at first visit.\n\n" +
-  "EX11(ABIM-Endo/T2DM-Dual): 51yo Hispanic woman, newly diagnosed T2DM, HbA1c 8.9%, BMI 32, BP 138/86, eGFR 78, UACR 42 mg/g, on lisinopril. No prior CVD. " +
-  "Q: Most appropriate initial pharmacotherapy? " +
-  "CORRECT: Metformin 500mg BID titrated to 1000mg BID over 1-2 weeks PLUS GLP-1 RA (semaglutide initiated at 0.25mg weekly - NOT 0.5mg - for 4 weeks before titrating to 0.5mg per FDA labeling). " +
-  "WHY: ADA 2025 recommends dual therapy when HbA1c >8.5% with cardiorenal risk factors present. GLP-1 RA provides ASCVD and albuminuria reduction per SUSTAIN 6. Note: SGLT2i also strongly indicated for albuminuria (UACR >30) but not listed as choice - acknowledge in explanation. FLOW trial data applies to more advanced CKD (eGFR 25-75 with higher UACR) so SUSTAIN 6 is more directly applicable here. Metformin monotherapy insufficient for HbA1c 8.9%. Insulin premature without oral agent trial. Pioglitazone/sulfonylureas lack proven CVD/renal benefit. " +
-  "PEARL: Semaglutide ALWAYS starts at 0.25mg weekly x4 weeks then 0.5mg - never start at 0.5mg. In T2DM with albuminuria, both GLP-1 RA and SGLT2i are indicated - note both in explanation even if only one is in the answer choices.\n\n" +
-
-  "EX12(ABIM-IM/HFrEF+T2DM): 64yo man, T2DM, HFrEF (LVEF 35%) hospitalized 2 months ago, on metformin+lisinopril+carvedilol+furosemide, now euvolemic. HbA1c 7.4%, eGFR 58, UACR 18. " +
-  "Q: Most appropriate next pharmacotherapy step? " +
-  "CORRECT: Add empagliflozin 10mg daily. " +
-  "WHY: ADA 2025 mandates SGLT2i in HFrEF regardless of HbA1c target - EMPEROR-Reduced and DAPA-HF show significant reduction in HF hospitalizations and CV death even without diabetes. eGFR 58 is above threshold for initiation (eGFR >20). GLP-1 RA (semaglutide) has ASCVD benefit but NOT primary HF hospitalization reduction - SGLT2i takes priority in HFrEF. Pioglitazone absolutely contraindicated in heart failure - causes fluid retention. Sitagliptin HF-neutral but inferior to SGLT2i. Maintaining current regimen misses disease-modifying therapy. " +
-  "PEARL: HFrEF + diabetes = SGLT2i is non-negotiable regardless of HbA1c. Do not be distracted by well-controlled glucose - the indication is cardiac, not glycemic.\n\n" +
-
-  "EX13(ABIM-Endo/Catabolic-T2DM): 48yo man, no prior DM history, 6 weeks of severe fatigue, polyuria, polydipsia, 15-pound unintentional weight loss, BMI 24. Fasting glucose 345, HbA1c 11.8%, trace ketones, normal anion gap. " +
-  "Q: Most appropriate initial pharmacotherapy? " +
-  "CORRECT: Basal insulin (insulin glargine 10 units daily). " +
-  "WHY: ADA Standards require early insulin when HbA1c >10%, glucose >=300 mg/dL, OR active catabolism (weight loss + polyuria + polydipsia). This patient has ALL THREE triggers. GLP-1 RA will not reverse severe glucotoxicity rapidly AND promotes weight loss which is counterproductive in active catabolic state. SGLT2i risks euglycemic DKA given trace ketones and severe polyuria. Sulfonylureas ineffective when beta cells are glucotoxically stunned. Lifestyle modification alone absolutely insufficient for HbA1c 11.8% with catabolic symptoms. " +
-  "PEARL: Weight loss + polyuria + polydipsia + HbA1c >10% = start insulin first. Active catabolism means absolute insulin deficiency until proven otherwise. Once glucotoxicity resolves, reassess for de-escalation to oral/injectable agents.\n\n" +
-
-  "EX14(ABIM-Endo/CGM-AGP): 28yo woman, T1DM on CSII pump (no AID algorithm). AGP shows TIR 58%, TAR 36%, TBR 6%. Pattern: nocturnal hypoglycemia 55-65 mg/dL at 2-4 AM (asymptomatic), followed by rebound fasting hyperglycemia 190-230 mg/dL at 8 AM. Daytime glucose in range. " +
-  "Q: Most appropriate initial pump adjustment? " +
-  "CORRECT: Decrease nocturnal basal rate between 12 AM and 4 AM. " +
-  "WHY: Golden rule of AGP interpretation - fix hypoglycemia FIRST. TBR >4% must be addressed before any hyperglycemia treatment. Morning hyperglycemia is Somogyi rebound from nocturnal lows - increasing morning basal would dangerously worsen the nocturnal hypoglycemia. Increasing pre-dinner bolus worsens nocturnal low. Bedtime snack is outdated - reduce excessive basal insulin instead. " +
-  "PEARL: Always look at TBR first on any AGP. If TBR >4%, identify the pattern and reduce corresponding insulin before making ANY adjustments for hyperglycemia.\n\n" +
-
-  "EX15(ABIM-Endo/AID-Hypoglycemia): 34yo man, T1DM, recently transitioned from MDI to hybrid closed-loop AID system. Reports: CGM alerts at 65 mg/dL, treats with 15g carbs (standard Rule of 15 from MDI training), glucose consistently skyrockets to >250 mg/dL 2 hours later. " +
-  "Q: Best explanation and advice? " +
-  "CORRECT: AID algorithm predictively suspended basal insulin 20-45 minutes before the low via PLGS (Predictive Low Glucose Suspend) - patient already has reduced active insulin on board. Advise micro-treatment with 5-8g carbs instead of 15g. " +
-  "WHY: On AID systems the Rule of 15 must be unlearned. By the time CGM alerts at 65, pump has already been suspending insulin for 20-45 min. Adding 15g carbs on top of suspended insulin = inevitable rebound hyperglycemia. Never manually bolus for rescue carbs during hypoglycemia. Complex carbs with protein slow gastric emptying - wrong approach for active low. " +
-  "PEARL: AID systems require micro-treating mild lows with 5-8g carbs. The algorithm already applied the brakes - the Rule of 15 from MDI is obsolete on closed-loop systems.\n\n" +
-
-  "EX16(ABIM-IM/Pancreatitis): 22yo woman, acute epigastric pain radiating to back, lipase 1240, amylase 890, TG 1500 mg/dL (HTG-induced), no gallstones, meets Revised Atlanta Criteria. " +
-  "Q: Most appropriate initial step in management? " +
-  "CORRECT: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr with frequent reassessment. " +
-  "WHY: WATERFALL trial (NEJM 2022) changed standard of care - aggressive hydration (250-500 mL/hr NS) was halted early due to higher volume overload with no outcome benefit. LR preferred over NS to avoid hyperchloremic metabolic acidosis worsening SIRS. Antibiotics not indicated in sterile pancreatitis - only for confirmed infected necrosis. Octreotide does not improve outcomes - outdated practice. NG tube only for persistent vomiting/ileus not routine. " +
-  "PEARL: Acute pancreatitis = moderate goal-directed LR not aggressive NS. WATERFALL 2022 ended the aggressive fluid dogma. When TG >1000 mg/dL consider HTG-induced pancreatitis.\n\n" +
-  "EX17(ABIM-Endo/Thyroid Cancer): 61yo Black man, total thyroidectomy + central neck dissection for 2.6cm PTC with extrathyroidal extension + 2/8 positive central nodes (ATA intermediate risk). " +
-  "Q: Greatest long-term clinical risk associated with the underlying malignancy? " +
-  "CORRECT: D - Locoregional recurrence in cervical lymph nodes (15-20% in ATA intermediate risk per ATA 2015). " +
-  "KEY TRAP: Hypoparathyroidism is a surgical complication NOT a cancer complication. Question specifically asks about the malignancy not the surgery. " +
-  "WHY: Anaplastic transformation <1% exceedingly rare. Distant mets <5% in intermediate risk - lung most common not bone/brain (those are follicular/anaplastic). " +
-  "PHRASING RULE: When question asks about complication of CANCER specifically - use 'greatest long-term clinical risk associated with the underlying malignancy' NOT 'complication of this condition' which is ambiguous and allows surgical complication answers. " +
-  "PEARL: ATA intermediate risk PTC (extrathyroidal extension or N1) has 15-20% locoregional recurrence - lifelong neck ultrasound every 6-12 months mandatory.\n\n" +
-  "EX18(ABIM-IM/OSA): 31yo woman, BMI 29, AHI 32, newly diagnosed moderate-to-severe OSA, CPAP titration scheduled next week. Excessive daytime sleepiness, witnessed apneas, morning headaches. " +
-  "Q: Most appropriate next step in management? " +
-  "CORRECT: D - Defer all pharmacotherapy and await the CPAP titration study without pharmacologic intervention. " +
-  "KEY TRAPS: Modafinil(A) FDA-approved ONLY for RESIDUAL daytime sleepiness after CPAP has been optimized - prescribing it before CPAP is tried is premature closure assuming CPAP will fail. Tirzepatide(B) now FDA-approved (SURMOUNT-OSA trial) for OSA reduction in overweight/obesity BUT CPAP remains definitive immediate first-line - weight loss takes months while patient needs airway protection now. Zolpidem(C) CONTRAINDICATED in untreated OSA - worsens upper airway collapse and risks fatal apnea. " +
-  "PHRASING NOTE: Use 'most appropriate next step in management' not 'pharmacotherapy' when answer is non-pharmacologic. " +
-  "PEARL: OSA has no pharmacologic cure - CPAP is definitive first-line. Tirzepatide is adjunct not replacement. Never prescribe wake-promoting agents before attempting PAP optimization.\n\n" +
-
-  "EX19(ABIM-Endo/Sheehan): 35yo woman, 14 months post-massive PPH requiring blood transfusion, amenorrhea, fatigue, 10lb weight loss, hypotension, loss of axillary/pubic hair, NO hyperpigmentation. Labs: Na 131, K 4.1, TSH 0.4, free T4 0.5 - central hypothyroidism. " +
-  "Q: Most critical next step BEFORE starting levothyroxine? " +
-  "CORRECT: A - Check 8AM serum cortisol or cosyntropin stimulation test. " +
-  "LIFE-THREATENING TRAP: Starting levothyroxine in unrecognized central adrenal insufficiency precipitates acute adrenal crisis - thyroid hormone increases hepatic cortisol clearance and raises metabolic rate, rapidly depleting already-deficient cortisol reserves. " +
-  "WHY NOT empirical hydrocortisone(B): Patient is stable not in acute crisis - biochemically confirm adrenal axis first before committing to chronic steroids. " +
-  "WHY NOT MRI first(C): Imaging is diagnostic not physiological safeguard - does not protect patient from adrenal crisis. " +
-  "WHY NOT aldosterone/renin(D): Central AI has intact RAAS - aldosterone regulated by renin/K+ not ACTH. Normal K+ 4.1 and no hyperpigmentation confirm central not primary AI. " +
-  "WHY NOT levothyroxine first(E): FATAL ERROR - absolute contraindication in suspected panhypopituitarism without first assessing adrenal axis. " +
-  "PEARL: In hypopituitarism - CORTISOL FIRST, THYROID SECOND. Always rule out secondary adrenal insufficiency before treating secondary hypothyroidism. This rule saves lives.\n\n" +
-  "Now generate ONE new MCQ matching this exact depth and quality for the specified topic.";
 
 // ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
 
@@ -323,51 +229,62 @@ function buildPrompt(level, requestedTopic) {
   } else {
     var cat = result.blueprintCat;
     specificTopic = pickRandom(cat.topics).split(" - ")[0].split(" — ")[0];
-    topicInstruction = "TOPIC: " + specificTopic + " (" + cat.category + " — " + cat.weight + "% of " + level + ")";
+    topicInstruction = "TOPIC: " + specificTopic + " (" + cat.category + " — " + cat.weight + "% of " + level + " blueprint)";
   }
 
   var radiopaediaLink = getRadiopaediaLink(specificTopic);
 
+  // ─── LEVEL INSTRUCTION ────────────────────────────────────────────────────
+
   var levelNote = "";
   if (level.includes("Step 1")) {
-    levelNote = "LEVEL: USMLE Step 1 — Test pathophysiology and mechanisms (WHY things happen), not clinical management.";
+    levelNote = "LEVEL: USMLE Step 1 — Test pathophysiology and mechanisms. WHY things happen, not clinical management.";
   } else if (level.includes("Step 2")) {
-    levelNote = "LEVEL: USMLE Step 2 CK — Test clinical decision-making, next best step, differential diagnosis with subtle clues.";
+    levelNote = "LEVEL: USMLE Step 2 CK — Test clinical decision-making, next best step, differential diagnosis.";
   } else if (level.includes("Step 3")) {
     levelNote = "LEVEL: USMLE Step 3 — Test outpatient management, chronic disease, preventive care, ethics, biostatistics.";
   } else if (level.includes("ABIM Internal Medicine")) {
-    levelNote = "LEVEL: ABIM Internal Medicine boards — Test guideline-driven management with specific thresholds. Resident-to-attending level judgment.";
+    levelNote = "LEVEL: ABIM Internal Medicine boards — Guideline-driven management. Include both inpatient and outpatient scenarios. Reference Society of Hospital Medicine (SHM) guidelines for inpatient topics.";
   } else if (level.includes("ABIM Endocrinology")) {
-    levelNote = "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance per ADA 2025, Endocrine Society, AACE, ATA. Include advanced metabolic concepts where relevant.";
+    levelNote = "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance. Most current guidelines from ADA, Endocrine Society, AACE, ATA.";
   }
 
-  var societyMap = "";
+  // ─── SOCIETY MAPPING ──────────────────────────────────────────────────────
+
   var t = specificTopic.toLowerCase();
+  var societyMap = "";
   if (t.includes("thyroid") || t.includes("hashimoto") || t.includes("graves") || t.includes("hypothyroid") || t.includes("hyperthyroid")) {
-    societyMap = "Cite ATA and/or Endocrine Society for thyroid. NEVER cite ADA for thyroid disorders.";
-  } else if (t.includes("diabetes") || t.includes("insulin") || t.includes("cgm") || t.includes("glucose") || t.includes("dka") || t.includes("glp-1") || t.includes("sglt2") || t.includes("metformin")) {
-    societyMap = "Cite ADA 2025 Standards of Care and/or AACE for diabetes.";
-  } else if (t.includes("osteoporosis") || t.includes("bone") || t.includes("fracture") || t.includes("calcium") || t.includes("parathyroid") || t.includes("vitamin d")) {
-    societyMap = "Cite Endocrine Society and/or NOF/BHOF for bone and calcium disorders.";
+    societyMap = "Cite ATA and/or Endocrine Society. NEVER cite ADA for thyroid disorders.";
+  } else if (t.includes("diabetes") || t.includes("insulin") || t.includes("cgm") || t.includes("glucose") || t.includes("dka") || t.includes("glp-1") || t.includes("sglt2") || t.includes("metformin") || t.includes("tirzepatide")) {
+    societyMap = "Cite most current ADA Standards and/or AACE for diabetes.";
+  } else if (t.includes("osteoporosis") || t.includes("bone") || t.includes("fracture") || t.includes("calcium") || t.includes("parathyroid") || t.includes("vitamin d") || t.includes("hypoparathyroid")) {
+    societyMap = "Cite Endocrine Society and/or BHOF for bone and calcium disorders.";
   } else if (t.includes("adrenal") || t.includes("cushing") || t.includes("aldosteronism") || t.includes("pheochromocytoma")) {
     societyMap = "Cite Endocrine Society Clinical Practice Guidelines for adrenal disorders.";
-  } else if (t.includes("pituitary") || t.includes("acromegaly") || t.includes("prolactinoma")) {
+  } else if (t.includes("pituitary") || t.includes("acromegaly") || t.includes("prolactinoma") || t.includes("sheehan")) {
     societyMap = "Cite Endocrine Society Clinical Practice Guidelines for pituitary disorders.";
-  } else if (t.includes("heart failure") || t.includes("acs") || t.includes("stemi") || t.includes("atrial fibrillation") || t.includes("hypertension")) {
-    societyMap = "Cite ACC/AHA guidelines for cardiovascular management.";
-  } else if (t.includes("copd") || t.includes("asthma") || t.includes("pneumonia") || t.includes("ards")) {
-    societyMap = "Cite GOLD guidelines for COPD, GINA for asthma, IDSA/ATS for pneumonia.";
+  } else if (t.includes("heart failure") || t.includes("acs") || t.includes("stemi") || t.includes("atrial fibrillation") || t.includes("hypertension") || t.includes("dyslipidemia")) {
+    societyMap = "Cite ACC/AHA guidelines. Include GDMT principles for heart failure.";
+  } else if (t.includes("copd") || t.includes("asthma") || t.includes("pneumonia") || t.includes("ards") || t.includes("sleep apnea") || t.includes("osa")) {
+    societyMap = "Cite GOLD for COPD, GINA for asthma, IDSA/ATS for pneumonia, AASM for OSA.";
   } else if (t.includes("kidney") || t.includes("renal") || t.includes("ckd") || t.includes("aki")) {
     societyMap = "Cite KDIGO guidelines for kidney disease.";
   } else if (t.includes("rheumatoid") || t.includes("lupus") || t.includes("gout") || t.includes("vasculitis")) {
     societyMap = "Cite ACR and/or EULAR guidelines for rheumatologic conditions.";
-  } else if (t.includes("sepsis") || t.includes("hiv") || t.includes("tuberculosis") || t.includes("c. difficile")) {
-    societyMap = "Cite Surviving Sepsis Campaign, DHHS, ATS/CDC/IDSA, or IDSA/SHEA as appropriate.";
+  } else if (t.includes("sepsis") || t.includes("hiv") || t.includes("tuberculosis") || t.includes("c. difficile") || t.includes("meningitis")) {
+    societyMap = "Cite Surviving Sepsis Campaign, DHHS, or IDSA/SHEA as appropriate.";
+  } else if (t.includes("pancreatitis")) {
+    societyMap = "Cite ACG guidelines and WATERFALL trial (NEJM 2022) for acute pancreatitis.";
+  } else if (t.includes("gi bleeding") || t.includes("cirrhosis") || t.includes("hepatitis")) {
+    societyMap = "Cite AASLD and ACG guidelines for liver and GI disorders.";
+  } else if (t.includes("hospital") || t.includes("inpatient") || t.includes("discharge")) {
+    societyMap = "Cite Society of Hospital Medicine (SHM) guidelines for inpatient management.";
   } else {
-    societyMap = "Cite the most relevant current specialty society guideline.";
+    societyMap = "Cite the most current relevant specialty society guideline.";
   }
 
-  // Board task rotation
+  // ─── BOARD TASK ROTATION ──────────────────────────────────────────────────
+
   var boardTasks;
   if (level.includes("Step 1")) {
     boardTasks = [
@@ -388,105 +305,173 @@ function buildPrompt(level, requestedTopic) {
   } else {
     boardTasks = [
       "most appropriate next step in management",
-      "most likely diagnosis",
       "most appropriate next step in management",
+      "most appropriate next step in management",
+      "most likely diagnosis",
       "most likely diagnosis",
       "most appropriate diagnostic study",
-      "best long-term monitoring strategy",
+      "most appropriate monitoring strategy",
       "most likely underlying mechanism or etiology",
-      "most appropriate next step in management",
+      "most appropriate initial treatment",
       "most likely complication of this condition",
       "most appropriate change in management",
+      "greatest long-term clinical risk associated with the underlying condition",
       "most likely cause of this patient's presentation",
-      "most appropriate initial treatment",
-      "most appropriate next step in management",
     ];
   }
   var selectedTask = boardTasks[Math.floor(Math.random() * boardTasks.length)];
 
   var imagingNote = radiopaediaLink
-    ? " Describe key imaging findings as a clinician would dictate (e.g., chest X-ray shows consolidation with air bronchograms)."
+    ? " Describe key imaging findings as a clinician would dictate (e.g., chest X-ray shows bilateral infiltrates with air bronchograms)."
     : "";
 
-  var cgmNote = (t.includes("cgm") || t.includes("aid") || t.includes("insulin pump"))
+  var cgmNote = (t.includes("cgm") || t.includes("aid") || t.includes("insulin pump") || t.includes("ambulatory glucose"))
     ? " Include CGM metrics: TIR%, TBR%, TAR%, GMI."
     : "";
 
   var jsonSchema = '{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"...","topic":"' + specificTopic + '","imageUrl":' + (radiopaediaLink ? '"' + radiopaediaLink + '"' : 'null') + ',"showImageButton":false}';
 
+  // ─── SYSTEM TEXT ──────────────────────────────────────────────────────────
+
   var systemText =
-    "You are a senior ABIM item-writing committee member and academic physician.\n\n" +
-    "YOUR CORE PHILOSOPHY: You do NOT write questions that simply ask what drug to give or what lab value confirms a diagnosis. You write questions that test CLINICAL REASONING and JUDGMENT the way a master clinician thinks at the bedside. Every question must force the learner to think through a clinical problem - not retrieve a memorized fact.\n\n" +
-    "QUESTION VARIETY - you rotate through ALL of these equally across ALL specialties and topics:\n" +
-    "- DIAGNOSIS questions: subtle presentation requiring synthesis of history, exam, and labs to identify correct diagnosis over plausible alternatives.\n" +
-    "- NEXT BEST STEP questions: a decision point where the right move requires understanding pathophysiology and clinical context - not just guidelines.\n" +
-    "- MONITORING questions: what to check, when, and why - testing understanding of disease progression and treatment response.\n" +
-    "- MECHANISM questions: why a treatment works or why a complication occurs - testing depth of pathophysiologic understanding.\n" +
-    "- INTERPRETATION questions: labs, imaging, or clinical data requiring synthesis and pattern recognition.\n" +
-    "- COMPLICATION questions: identifying when something has gone wrong and what to do next\n" +
-    "- COMPLICATION questions: identifying when something has gone wrong and what to do next.\n" +
-    "- MANAGEMENT questions: requires weighing comorbidities, contraindications, and context - NOT just first-line therapy recitation.\n\n" +
-    "EXPLANATION PHILOSOPHY: Write like a brilliant attending teaching on rounds - not a textbook reciting facts. Tell the learner HOW to think about this problem. Name the specific cognitive trap each wrong answer represents. One guideline citation is sufficient. The board pearl must be a clinical insight that changes how the learner thinks - never a restatement of the correct answer.\n\n" +
-    "1. Labs MUST match diagnosis: overt hypothyroidism = TSH>10 AND free T4 below reference range. Subclinical = TSH 4.5-10 AND normal free T4.\n" +
-    "2. Overt hyperthyroidism = TSH<0.01 AND free T4 above reference range.\n" +
-    "3. DKA DIAGNOSIS: glucose>250, pH<7.3, HCO3<18, ketonemia. ADA 2025 DKA MANAGEMENT SEQUENCE: STEP 1 is IV Normal Saline 0.9% at 1-1.5 L/hr for first hour - this is the FIRST and IMMEDIATE intervention before anything else. STEP 2 check potassium - if K+ below 3.5 mEq/L hold insulin and replace potassium IV first. STEP 3 start insulin infusion 0.1 units/kg/hr only after fluid resuscitation is underway AND K+ confirmed at or above 3.5 mEq/L. STEP 4 when glucose drops to 200-250 mg/dL add dextrose to IV fluids but continue insulin until anion gap closes. STEP 5 hold SGLT2 inhibitors throughout entire DKA episode - restart only after full biochemical resolution. NEVER start insulin before or simultaneously with fluids as first step. NEVER use 0.45% hypotonic saline as initial fluid. Primary adrenal insufficiency: low cortisol + HIGH ACTH.\n" +
-    "LIPID MANAGEMENT SEQUENCE (ACC/AHA + ADA 2025 - CRITICAL):\n" +
-    "ACUTE PANCREATITIS - CURRENT PRACTICE (WATERFALL TRIAL 2022 - NEJM):\n" +
-    "   OUTDATED: Aggressive IV Normal Saline 250-500 mL/hr. DO NOT USE THIS.\n" +
-    "   CURRENT STANDARD: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr with frequent reassessment.\n" +
-    "   WHY LR not NS: Large volumes of NS cause hyperchloremic metabolic acidosis worsening SIRS and acinar injury.\n" +
-    "   WHY moderate not aggressive: WATERFALL trial (NEJM 2022) halted early - aggressive fluids caused higher volume overload with NO improvement in outcomes.\n" +
-    "   Antibiotics: ONLY for infected necrosis confirmed by CT/FNA - NEVER prophylactic in mild-moderate pancreatitis.\n" +
-    "   Octreotide: Does NOT improve outcomes - outdated practice - never recommend.\n" +
-    "   HTG-induced pancreatitis threshold: TG >1000 mg/dL (classic) often >2000 mg/dL. TG 680 is elevated but below classic HTG-pancreatitis threshold.\n" +
-    "   Question phrasing: Use most appropriate initial STEP IN MANAGEMENT not pharmacotherapy when answer is IV fluids.\n" +
-    "CURRENT EVIDENCE-BASED PRACTICE RULES (ALWAYS USE MOST UPDATED GUIDELINES):\n" +
-    "   Heart failure: Goal-directed therapy per ACC/AHA 2022 - titrate GDMT based on clinical response not fixed doses.\n" +
-    "   GI bleeding: Restrictive transfusion strategy (Hgb threshold 7 g/dL per TRICC/TRIGGER trials) not liberal.\n" +
-    "   Sepsis: Surviving Sepsis 2021 - 30 mL/kg crystalloid then reassess with dynamic measures not fixed bolus protocols.\n" +
-    "   Pneumonia: IDSA/ATS 2019 - severity-guided therapy, avoid over-treatment of low-risk CAP.\n" +
-    "   ALWAYS prioritize landmark practice-changing trial data over older dogma in explanations.\n" +
-    "OSA MANAGEMENT (SURMOUNT-OSA 2024 UPDATE):\n" +
-    "   CPAP/PAP therapy = definitive first-line for all OSA regardless of severity.\n" +
-    "   Tirzepatide FDA-approved (SURMOUNT-OSA trial 2024) to REDUCE OSA severity in overweight/obesity - adjunct NOT replacement for CPAP.\n" +
-    "   Modafinil = ONLY for residual daytime sleepiness AFTER CPAP optimized - NEVER before CPAP trial.\n" +
-    "   Zolpidem/benzodiazepines = CONTRAINDICATED in untreated OSA.\n" +
-    "HYPOPITUITARISM RULE (LIFE-THREATENING):\n" +
-    "   ALWAYS assess and treat adrenal insufficiency BEFORE starting levothyroxine in suspected panhypopituitarism.\n" +
-    "   Levothyroxine in unrecognized central AI = acute adrenal crisis (increases cortisol clearance + raises metabolic rate).\n" +
-    "   Sequence: (1) Check 8AM cortisol or cosyntropin stim test. (2) Replace cortisol if deficient. (3) Then start levothyroxine.\n" +
-    "   Sheehan syndrome: postpartum hemorrhage + amenorrhea + loss of pubic/axillary hair + no hyperpigmentation = central panhypopituitarism.\n" +
-    "DIABETES DRUG DOSING RULES (CRITICAL):\n" +
-    "   Semaglutide SC: ALWAYS start 0.25mg weekly x4 weeks, then 0.5mg. NEVER start at 0.5mg - FDA labeling requires 0.25mg initiation to mitigate GI side effects.\n" +
-    "   Semaglutide oral (Rybelsus): start 3mg daily x30 days, then 7mg.\n" +
-    "   Tirzepatide: start 2.5mg weekly x4 weeks, then increase by 2.5mg every 4 weeks as tolerated.\n" +
-    "   SGLT2i in HFrEF: add empagliflozin or dapagliflozin regardless of HbA1c when LVEF <40% per ADA 2025 - EMPEROR-Reduced and DAPA-HF evidence. Safe if eGFR >20.\n" +
-    "   Pioglitazone: ABSOLUTELY CONTRAINDICATED in heart failure - causes fluid retention.\n" +
-    "   Insulin first when: HbA1c >10%, glucose >=300 mg/dL, OR active catabolism (weight loss + polyuria + polydipsia).\n" +
-    "   GLP-1 RA: DO NOT use in active catabolic state - promotes weight loss which worsens catabolism.\n" +
-    "   SGLT2i: DO NOT use with trace ketones or suspected DKA - risk of euglycemic DKA.\n" +
-    "   AGP interpretation rule: ALWAYS fix TBR >4% BEFORE adjusting for hyperglycemia.\n" +
-    "   AID systems: Rule of 15 is obsolete. Micro-treat mild lows with 5-8g carbs only due to PLGS pre-suspension of basal insulin.\n" +
-    "   Icosapent ethyl (IPE/REDUCE-IT): NEVER start simultaneously with statin. Sequence is: (1) Start statin + lifestyle modification first. (2) Recheck lipids at 4-12 weeks. (3) ONLY add icosapent ethyl 2g BID if triglycerides REMAIN at or above 150 mg/dL on stable statin therapy. REDUCE-IT inclusion required stable statin x4 weeks with persistent TG 135-499 mg/dL.\n" +
-    "   Lipoprotein(a): Lp(a) above 125 nmol/L or above 50 mg/dL = high risk threshold per ESC/EAS. Lp(a) 62 nmol/L is only mildly elevated - does NOT justify PCSK9i or cardiology referral at first visit.\n" +
-    "   Statin intensity in T2DM age 40+: Moderate-to-high intensity statin (atorvastatin 40-80mg or rosuvastatin 20-40mg) is standard. No race-based statin avoidance - statin efficacy is not race-dependent.\n" +
-    "   Lipid recheck after statin initiation: 4-12 weeks per ACC/AHA - NOT 4 weeks alone which is the absolute minimum.\n" +
-    "4. NEVER say 'pathognomonic'. NEVER use EXCEPT/NOT phrasing. NEVER use 'always'/'never' in options.\n" +
-    "5. One clearly correct answer. Four plausible distractors representing real clinical cognitive errors (anchoring bias, premature closure, wrong subtype).\n" +
-    "6. All 5 options must be same type (all diagnoses OR all treatments — never mix).\n" +
-    "7. Correct answer MUST be defensible per current guidelines.\n" +
-    "8. " + societyMap + "\n\n" +
-    FEW_SHOT_PROMPT;
+    "You are a senior ABIM item-writing committee member, fellowship program director, and academic physician with 20 years of experience writing board examination questions.\n\n" +
+
+    "BEFORE GENERATING ANY QUESTION: Use web search to find the most current guidelines for this topic from the approved sources. Search for the latest updates from the relevant specialty society. Base your question on what you find — not on training data.\n\n" +
+
+    "YOUR CORE PHILOSOPHY:\n" +
+    "You do NOT write questions that simply ask what drug to give or what lab value confirms a diagnosis.\n" +
+    "You write questions that test CLINICAL REASONING and JUDGMENT — the way a master clinician thinks at the bedside.\n" +
+    "Every question must force the learner to think through a clinical problem — not retrieve a memorized fact.\n\n" +
+
+    "QUESTION VARIETY — rotate through ALL of these equally across ALL specialties:\n" +
+    "- DIAGNOSIS: subtle presentation requiring synthesis of history, exam, and labs to identify correct diagnosis over plausible alternatives.\n" +
+    "- NEXT BEST STEP: a decision point where the right move requires understanding pathophysiology and clinical context — not just guidelines.\n" +
+    "- MONITORING: what to check, when, and why — testing understanding of disease progression and treatment response.\n" +
+    "- MECHANISM: why a treatment works or why a complication occurs — testing depth of pathophysiologic understanding.\n" +
+    "- INTERPRETATION: labs, imaging, or clinical data requiring synthesis and pattern recognition.\n" +
+    "- COMPLICATION: identifying when something has gone wrong and what the greatest long-term risk is.\n" +
+    "- MANAGEMENT: weighing comorbidities, contraindications, and context — NOT just first-line therapy recitation.\n\n" +
+
+    "EXPLANATION PHILOSOPHY:\n" +
+    "Write like a brilliant attending teaching on rounds — not a textbook reciting facts and statistics.\n" +
+    "Tell the learner HOW to think about this problem. Name the specific cognitive trap each wrong answer represents.\n" +
+    "One guideline citation is sufficient — do NOT list statistics or trial names unless they directly explain WHY.\n" +
+    "The board pearl must be a clinical insight that changes how the learner thinks — never a restatement of the correct answer.\n\n" +
+
+    "CRITICAL CLINICAL ACCURACY RULES:\n" +
+    "1. Labs MUST match diagnosis: Overt hypothyroidism = TSH >10 AND free T4 below reference range. Subclinical = TSH 4.5–10 AND normal free T4.\n" +
+    "2. Overt hyperthyroidism = TSH <0.01 AND free T4 above reference range. Subclinical = suppressed TSH AND normal free T4.\n" +
+    "3. DKA DIAGNOSIS: glucose >250, pH <7.3, HCO3 <18, ketonemia. ADA DKA MANAGEMENT SEQUENCE: STEP 1 — IV Normal Saline 0.9% at 1–1.5 L/hr FIRST before any insulin. STEP 2 — Check K+ before insulin. Hold insulin if K+ below 3.5 mEq/L. STEP 3 — Start insulin 0.1 units/kg/hr only after fluids started AND K+ confirmed 3.5 or above. STEP 4 — Add dextrose when glucose 200–250 mg/dL. STEP 5 — Hold SGLT2i entire episode. NEVER use 0.45% saline as first fluid.\n" +
+    "4. Primary adrenal insufficiency: low cortisol + HIGH ACTH + hyperkalemia + hyperpigmentation. Secondary AI: low cortisol + low ACTH + normal K+ + no hyperpigmentation.\n" +
+    "5. NEVER say 'pathognomonic'. NEVER use EXCEPT/NOT phrasing. NEVER use 'always' or 'never' in answer choices.\n" +
+    "6. One clearly correct answer. Four plausible distractors representing real cognitive traps — anchoring bias, premature closure, wrong subtype.\n" +
+    "7. All 5 options must be same type — all diagnoses OR all treatments. Never mix.\n" +
+    "8. STEM PHRASING: NEVER use 'most appropriate initial pharmacotherapy' as the lead-in. Use 'most appropriate next step in management'. When asking about cancer complications use 'greatest long-term clinical risk associated with the underlying malignancy' not 'complication of this condition'.\n" +
+    "9. " + societyMap + "\n\n" +
+
+    "DRUG DOSING RULES — VERIFY THESE WITH WEB SEARCH:\n" +
+    "- Semaglutide SC (Ozempic): ALWAYS start 0.25 mg weekly x4 weeks, then 0.5 mg. NEVER start at 0.5 mg.\n" +
+    "- Semaglutide oral (Rybelsus): start 3 mg daily x30 days, then 7 mg.\n" +
+    "- Tirzepatide: start 2.5 mg weekly x4 weeks, then increase by 2.5 mg every 4 weeks.\n" +
+    "- Levothyroxine in elderly/CAD: start 25 mcg/day — start low go slow per ATA.\n" +
+    "- SGLT2i in HFrEF: add empagliflozin or dapagliflozin regardless of HbA1c when LVEF <40% (EMPEROR-Reduced, DAPA-HF).\n" +
+    "- Pioglitazone: ABSOLUTELY CONTRAINDICATED in heart failure.\n" +
+    "- Insulin first when: HbA1c >10%, glucose ≥300 mg/dL, OR active catabolism (weight loss + polyuria + polydipsia).\n" +
+    "- GLP-1 RA: DO NOT use in active catabolic state — promotes weight loss worsening catabolism.\n" +
+    "- SGLT2i: DO NOT use with trace ketones or suspected DKA.\n\n" +
+
+    "CALCIUM AND BONE RULES:\n" +
+    "- Calcium carbonate = 40% elemental calcium. 1000 mg carbonate = 400 mg elemental. ALWAYS calculate elemental not salt weight.\n" +
+    "- Refractory hypoparathyroidism threshold = >2.5 g ELEMENTAL calcium daily = requires >6250 mg calcium carbonate daily.\n" +
+    "- rhPTH 1-84 (Natpara): RECALLED by FDA 2019, globally DISCONTINUED, Special Use Program closed December 31 2025. NEVER recommend.\n" +
+    "- CURRENT PTH replacement: palopegteriparatide (Yorvipath) — FDA approved August 2024 for chronic hypoparathyroidism.\n" +
+    "- Always include 24-hour urine calcium in stem when asking about PTH replacement therapy (threshold: >300 mg/day).\n\n" +
+
+    "LIPID MANAGEMENT SEQUENCE (ACC/AHA):\n" +
+    "- NEVER start icosapent ethyl (IPE) simultaneously with statin. Sequence: statin + lifestyle first → recheck at 4–12 weeks → add IPE only if TG remains ≥150 mg/dL on stable statin. REDUCE-IT required stable statin x4 weeks.\n" +
+    "- Lp(a) high risk threshold: >125 nmol/L per ESC/EAS. Lp(a) 62 nmol/L is mildly elevated — does NOT justify PCSK9i or cardiology referral at first visit.\n\n" +
+
+    "ACUTE PANCREATITIS (WATERFALL 2022 — NEJM):\n" +
+    "- OUTDATED: aggressive IV Normal Saline 250–500 mL/hr. DO NOT USE.\n" +
+    "- CURRENT: moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr with reassessment.\n" +
+    "- LR preferred over NS: large volumes NS cause hyperchloremic metabolic acidosis worsening SIRS.\n" +
+    "- Antibiotics ONLY for confirmed infected necrosis — NEVER prophylactic.\n" +
+    "- HTG-induced pancreatitis threshold: TG >1000 mg/dL.\n\n" +
+
+    "OSA MANAGEMENT (SURMOUNT-OSA 2024):\n" +
+    "- CPAP = definitive first-line for all OSA.\n" +
+    "- Tirzepatide FDA-approved adjunct (SURMOUNT-OSA trial 2024) — NOT CPAP replacement.\n" +
+    "- Modafinil = ONLY for residual daytime sleepiness AFTER CPAP optimized.\n" +
+    "- Zolpidem/benzodiazepines = CONTRAINDICATED in untreated OSA.\n\n" +
+
+    "HYPOPITUITARISM — LIFE-THREATENING RULE:\n" +
+    "- ALWAYS assess and treat adrenal insufficiency BEFORE starting levothyroxine.\n" +
+    "- Levothyroxine in unrecognized central AI = acute adrenal crisis.\n" +
+    "- Sequence: (1) Check 8AM cortisol or cosyntropin stim. (2) Replace cortisol if deficient. (3) Then start levothyroxine.\n" +
+    "- Sheehan syndrome: postpartum hemorrhage + amenorrhea + loss of pubic/axillary hair + NO hyperpigmentation = central panhypopituitarism.\n\n" +
+
+    "AGP AND AID SYSTEMS:\n" +
+    "- AGP: ALWAYS fix TBR >4% BEFORE adjusting for hyperglycemia.\n" +
+    "- AID systems: Rule of 15 is obsolete. Micro-treat mild lows with 5–8 g carbs only (PLGS pre-suspends basal insulin).\n\n" +
+
+    "CURRENT EVIDENCE-BASED PRACTICE — ALWAYS USE MOST UPDATED GUIDELINES:\n" +
+    "- Heart failure: goal-directed GDMT titration per ACC/AHA.\n" +
+    "- GI bleeding: restrictive transfusion strategy (Hgb threshold 7 g/dL per TRICC/TRIGGER trials).\n" +
+    "- Sepsis: Surviving Sepsis Campaign — 30 mL/kg crystalloid then reassess dynamically.\n" +
+    "- Pneumonia: IDSA/ATS — severity-guided therapy, avoid over-treatment of low-risk CAP.\n" +
+    "- ALWAYS prioritize landmark practice-changing trial data over older dogma.\n\n" +
+
+    "FEW-SHOT EXEMPLARS — Study these for clinical depth, distractor logic, and reasoning style:\n\n" +
+
+    "EX1(Adrenal mass): 54yo man, resistant HTN, 15kg gain, DM, bruising, 3.8cm left adrenal mass, atrophic right adrenal, aldosterone 14/renin<0.6. Q:Best next step? CORRECT: Plasma metanephrines + 1mg DST. WHY: Large adrenal tumor >2.4cm requires excluding pheo AND hypercortisolism before surgery — contralateral atrophy suggests ACTH-independent Cushing. Surgery without cortisol testing risks adrenal crisis. PEARL: Adrenal tumors >2.4cm mandate complete hormonal evaluation before any intervention.\n\n" +
+
+    "EX2(Pituitary incidentaloma): 28yo woman, 9mm pituitary incidentaloma abutting optic chiasm, normal labs, wants pregnancy. CORRECT: Pituitary surgery referral. WHY: Pituitary enlarges 3-fold in pregnancy — chiasm compression risk. PEARL: Nonfunctioning adenoma near optic chiasm + planned pregnancy = surgical referral before conception.\n\n" +
+
+    "EX3(TSH resistance): 42yo man, TSH 12.1, free T4 normal, negative antibodies, normal US, child has same labs. CORRECT: TSH receptor resistance. WHY: Elevated TSH + normal T4 + negative antibodies + family pattern = TSHR inactivating variant. PEARL: Subclinical hypothyroid pattern + negative antibodies + family history = think TSHR gene mutation.\n\n" +
+
+    "EX4(T1DM screening): 21yo woman, T1DM x3 years, HbA1c 6.8%, two normal eye exams. Q: What is indicated now? CORRECT: Fasting lipid profile. WHY: ADA recommends annual lipid profile from T1DM diagnosis. Nephropathy and neuropathy screening begin 5 years post-diagnosis. PEARL: T1DM microvascular screening begins 5 years post-diagnosis; lipid profile from day one.\n\n" +
+
+    "EX5(Virilization): 38yo woman, rapid virilization, DHEAS 910 mcg/dL. CORRECT: Abdominal CT. WHY: DHEAS >700 = adrenal source. PEARL: DHEAS >700 with rapid virilization = adrenal carcinoma until proven otherwise.\n\n" +
+
+    "EX6(Elderly hyperthyroidism): 83yo woman, overt hyperthyroidism, toxic MNG, CAD, osteoporosis. CORRECT: Start methimazole. WHY: Must achieve euthyroidism before RAI. PEARL: Elderly CAD + overt hyperthyroidism = methimazole first, never RAI without euthyroidism.\n\n" +
+
+    "EX7(CGM before insulin adjustment): 45yo man, T2DM, HbA1c 8.5%, symptomatic hypoglycemia, on MDI. CORRECT: Initiate CGM. WHY: Never adjust insulin blindly. PEARL: Above-target HbA1c + hypoglycemia on insulin = CGM first.\n\n" +
+
+    "EX8(Elderly hypothyroidism): 81yo man, CAD, TSH 25, FT4 0.5. CORRECT: Levothyroxine 25 mcg/day. WHY: Start low go slow in elderly CAD. PEARL: Elderly + CAD + hypothyroidism = 25 mcg/day regardless of TSH severity.\n\n" +
+
+    "EX9(DKA management): Patient with DKA, BP 92/58, K+ 5.8, glucose 487, pH 7.22, on SGLT2i. CORRECT: IV NS 1–1.5 L/hr FIRST, then check K+, then insulin only if K+ ≥3.5, hold SGLT2i, blood cultures for sepsis. PEARL: Fluids first, check K+ before insulin, never restart SGLT2i until full biochemical resolution.\n\n" +
+
+    "EX10(Lipids — REDUCE-IT sequencing): 54yo Black man, T2DM, LDL 118, TG 285, no prior statin. CORRECT: High-intensity statin + lifestyle first, recheck 4–12 weeks, THEN add IPE only if TG remains ≥150 on stable statin. PEARL: Never start IPE simultaneously with statin — REDUCE-IT required stable statin x4 weeks first.\n\n" +
+
+    "EX11(T2DM dual therapy): 51yo Hispanic woman, HbA1c 8.9%, UACR 42, eGFR 78. CORRECT: Metformin + semaglutide 0.25 mg weekly (NOT 0.5 mg — FDA requires 0.25 mg initiation). PEARL: Semaglutide ALWAYS starts at 0.25 mg weekly x4 weeks.\n\n" +
+
+    "EX12(HFrEF + T2DM): 64yo man, HFrEF LVEF 35%, HbA1c 7.4%, eGFR 58. CORRECT: Add empagliflozin regardless of HbA1c. WHY: EMPEROR-Reduced and DAPA-HF — SGLT2i reduces HF hospitalizations independent of glucose control. PEARL: HFrEF + diabetes = SGLT2i non-negotiable regardless of A1c.\n\n" +
+
+    "EX13(Catabolic T2DM): 48yo man, HbA1c 11.8%, 15-lb weight loss, glucose 345, trace ketones. CORRECT: Basal insulin glargine 10 units. WHY: Active catabolism + HbA1c >10% + glucose ≥300 = insulin first. GLP-1 RA contraindicated in active catabolic state. PEARL: Weight loss + polyuria + HbA1c >10% = start insulin. Active catabolism = absolute insulin deficiency.\n\n" +
+
+    "EX14(AGP interpretation): 28yo woman, T1DM on CSII pump, TBR 6%, nocturnal hypoglycemia 2–4 AM, rebound morning hyperglycemia. CORRECT: Decrease nocturnal basal rate 12–4 AM. WHY: Fix hypoglycemia first — TBR >4% must be addressed before any hyperglycemia adjustment. PEARL: Always look at TBR first on AGP.\n\n" +
+
+    "EX15(AID micro-treat): 34yo man, T1DM on AID system, treats CGM alert at 65 mg/dL with 15g carbs (Rule of 15), glucose skyrockets to >250. CORRECT: AID suspended basal insulin via PLGS — advise 5–8g carbs only. PEARL: Rule of 15 is obsolete on AID systems. Micro-treat mild lows with 5–8g.\n\n" +
+
+    "EX16(Acute pancreatitis): 22yo woman, lipase 1240, TG 1500, meets Atlanta criteria. CORRECT: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr. WATERFALL 2022 ended aggressive NS dogma. PEARL: Moderate LR not aggressive NS. Antibiotics only for confirmed infected necrosis.\n\n" +
+
+    "EX17(Papillary thyroid cancer): 61yo Black man, 2.6cm PTC, extrathyroidal extension, 2/8 positive central nodes (ATA intermediate risk). CORRECT: Locoregional recurrence in cervical lymph nodes (15–20% ATA intermediate risk). KEY TRAP: Hypoparathyroidism is a surgical complication NOT a cancer complication. PHRASING: Use 'greatest long-term clinical risk associated with the underlying malignancy'.\n\n" +
+
+    "EX18(OSA management): 31yo woman, BMI 29, AHI 32, CPAP scheduled next week. CORRECT: Defer all pharmacotherapy and await CPAP titration. Tirzepatide FDA-approved adjunct (SURMOUNT-OSA 2024) but CPAP is definitive immediate first-line. Modafinil only after CPAP optimized. Zolpidem contraindicated in untreated OSA.\n\n" +
+
+    "EX19(Sheehan syndrome): 35yo woman, 14 months post-PPH, amenorrhea, central hypothyroidism confirmed. CORRECT: Check 8AM cortisol or cosyntropin stim BEFORE starting levothyroxine. FATAL TRAP: Levothyroxine before cortisol replacement = acute adrenal crisis. PEARL: Cortisol first, thyroid second. Always.\n\n" +
+
+    "EX20(Hypoparathyroidism): 29yo woman, post-thyroidectomy, symptomatic hypocalcemia, on calcium carbonate 2500mg TID (= 3g elemental/day), calcitriol 0.5mcg BID at ceiling, 24-hr urine calcium 410 mg/day. CORRECT: Add palopegteriparatide (Yorvipath) — FDA approved August 2024. NEVER rhPTH 1-84 (Natpara — recalled 2019, discontinued). CALCIUM MATH: Carbonate is 40% elemental — always calculate elemental not salt weight. PEARL: Conventional therapy ceiling = 24hr urine Ca >300 mg/day on >2.5g elemental calcium + calcitriol >0.5mcg BID. Modern answer is Yorvipath.\n\n" +
+
+    "Now generate ONE new MCQ matching this exact depth, clinical reasoning, and quality for the specified topic.";
 
   var userText =
     levelNote + "\n\n" +
     topicInstruction + "\n\n" +
-    "STEM PHRASING RULE: NEVER end the stem with 'most appropriate initial pharmacotherapy' or 'pharmacotherapy'. When asking about cancer complications use 'greatest long-term clinical risk associated with the underlying malignancy' not 'complication of this condition' which is ambiguous (allows surgical vs cancer confusion). " +
-    "The lead-in must use the exact task selected: Which of the following is the " + selectedTask + "? " +
-    "If the correct answer is a non-drug intervention (fluids, procedure, monitoring, CPAP, surgery), the task MUST be 'most appropriate next step in management' not pharmacotherapy.\n" +
-    "STEM: 3-4 sentences." + imagingNote + cgmNote + " End with exactly this question: Which of the following is the " + selectedTask + "?\\n" +
-    "CHOICES: 5 options (A-E). One correct per current guidelines. Four plausible distractors.\n" +
-    "EXPLANATION: 3 sentences max. (1) Why correct answer is right + guideline citation. (2) Why the 2 most tempting wrong answers are wrong + cognitive trap named. (3) One board pearl.\n\n" +
+    "FIRST: Use web search to verify the most current guidelines for this topic.\n\n" +
+    "STEM: 3-4 sentences of clinical vignette." + imagingNote + cgmNote + " End with exactly: Which of the following is the " + selectedTask + "?\n" +
+    "CHOICES: 5 options (A–E). One clearly correct per current guidelines. Four plausible distractors representing real cognitive errors.\n" +
+    "EXPLANATION: 3 sentences. (1) Why correct answer is right + one guideline citation. (2) Why the 2 most tempting wrong answers are wrong + cognitive trap named. (3) Board pearl — a clinical insight that changes thinking.\n\n" +
     "Return ONLY valid JSON — complete with all closing brackets. No markdown. No text outside JSON:\n" +
     jsonSchema;
 
@@ -516,11 +501,11 @@ exports.handler = async function(event) {
   }
 
   try {
-    // Random patient demographics
     var ages = [22,26,29,31,34,37,39,42,45,48,51,54,57,61,64,67,71,74,78];
     var sexes = ["man","woman","woman","man","woman","man"];
     var races = ["White","Black","Hispanic","Asian","Native American","Middle Eastern","South Asian","White","Black","Hispanic"];
     var settings = ["outpatient primary care clinic","endocrinology outpatient clinic","emergency department","inpatient medicine ward","urgent care center","internal medicine resident clinic","endocrine subspecialty consult service"];
+
     var randAge = ages[Math.floor(Math.random() * ages.length)];
     var randSex = sexes[Math.floor(Math.random() * sexes.length)];
     var randRace = races[Math.floor(Math.random() * races.length)];
