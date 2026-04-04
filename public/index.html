@@ -82,6 +82,8 @@ const GUIDES=[
   {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"P",u:"https://www.thoracic.org/statements"},
   {id:13,t:"American Thyroid Association Guidelines",s:"Endocrinology",i:"T",u:"https://www.thyroid.org/professionals/ata-professional-guidelines"},
   {id:14,t:"National Osteoporosis Foundation Guidelines",s:"Bone",i:"B",u:"https://www.bonehealthandosteoporosis.org/clinicians/guidelines"},
+  {id:15,t:"NEJM Image Challenge",s:"Visual Dx",i:"N",u:"https://www.nejm.org/image-challenge"},
+  {id:16,t:"ECG Wave-Maven — Harvard/BIDMC",s:"Cardiology",i:"E",u:"http://ecg.bidmc.harvard.edu"},
 ];
 const FAQS=[
   {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE -- Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
@@ -467,6 +469,74 @@ function App(){
         </div>
         <p style={{color:"#475569",fontSize:13}}>Credit card required · No charge until Day 15 · Cancel anytime</p>
       </section>
+      <section style={{padding:"80px 5%"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:56}}>
+            <p style={{fontSize:12,fontWeight:700,color:GOLD,letterSpacing:3,textTransform:"uppercase",marginBottom:12}}>Simple by design</p>
+            <h2 style={{fontSize:34,fontWeight:800,color:"#f1f5f9",margin:0}}>How MedBoard Pro Works</h2>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:0,position:"relative"}}>
+            {[
+              {
+                num:"01",
+                icon:"◎",
+                title:"Choose Your Exam",
+                desc:"Select from USMLE Step 1, Step 2 CK, Step 3, ABIM Internal Medicine, or ABIM Endocrinology and Metabolism subspecialty. Every question is weighted to the real exam blueprint.",
+                color:"#6366f1"
+              },
+              {
+                num:"02",
+                icon:"◈",
+                title:"Receive a Fresh Question",
+                desc:"A unique board-quality clinical vignette — written to NBME and ABIM item-writing standards — with a real patient, real labs, and real clinical decisions. Never the same question twice.",
+                color:GOLD
+              },
+              {
+                num:"03",
+                icon:"◉",
+                title:"Learn from Every Answer",
+                desc:"Instant feedback with the correct answer, guideline citations from ADA, ATA, ACC/AHA, Endocrine Society and 20+ societies, cognitive error analysis, and a board pearl from a fellowship program director.",
+                color:"#10b981"
+              }
+            ].map(function(step, i){
+              return React.createElement("div",{
+                key:step.num,
+                style:{
+                  padding:"40px 36px",
+                  borderTop:"1px solid "+BDR,
+                  borderBottom:"1px solid "+BDR,
+                  borderLeft:"1px solid "+BDR,
+                  borderRight: i===2 ? "1px solid "+BDR : "none",
+                  position:"relative",
+                  background:"transparent",
+                  transition:"background 0.3s"
+                },
+                onMouseEnter:function(e){e.currentTarget.style.background="rgba(255,255,255,0.02)";},
+                onMouseLeave:function(e){e.currentTarget.style.background="transparent";}
+              },
+                React.createElement("div",{style:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:28}},
+                  React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#334155",letterSpacing:2}},step.num),
+                  React.createElement("span",{style:{fontSize:28,color:step.color,opacity:0.6}},step.icon)
+                ),
+                React.createElement("h3",{style:{fontSize:18,fontWeight:800,color:"#f1f5f9",marginBottom:14,lineHeight:1.3}},step.title),
+                React.createElement("p",{style:{fontSize:14,color:"#64748b",lineHeight:1.8,margin:0}},step.desc),
+                React.createElement("div",{style:{position:"absolute",bottom:0,left:0,width:"100%",height:2,background:"linear-gradient(90deg,"+step.color+"44,transparent)"}}),
+                i < 2 && React.createElement("div",{style:{
+                  position:"absolute",
+                  right:-1,
+                  top:"50%",
+                  transform:"translateY(-50%)",
+                  width:1,
+                  height:"60%",
+                  background:"linear-gradient(180deg,transparent,"+BDR+",transparent)",
+                  zIndex:1
+                }})
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       <section id="features" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
         <div style={{maxWidth:1100,margin:"0 auto"}}>
           <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Everything you need to pass</h2>
