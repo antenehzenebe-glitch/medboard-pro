@@ -1,1012 +1,506 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>MedBoard Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',sans-serif;background:#0a0a0f;color:#f1f5f9}
-button,select,input{font-family:inherit}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+// generate-mcq.js — MedBoard Pro
+// Model: claude-haiku-4-5-20251001
+// Clean rebuild — no patches
 
-a{text-decoration:none}
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script type="text/babel">
-const SB_URL="https://vhzeeskhvkujihuvddcc.supabase.co";
-const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
-const sb=window.supabase.createClient(SB_URL,SB_KEY);
-const NAVY="#002868",GOLD="#C9A84C",BG="#0a0a0f",CARD="rgba(255,255,255,0.04)",BDR="#1e293b",SECS=90;
-const PORTAL_URL="https://billing.stripe.com/p/login/fZufZ9fDJ4NVbNM5iS2sM00";
-const PAYMENT_LINKS={
-  student:"https://buy.stripe.com/8x24gr9flcgn9FE4eO2sM03",
-  resident:"https://buy.stripe.com/8x228j0IPfszcRQ8v42sM04",
-  institution:"https://buy.stripe.com/cNidR19flbcjbNM5iS2sM05"
-};
-const PLANS=[
-  {key:"student",name:"Medical Student",price:29,period:"month",color:"#3B82F6",badge:null,
-    features:["USMLE Step 1, 2 & 3","500+ topics","AI clinical vignettes on demand","Official society guidelines","Study & exam modes"]},
-  {key:"resident",name:"Resident / Fellow",price:59,period:"month",color:"#8B5CF6",badge:"MOST POPULAR",
-    features:["Everything in Student","ABIM Internal Medicine","ABIM Endocrinology subspecialty","Timed exam mode","Progress tracking"]},
-  {key:"institution",name:"Institution",price:2999,period:"year",color:"#10B981",badge:"BEST VALUE",
-    features:["Up to 20 learner seats","Full access all content","ADA, ES, AACE, ACC/AHA, ESC","Personal onboarding","~$250/mo flat"]},
-];
-const GROUPS={
-  "Random":["Random -- All Specialties","Random -- Endocrinology Only","Random -- ABIM IM Blueprint","Random -- USMLE High-Yield"],
-  "Diabetes":["Type 2 Diagnosis and Management","Type 1 Insulin Therapy","DKA and HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA and MODY","CGM and AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
-  "Thyroid":["Hypothyroidism and Hashimotos","Hyperthyroidism and Graves","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
-  "Adrenal":["Adrenal Insufficiency","Cushings Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
-  "Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushings Disease"],
-  "Bone and Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Pagets Disease","Hypoparathyroidism"],
-  "Reproductive Endo":["PCOS","Male Hypogonadism","Menopause and HRT","Precocious Puberty","Turner and Klinefelter"],
-  "NETs and MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A and MEN2B"],
-  "Cardiology":["ACS STEMI NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
-  "Pulmonology":["Asthma and COPD","Pneumonia","Interstitial Lung Disease","ARDS","Sleep Apnea","Pulmonary Function Tests"],
-  "Nephrology":["Acute Kidney Injury","CKD","Glomerulonephritis","Electrolyte Disorders","Acid-Base Disorders","Nephrotic Syndrome"],
-  "GI and Hepatology":["IBD Crohns and UC","Cirrhosis","Hepatitis B and C","GI Bleeding","Acute Pancreatitis","NAFLD NASH"],
-  "Neurology":["Ischemic Stroke","Seizures and Epilepsy","Multiple Sclerosis","Meningitis","Parkinsons Disease","Headache"],
-  "Infectious Disease":["Sepsis and Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
-  "Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT and Anticoagulation","Leukemia and Lymphoma","Multiple Myeloma"],
-  "Rheumatology":["Rheumatoid Arthritis","SLE","Gout and Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
-  "Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
-  "Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
-};
-const LEVELS=[
-  {l:"USMLE Step 1",v:"USMLE Step 1 (M2 basic science and pathophysiology)"},
-  {l:"USMLE Step 2 CK",v:"USMLE Step 2 CK (M3/M4 clinical decision-making)"},
-  {l:"USMLE Step 3",v:"USMLE Step 3 (PGY-1/2 clinical management -- MCQ only)"},
-  {l:"ABIM Internal Medicine",v:"ABIM Internal Medicine boards (residents)"},
-  {l:"ABIM Endocrinology",v:"ABIM Endocrinology and Metabolism subspecialty (fellows)"},
-];
-const GUIDES=[
-  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"D",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
-  {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"E",u:"https://www.endocrine.org/clinical-practice-guidelines"},
-  {id:3,t:"AACE Clinical Guidance",s:"Endocrinology",i:"A",u:"https://pro.aace.com/clinical-guidance"},
-  {id:4,t:"ACC/AHA Cardiovascular Guidelines",s:"Cardiology",i:"C",u:"https://www.acc.org/guidelines"},
-  {id:5,t:"KDIGO Kidney Disease Guidelines",s:"Nephrology",i:"K",u:"https://kdigo.org/guidelines"},
-  {id:6,t:"USPSTF Preventive Recommendations",s:"Preventive",i:"U",u:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
-  {id:7,t:"ESC Cardiovascular Guidelines",s:"Cardiology",i:"S",u:"https://www.escardio.org/Guidelines"},
-  {id:8,t:"EASD Diabetes Guidelines",s:"Endocrinology",i:"X",u:"https://www.easd.org/guidelines/statements-and-guidelines.html"},
-  {id:9,t:"IDSA Infectious Disease Guidelines",s:"ID",i:"I",u:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
-  {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"N",u:"https://www.nccn.org/guidelines/guidelines-detail"},
-  {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"R",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
-  {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"P",u:"https://www.thoracic.org/statements"},
-  {id:13,t:"American Thyroid Association Guidelines",s:"Endocrinology",i:"T",u:"https://www.thyroid.org/professionals/ata-professional-guidelines"},
-  {id:14,t:"National Osteoporosis Foundation Guidelines",s:"Bone",i:"B",u:"https://www.bonehealthandosteoporosis.org/clinicians/guidelines"},
-  {id:15,t:"NEJM Image Challenge",s:"Visual Dx",i:"N",u:"https://www.nejm.org/image-challenge"},
-  {id:16,t:"ECG Wave-Maven — Harvard/BIDMC",s:"Cardiology",i:"E",u:"http://ecg.bidmc.harvard.edu"},
-];
-const FAQS=[
-  {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE -- Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
-  {q:"What exams does it cover?",a:"USMLE Step 1, Step 2 CK, and Step 3, ABIM Internal Medicine boards, and ABIM Endocrinology and Metabolism subspecialty boards."},
-  {q:"How is it different from UWorld or Amboss?",a:"MedBoard Pro offers unmatched endocrinology depth, AI-generated vignettes on demand across 500+ topics, and guidelines from 20+ US and European societies -- built by a fellowship program director."},
-  {q:"Which guidelines are used?",a:"ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European societies."},
-  {q:"Is there a free trial?",a:"Yes -- 14-day free trial. A credit card is required but you will not be charged until Day 15. Cancel anytime before then at no charge."},
-  {q:"Can I cancel anytime?",a:"Absolutely. Cancel any time with no penalties or hidden fees."},
-];
-const TOS_SECTIONS=[
-  {t:"1. Acceptance of Terms",b:"By accessing or using MedBoard Pro, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform."},
-  {t:"2. Subscription and Payment",b:"MedBoard Pro offers paid subscription plans with a 14-day free trial. Your credit card will not be charged until Day 15. Subscriptions auto-renew. Cancel anytime via the Manage Subscription portal. All payments processed by Stripe."},
-  {t:"3. Cancellation Policy",b:"You may cancel anytime with no penalties. Cancellation takes effect at end of current billing period. No refunds for partial periods. To cancel, click Manage Subscription inside the app or email antenehzenebe@gmail.com."},
-  {t:"4. Intellectual Property",b:"All content on MedBoard Pro including MCQ questions, explanations, curriculum design, and study manuals is the intellectual property of Dr. Anteneh Zenebe, MD, FACE, protected by US copyright law. Use is for personal board preparation only."},
-  {t:"5. No Medical Advice",b:"MedBoard Pro is an educational platform for board exam preparation only. Content does not constitute medical advice, diagnosis, or treatment. Do not use as a substitute for professional medical judgment."},
-  {t:"6. No Real Patient Data",b:"MedBoard Pro does not use, store, or display any real patient data. All clinical vignettes are entirely fictional and AI-generated for educational purposes."},
-  {t:"7. Acceptable Use",b:"You agree to use MedBoard Pro solely for lawful personal educational purposes. You may not share credentials, resell access, or scrape content. Violations result in immediate termination without refund."},
-  {t:"8. Disclaimer of Warranties",b:"MedBoard Pro is provided as-is without warranties of any kind. We do not guarantee the platform will be error-free or that it will result in passing any board examination."},
-  {t:"9. Limitation of Liability",b:"To the maximum extent permitted by law, MedBoard Pro and Dr. Anteneh Zenebe shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform."},
-  {t:"10. Governing Law",b:"These Terms are governed by the laws of the District of Columbia, United States of America."},
-  {t:"11. Changes to Terms",b:"We reserve the right to modify these terms at any time. Continued use after changes constitutes acceptance."},
-  {t:"12. Contact",b:"Dr. Anteneh Zenebe, MD, FACE -- antenehzenebe@gmail.com -- Howard University College of Medicine, Washington, DC."},
-];
-const PRIVACY_SECTIONS=[
-  {t:"1. Information We Collect",b:"MedBoard Pro collects only your email address and full name when you create an account, and subscription status managed by Stripe. We do not collect your credit card number."},
-  {t:"2. How We Use Your Information",b:"Your email is used to manage your account, send subscription receipts via Stripe, and communicate platform updates. We do not use your information for advertising or third-party marketing."},
-  {t:"3. Payment Processing",b:"All payment processing is handled by Stripe, Inc. MedBoard Pro never sees, stores, or has access to your credit card details. Stripe is PCI-DSS Level 1 certified."},
-  {t:"4. Data Storage",b:"Your account data is stored securely using Supabase, a SOC 2 Type II certified cloud database provider. Data is encrypted at rest and in transit."},
-  {t:"5. No Data Selling",b:"MedBoard Pro does not sell, rent, trade, or transfer your personal information to any third party for commercial purposes."},
-  {t:"6. No Real Patient Data",b:"MedBoard Pro does not process any real patient health information. All clinical content is fictional and AI-generated for educational purposes."},
-  {t:"7. Cookies",b:"MedBoard Pro uses only essential session cookies required to maintain your login state. We do not use tracking or advertising cookies."},
-  {t:"8. GDPR Rights",b:"EU users have the right to access, correct, or delete personal data and the right to data portability. Contact antenehzenebe@gmail.com. We will respond within 30 days."},
-  {t:"9. CCPA Rights",b:"California residents have the right to know what personal information is collected and the right to delete it. MedBoard Pro does not sell personal information."},
-  {t:"10. Data Security",b:"We implement appropriate technical and organizational measures to protect your personal information against unauthorized access or disclosure."},
-  {t:"11. Children's Privacy",b:"MedBoard Pro is designed for medical students, residents, and physicians. We do not knowingly collect information from anyone under 18."},
-  {t:"12. Changes to This Policy",b:"We may update this Privacy Policy periodically. We will notify you of material changes by email."},
-  {t:"13. Contact Us",b:"Dr. Anteneh Zenebe, MD, FACE -- antenehzenebe@gmail.com -- Howard University College of Medicine, Washington, DC 20060."},
-];
-function LabPanel(){
-  const [labTab,setLabTab]=React.useState("labs");
-  const [openCat,setOpenCat]=React.useState(null);
-  const LAB_DATA=[
-    {cat:"Chemistry",color:"#3B82F6",labs:[
-      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},{n:"Chloride",v:"98-106 mEq/L"},
-      {n:"Bicarbonate",v:"22-29 mEq/L"},{n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
-      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose fasting",v:"70-99 mg/dL"},{n:"Calcium total",v:"8.5-10.5 mg/dL"},
-      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},{n:"Albumin",v:"3.5-5.0 g/dL"},
-      {n:"ALT",v:"7-56 U/L"},{n:"AST",v:"10-40 U/L"},{n:"Alk Phos",v:"44-147 U/L"},
-      {n:"Total Bilirubin",v:"0.1-1.2 mg/dL"},{n:"Troponin I",v:"<0.04 ng/mL"},{n:"BNP",v:"<100 pg/mL"},
-      {n:"CRP",v:"<1.0 mg/L"},{n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Serum Osmolality",v:"275-295 mOsm/kg"},
-      {n:"Anion Gap",v:"8-12 mEq/L"},{n:"Ferritin male",v:"24-336 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
-    ]},
-    {cat:"Hematology",color:"#EF4444",labs:[
-      {n:"WBC",v:"4500-11000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},{n:"Hgb female",v:"12.0-15.5 g/dL"},
-      {n:"Hct male",v:"41-53%"},{n:"MCV",v:"80-100 fL"},{n:"Platelets",v:"150-400k/uL"},
-      {n:"Neutrophils",v:"50-70%"},{n:"Lymphocytes",v:"20-40%"},{n:"PT",v:"11-13.5 sec"},
-      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},{n:"D-dimer",v:"<0.5 ug/mL"},
-      {n:"Fibrinogen",v:"200-400 mg/dL"},{n:"Haptoglobin",v:"30-200 mg/dL"},
-    ]},
-    {cat:"Endocrinology",color:"#C9A84C",labs:[
-      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},{n:"Free T3",v:"2.3-4.2 pg/mL"},
-      {n:"HbA1c normal",v:"<5.7%"},{n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0%"},
-      {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
-      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},{n:"UFC 24hr",v:"<50 ug/24hr"},
-      {n:"LDDST post dex",v:"<1.8 ug/dL"},{n:"Aldosterone upright",v:"4-31 ng/dL"},
-      {n:"Plasma metanephrines",v:"<0.5 nmol/L"},{n:"PTH intact",v:"10-65 pg/mL"},
-      {n:"25-OH Vit D",v:"30-100 ng/mL"},{n:"Prolactin male",v:"2-18 ng/mL"},
-      {n:"IGF-1 adult 20-40yr",v:"115-355 ng/mL"},{n:"Testosterone male",v:"300-1000 ng/dL"},
-      {n:"LH male",v:"1.7-8.6 IU/L"},{n:"FSH male",v:"1.5-12.4 IU/L"},
-    ]},
-    {cat:"Lipidology",color:"#10B981",labs:[
-      {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL optimal",v:"<100 mg/dL"},
-      {n:"LDL high risk",v:"<70 mg/dL"},{n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
-      {n:"TG normal",v:"<150 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},{n:"Non-HDL target",v:"<130 mg/dL"},
-      {n:"Apo B",v:"<90 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL"},
-    ]},
-    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
-      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},{n:"PaO2",v:"75-100 mmHg"},
-      {n:"HCO3",v:"22-26 mEq/L"},{n:"O2 sat",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
-      {n:"Anion gap",v:"8-12 mEq/L"},{n:"P/F normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
-    ]},
-    {cat:"Rheumatology",color:"#F59E0B",labs:[
-      {n:"ANA screening",v:"<1:40 negative"},{n:"Anti-dsDNA",v:"<30 IU/mL"},
-      {n:"RF IgM",v:"<14 IU/mL"},{n:"Anti-CCP",v:"<20 U/mL"},
-      {n:"C3 complement",v:"90-180 mg/dL"},{n:"C4 complement",v:"16-47 mg/dL"},
-      {n:"Uric acid gout target",v:"<6.0 mg/dL"},
-    ]},
-    {cat:"CSF",color:"#14B8A6",labs:[
-      {n:"Opening pressure",v:"70-180 mmH2O"},{n:"WBC",v:"0-5 cells/uL"},
-      {n:"Protein",v:"15-45 mg/dL"},{n:"Glucose",v:"45-80 mg/dL"},
-      {n:"CSF:serum glucose",v:">0.6"},
-    ]},
-  ];
-  const CALCS=[
-    {n:"Anion Gap",f:"Na - (Cl + HCO3)",v:"Normal 8-12 mEq/L",note:"Corrected AG = AG + 2.5 x (4 - albumin)"},
-    {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL",note:"Add 0.8 per 1 g/dL drop in albumin below 4"},
-    {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose-100)/100]",v:"Normal 136-145 mEq/L",note:"For hyperglycemia correction"},
-    {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese"},
-    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics"},
-    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols"},
-    {n:"Winters Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation"},
-    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg"},
-    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = non-AG acidosis; >2 = met alkalosis"},
-    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant"},
-    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate"},
-    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk"},
-    {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high"},
-    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpt / 2 admit / >=3 ICU"},
-    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 increase = organ dysfunction"},
-    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk"},
-    {n:"Corrected QTc",f:"QT / sqrt(RR in seconds)",v:"<440ms male / <460ms female",note:">500ms = high risk Torsades"},
-    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9"},
-    {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference"},
-    {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal",note:"ARDS: mild 200-300 / mod 100-200 / severe <100"},
-  ];
-  return(
-    React.createElement("div",{style:{marginTop:12}},
-      React.createElement("div",{style:{height:1,background:BDR,marginBottom:12}}),
-      React.createElement("div",{style:{display:"flex",gap:4,marginBottom:10}},
-        React.createElement("button",{onClick:function(){setLabTab("labs");},style:{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}},"Labs"),
-        React.createElement("button",{onClick:function(){setLabTab("calcs");},style:{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}},"Calcs")
-      ),
-      labTab==="labs"&&React.createElement("div",null,
-        LAB_DATA.map(function(section){
-          return React.createElement("div",{key:section.cat,style:{marginBottom:4}},
-            React.createElement("button",{onClick:function(){setOpenCat(openCat===section.cat?null:section.cat);},style:{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}},
-              React.createElement("span",null,section.cat),React.createElement("span",{style:{fontSize:9}},openCat===section.cat?"hide":"show")
-            ),
-            openCat===section.cat&&React.createElement("div",{style:{padding:"4px 0",maxHeight:240,overflowY:"auto"}},
-              section.labs.map(function(lab){
-                return React.createElement("div",{key:lab.n,style:{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}},
-                  React.createElement("span",{style:{fontSize:11,color:"#e2e8f0",flex:1}},lab.n),
-                  React.createElement("span",{style:{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}},lab.v)
-                );
-              })
-            )
-          );
-        })
-      ),
-      labTab==="calcs"&&React.createElement("div",{style:{maxHeight:440,overflowY:"auto"}},
-        CALCS.map(function(c){
-          return React.createElement("div",{key:c.n,style:{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}},
-            React.createElement("p",{style:{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}},c.n),
-            React.createElement("p",{style:{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}},c.f),
-            React.createElement("p",{style:{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}},c.v),
-            c.note&&React.createElement("p",{style:{fontSize:10,color:"#cbd5e1",lineHeight:1.3}},c.note)
-          );
-        })
-      )
-    )
-  );
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+async function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
-function App(){
-  const [screen,setScreen]=React.useState("landing");
-  const [user,setUser]=React.useState(null);
-  const [authLoading,setAuthLoading]=React.useState(true);
-  const [email,setEmail]=React.useState("");
-  const [pw,setPw]=React.useState("");
-  const [nm,setNm]=React.useState("");
-  const [authErr,setAuthErr]=React.useState("");
-  const [authBusy,setAuthBusy]=React.useState(false);
-  const [fromStripe,setFromStripe]=React.useState(false);
-  const [tab,setTab]=React.useState("mcq");
-  const [annual,setAnnual]=React.useState(false);
-  const [openFaq,setOpenFaq]=React.useState(null);
-  const [showTos,setShowTos]=React.useState(false);
-  const [showPrivacy,setShowPrivacy]=React.useState(false);
-  const [grp,setGrp]=React.useState("Random");
-  const [topic,setTopic]=React.useState("Random -- All Specialties");
-  const [lvl,setLvl]=React.useState(LEVELS[3]);
-  const [examMode,setExamMode]=React.useState(false);
-  const [tLeft,setTLeft]=React.useState(null);
-  const [tActive,setTActive]=React.useState(false);
-  const [qs,setQs]=React.useState([]);
-  const [busy,setBusy]=React.useState(false);
-  const [mcqErr,setMcqErr]=React.useState("");
-  const [sel,setSel]=React.useState({});
-  const [rev,setRev]=React.useState({});
-  const [score,setScore]=React.useState({t:0,c:0,s:0});
-  const [qNum,setQNum]=React.useState(0);
-  const [sidebarOpen,setSidebarOpen]=React.useState(false);
 
-  const tRef=React.useRef(null);
+async function callClaude(systemText, userText) {
+  var maxRetries = 3;
+  var retryDelays = [800, 1500, 2500];
+  var entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
+  var finalUserText = userText + "\n\n[Seed: " + entropySeed + " - Generate a completely unique vignette.]";
 
-  // Keyboard shortcut: N = next question, Enter = submit answer
-  React.useEffect(function(){
-    function handleKey(e){
-      if(e.key==="n"||e.key==="N"){
-        var answered=rev&&rev[0];
-        if(answered&&!busy)nextQuestion();
-      }
-      if(e.key==="Enter"){
-        var answered=rev&&rev[0];
-        var selected=sel&&sel[0];
-        if(!answered&&selected)reveal(0);
-      }
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) await sleep(retryDelays[attempt - 1]);
+
+    var response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1100,
+        temperature: 0.7,
+        system: systemText,
+        messages: [{ role: "user", content: finalUserText }]
+      })
+    });
+
+    if (response.status === 529 || response.status === 503 || response.status === 502) {
+      if (attempt === maxRetries - 1) throw new Error("API busy. Please try again.");
+      continue;
     }
-    window.addEventListener("keydown",handleKey);
-    return function(){window.removeEventListener("keydown",handleKey);};
-  },[rev,sel,busy,qs]);
 
-  React.useEffect(function(){
-    var params=new URLSearchParams(window.location.search);
-    if(params.get("subscribed")==="true"){setFromStripe(true);setScreen("auth");window.history.replaceState({},"","/");}
-    sb.auth.getSession().then(function(res){
-      if(res.data.session&&res.data.session.user){setUser(res.data.session.user);setScreen("app");}
-      setAuthLoading(false);
-    }).catch(function(){setAuthLoading(false);});
-    var sub=sb.auth.onAuthStateChange(function(_,session){
-      if(session&&session.user){setUser(session.user);setScreen("app");}
-      else setUser(null);
-    });
-    return function(){sub.data.subscription.unsubscribe();};
-  },[]);
+    if (!response.ok) {
+      var err = await response.text();
+      throw new Error("API error " + response.status + ": " + err);
+    }
 
-  function login(){
-    setAuthErr("");setAuthBusy(true);
-    sb.auth.signInWithPassword({email:email,password:pw}).then(function(res){
-      if(res.error)setAuthErr(res.error.message);
-      else{setScreen("app");setTab("mcq");}
-      setAuthBusy(false);
-    });
+    var data = await response.json();
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      throw new Error("Unexpected API response format");
+    }
+    return data.content[0].text;
   }
-  function signup(){
-    setAuthErr("");setAuthBusy(true);
-    if(pw.length<8){setAuthErr("Password must be at least 8 characters");setAuthBusy(false);return;}
-    sb.auth.signUp({email:email,password:pw,options:{data:{full_name:nm}}}).then(function(res){
-      if(res.error)setAuthErr(res.error.message);
-      else setAuthErr("Check your email to confirm your account, then sign in!");
-      setAuthBusy(false);
-    });
-  }
-  function googleLogin(){sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:"https://medboardpro.org"}});}
-  function logout(){
-    sb.auth.signOut();setUser(null);setScreen("landing");
-    setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});setQNum(0);
-  }
-  function getPrice(p){return p.period==="year"?p.price:annual?Math.round(p.price*0.8):p.price;}
-  function fmtT(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
-  function stopT(){clearInterval(tRef.current);setTActive(false);}
-  function revealAll(questions){setRev(function(p){var n=Object.assign({},p);questions.forEach(function(_,i){n[i]=true;});return n;});}
-  function startT(total,questions){
-    setTLeft(total*SECS);setTActive(true);
-    tRef.current=setInterval(function(){
-      setTLeft(function(t){
-        if(t<=1){clearInterval(tRef.current);setTActive(false);revealAll(questions);return 0;}
-        return t-1;
-      });
-    },1000);
-  }
-  const [revealText,setRevealText]=React.useState("");
-
-  async function generate(){
-    stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);setRevealText("");
-    fetch("/.netlify/functions/generate-mcq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic:topic,level:lvl.v,count:1})})
-    .then(function(res){
-      if(!res.ok)return res.json().then(function(e){throw new Error(e.error||"Server error "+res.status);});
-      return res.json();
-    })
-    .then(function(data){
-      if(!Array.isArray(data))throw new Error("Invalid response");
-      setBusy(false);
-      var words=data[0].stem.split(" ");
-      var i=0;
-      setRevealText("");
-      var timer=setInterval(function(){
-        if(i>=words.length){
-          clearInterval(timer);
-          setQs(data);
-          setRevealText("");
-          setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
-          if(examMode)startT(data.length,data);
-          return;
-        }
-        setRevealText(function(t){return t+(i===0?"": " ")+words[i];});
-        i++;
-      },20);
-    })
-    .catch(function(e){setMcqErr("Failed to generate questions: "+e.message);setBusy(false);});
-  }
-
-
-  function nextQuestion(){setQNum(function(n){return n+1;});generate();}
-  function reveal(i){
-    if(!sel[i]||!qs[i])return;
-    var ok=sel[i]===qs[i].correct;
-    setRev(function(p){var n=Object.assign({},p);n[i]=true;return n;});
-    setScore(function(s){return{t:s.t+1,c:s.c+(ok?1:0),s:s.s};});
-  }
-
-  function qColor(i,l){
-    if(!qs[i])return"transparent";
-    if(!rev[i])return sel[i]===l?GOLD:"transparent";
-    if(l===qs[i].correct)return"#10b981";
-    if(sel[i]===l)return"#ef4444";
-    return"transparent";
-  }
-  var uname=user&&user.user_metadata&&user.user_metadata.full_name?user.user_metadata.full_name:user&&user.email?user.email.split("@")[0]:"Doctor";
-
-  function NB(props){
-    return React.createElement("button",{
-      onClick:function(){setTab(props.id);},
-      style:{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",border:"none",borderRadius:8,cursor:"pointer",background:tab===props.id?"rgba(201,168,76,0.12)":"transparent",borderBottom:tab===props.id?"2px solid "+GOLD:"2px solid transparent",color:tab===props.id?GOLD:"#94a3b8",fontWeight:700,fontSize:12,minWidth:52}
-    },React.createElement("span",{style:{fontSize:18}},props.icon),props.label);
-  }
-
-  if(showTos)return React.createElement("div",{style:{background:BG,minHeight:"100vh",padding:"40px 5%"}},
-    React.createElement("div",{style:{maxWidth:800,margin:"0 auto"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}},
-        React.createElement("span",{style:{fontWeight:700,fontSize:18,color:"#f1f5f9"}},"MedBoard Pro"),
-        React.createElement("button",{onClick:function(){setShowTos(false);},style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer"}},"Back")
-      ),
-      React.createElement("h1",{style:{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}},"Terms of Service"),
-      React.createElement("p",{style:{color:"#64748b",fontSize:13,marginBottom:32}},"Last updated: April 1, 2026"),
-      TOS_SECTIONS.map(function(s){return React.createElement("div",{key:s.t,style:{marginBottom:24}},
-        React.createElement("h3",{style:{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}},s.t),
-        React.createElement("p",{style:{color:"#94a3b8",lineHeight:1.8,fontSize:14}},s.b)
-      );})
-    )
-  );
-
-  if(showPrivacy)return React.createElement("div",{style:{background:BG,minHeight:"100vh",padding:"40px 5%"}},
-    React.createElement("div",{style:{maxWidth:800,margin:"0 auto"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}},
-        React.createElement("span",{style:{fontWeight:700,fontSize:18,color:"#f1f5f9"}},"MedBoard Pro"),
-        React.createElement("button",{onClick:function(){setShowPrivacy(false);},style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer"}},"Back")
-      ),
-      React.createElement("h1",{style:{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}},"Privacy Policy"),
-      React.createElement("p",{style:{color:"#64748b",fontSize:13,marginBottom:32}},"Last updated: April 1, 2026"),
-      PRIVACY_SECTIONS.map(function(s){return React.createElement("div",{key:s.t,style:{marginBottom:24}},
-        React.createElement("h3",{style:{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}},s.t),
-        React.createElement("p",{style:{color:"#94a3b8",lineHeight:1.8,fontSize:14}},s.b)
-      );})
-    )
-  );
-
-  if(authLoading)return React.createElement("div",{style:{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}},
-    React.createElement("div",{style:{textAlign:"center"}},
-      React.createElement("div",{style:{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 14px"}},"M"),
-      React.createElement("p",{style:{color:"#475569",fontSize:14}},"Loading MedBoard Pro...")
-    )
-  );
-
-  if(screen==="landing")return(
-    <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(10,10,15,0.93)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 5%"}}>
-        <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:64,gap:8,flexWrap:"wrap"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
-            <span style={{fontWeight:700,fontSize:18,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>{setScreen("auth");}}
-              style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
-              Subscriber Sign In
-            </button>
-            <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-              style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
-              View Plans
-            </button>
-          </div>
-        </div>
-      </nav>
-      <section style={{textAlign:"center",padding:"100px 5% 80px"}}>
-        <h1 style={{fontSize:"clamp(30px,5vw,58px)",fontWeight:800,lineHeight:1.1,maxWidth:820,margin:"0 auto 20px",color:"#f1f5f9"}}>
-          Board Prep That Actually <span style={{color:GOLD}}>Understands Medicine</span>
-        </h1>
-        <p style={{fontSize:17,color:"#94a3b8",maxWidth:640,margin:"0 auto 12px",lineHeight:1.7}}>
-          USMLE Step 1, 2 and 3 · ABIM Internal Medicine · ABIM Endocrinology Subspecialty
-        </p>
-        <p style={{fontSize:15,color:"#64748b",maxWidth:640,margin:"0 auto 40px",lineHeight:1.7}}>
-          Built by <strong style={{color:"#e2e8f0"}}>Dr. Anteneh Zenebe, MD, FACE</strong> -- Assistant Clinical Professor and Associate Program Director, Howard University College of Medicine
-        </p>
-        <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:14}}>
-          <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-            style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16}}>
-            Start 14-Day Free Trial
-          </button>
-          <button onClick={()=>setScreen("auth")}
-            style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:16}}>
-            Subscriber Sign In
-          </button>
-        </div>
-        <p style={{color:"#475569",fontSize:13}}>Credit card required · No charge until Day 15 · Cancel anytime</p>
-      </section>
-      <section style={{padding:"80px 5%"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <div style={{textAlign:"center",marginBottom:56}}>
-            <p style={{fontSize:12,fontWeight:700,color:GOLD,letterSpacing:3,textTransform:"uppercase",marginBottom:12}}>Simple by design</p>
-            <h2 style={{fontSize:34,fontWeight:800,color:"#f1f5f9",margin:0}}>How MedBoard Pro Works</h2>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:0,position:"relative"}}>
-            {[
-              {
-                num:"01",
-                icon:"◎",
-                title:"Choose Your Exam",
-                desc:"Select from USMLE Step 1, Step 2 CK, Step 3, ABIM Internal Medicine, or ABIM Endocrinology and Metabolism subspecialty. Every question is weighted to the real exam blueprint.",
-                color:"#6366f1"
-              },
-              {
-                num:"02",
-                icon:"◈",
-                title:"Receive a Fresh Question",
-                desc:"A unique board-quality clinical vignette — written to NBME and ABIM item-writing standards — with a real patient, real labs, and real clinical decisions. Never the same question twice.",
-                color:GOLD
-              },
-              {
-                num:"03",
-                icon:"◉",
-                title:"Learn from Every Answer",
-                desc:"Instant feedback with the correct answer, guideline citations from ADA, ATA, ACC/AHA, Endocrine Society and 20+ societies, cognitive error analysis, and a board pearl from a fellowship program director.",
-                color:"#10b981"
-              }
-            ].map(function(step, i){
-              return React.createElement("div",{
-                key:step.num,
-                style:{
-                  padding:"40px 36px",
-                  borderTop:"1px solid "+BDR,
-                  borderBottom:"1px solid "+BDR,
-                  borderLeft:"1px solid "+BDR,
-                  borderRight: i===2 ? "1px solid "+BDR : "none",
-                  position:"relative",
-                  background:"transparent",
-                  transition:"background 0.3s"
-                },
-                onMouseEnter:function(e){e.currentTarget.style.background="rgba(255,255,255,0.02)";},
-                onMouseLeave:function(e){e.currentTarget.style.background="transparent";}
-              },
-                React.createElement("div",{style:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:28}},
-                  React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#334155",letterSpacing:2}},step.num),
-                  React.createElement("span",{style:{fontSize:28,color:step.color,opacity:0.6}},step.icon)
-                ),
-                React.createElement("h3",{style:{fontSize:18,fontWeight:800,color:"#f1f5f9",marginBottom:14,lineHeight:1.3}},step.title),
-                React.createElement("p",{style:{fontSize:14,color:"#64748b",lineHeight:1.8,margin:0}},step.desc),
-                React.createElement("div",{style:{position:"absolute",bottom:0,left:0,width:"100%",height:2,background:"linear-gradient(90deg,"+step.color+"44,transparent)"}}),
-                i < 2 && React.createElement("div",{style:{
-                  position:"absolute",
-                  right:-1,
-                  top:"50%",
-                  transform:"translateY(-50%)",
-                  width:1,
-                  height:"60%",
-                  background:"linear-gradient(180deg,transparent,"+BDR+",transparent)",
-                  zIndex:1
-                }})
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section id="features" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Everything you need to pass</h2>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:20}}>
-            {[
-              {icon:"T",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 and 3. Fresh clinical vignettes on demand."},
-              {icon:"E",title:"Study and Exam Modes",desc:"Study mode gives instant feedback. Exam mode runs 90 seconds per question with a live countdown timer."},
-              {icon:"G",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US and European societies."},
-              {icon:"R",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines including ADA, Endocrine Society, AACE, ACC/AHA and more."},
-              {icon:"L",title:"Lab and Calc Reference",desc:"Comprehensive lab reference values and 20 medical calculations built into the question sidebar."},
-
-            ].map(f=>(
-              <div key={f.title} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:26}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                <div style={{width:40,height:40,borderRadius:8,background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:GOLD,marginBottom:14,fontSize:16}}>{f.icon}</div>
-                <h3 style={{fontWeight:700,marginBottom:8,fontSize:16,color:"#f1f5f9"}}>{f.title}</h3>
-                <p style={{color:"#64748b",lineHeight:1.6,fontSize:14}}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section id="about" style={{padding:"80px 5%"}}>
-        <div style={{maxWidth:900,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>About the Founder</h2>
-          <div style={{background:CARD,border:"1px solid #6366f1",borderRadius:16,padding:32,display:"flex",gap:28,flexWrap:"wrap"}}>
-            <div style={{width:90,height:90,borderRadius:"50%",background:"linear-gradient(135deg,"+NAVY+",#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:800,color:"#fff",flexShrink:0}}>AZ</div>
-            <div style={{flex:1,minWidth:260}}>
-              <h3 style={{fontSize:22,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Anteneh Zenebe, MD, FACE</h3>
-              <p style={{color:"#8b5cf6",fontWeight:600,marginBottom:14,fontSize:14}}>Assistant Clinical Professor · Associate Program Director<br/>Endocrinology Fellowship · Howard University College of Medicine</p>
-              <p style={{color:"#94a3b8",lineHeight:1.8,fontSize:15}}>Board-certified endocrinologist and Fellow of the American College of Endocrinology. Dedicated to training physicians who serve underserved communities at Howard University.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section id="pricing" style={{padding:"80px 5%"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:20,color:"#f1f5f9"}}>Simple, transparent pricing</h2>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:40}}>
-            <div style={{display:"inline-flex",alignItems:"center",gap:12,background:"#1e293b",borderRadius:30,padding:"6px 16px"}}>
-              <span style={{fontSize:14,color:annual?"#475569":"#f1f5f9"}}>Monthly</span>
-              <div onClick={()=>setAnnual(!annual)} style={{width:44,height:24,borderRadius:12,background:annual?"#6366f1":"#334155",cursor:"pointer",position:"relative"}}>
-                <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:annual?23:3,transition:"left 0.3s"}}/>
-              </div>
-              <span style={{fontSize:14,color:annual?"#f1f5f9":"#475569"}}>Annual <span style={{color:"#10b981",fontWeight:700}}>-20%</span></span>
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
-            {PLANS.map(plan=>(
-              <div key={plan.key} style={{background:plan.badge==="MOST POPULAR"?"rgba(99,102,241,0.1)":"rgba(255,255,255,0.03)",border:"2px solid "+(plan.badge==="MOST POPULAR"?"#6366f1":BDR),borderRadius:20,padding:32,position:"relative",display:"flex",flexDirection:"column"}}>
-                {plan.badge&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:plan.badge==="MOST POPULAR"?"#6366f1":"#10b981",color:"#fff",fontSize:11,fontWeight:700,padding:"4px 14px",borderRadius:20}}>{plan.badge}</div>}
-                <div style={{color:plan.color,fontSize:13,fontWeight:600,marginBottom:8,textTransform:"uppercase"}}>{plan.name}</div>
-                <div style={{fontSize:44,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>${getPrice(plan).toLocaleString()}<span style={{fontSize:15,color:"#475569",fontWeight:400}}>/{plan.period}</span></div>
-                <ul style={{listStyle:"none",padding:0,margin:"20px 0",flex:1}}>
-                  {plan.features.map(f=>(
-                    <li key={f} style={{padding:"8px 0",fontSize:14,color:"#94a3b8",display:"flex",gap:10}}>
-                      <span style={{color:plan.color,flexShrink:0}}>v</span>{f}
-                    </li>
-                  ))}
-                </ul>
-                <button onClick={()=>window.location.href=PAYMENT_LINKS[plan.key]}
-                  style={{width:"100%",background:plan.badge==="MOST POPULAR"?"linear-gradient(135deg,#6366f1,#8b5cf6)":"transparent",border:plan.badge==="MOST POPULAR"?"none":"2px solid "+plan.color,color:plan.badge==="MOST POPULAR"?"#fff":plan.color,padding:14,borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                  Start 14-Day Free Trial
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section id="faq" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
-        <div style={{maxWidth:780,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Frequently Asked Questions</h2>
-          {FAQS.map((f,i)=>(
-            <div key={i} style={{borderBottom:"1px solid "+BDR}}>
-              <button onClick={()=>setOpenFaq(openFaq===i?null:i)}
-                style={{width:"100%",background:"none",border:"none",color:"#f1f5f9",textAlign:"left",padding:"20px 0",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:16,fontWeight:600,gap:16}}>
-                {f.q}<span style={{color:"#6366f1",fontSize:22,flexShrink:0}}>{openFaq===i?"-":"+"}</span>
-              </button>
-              {openFaq===i&&<p style={{color:"#94a3b8",lineHeight:1.8,paddingBottom:20,fontSize:15,margin:0}}>{f.a}</p>}
-            </div>
-          ))}
-        </div>
-      </section>
-      <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
-        <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE</div>
-        <div>{new Date().getFullYear()} MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
-        <div style={{marginTop:10,display:"flex",gap:20,justifyContent:"center"}}>
-          <span onClick={()=>setShowTos(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Terms of Service</span>
-          <span onClick={()=>setShowPrivacy(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Privacy Policy</span>
-        </div>
-      </footer>
-    </div>
-  );
-
-  if(screen==="auth")return(
-    <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{width:"100%",maxWidth:420}}>
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 12px"}}>M</div>
-          <h1 style={{fontSize:22,fontWeight:800,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></h1>
-          <p style={{color:"#475569",fontSize:13,marginTop:4}}>Board Prep Platform</p>
-        </div>
-        <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:20,padding:28}}>
-          {fromStripe&&(
-            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:10,padding:"12px 16px",marginBottom:20,textAlign:"center"}}>
-              <p style={{color:"#10b981",fontWeight:700,fontSize:14,marginBottom:4}}>Payment confirmed! Welcome to MedBoard Pro.</p>
-              <p style={{color:"#64748b",fontSize:12}}>Create your account below to access your 14-day free trial.</p>
-            </div>
-          )}
-          {!fromStripe&&(
-            <div style={{background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#94a3b8",lineHeight:1.7}}>
-              <p style={{fontWeight:700,color:"#818cf8",marginBottom:6}}>New subscriber?</p>
-              <p>After completing payment, return here and sign in with Google or create an account with your email and password.</p>
-              <p style={{marginTop:6}}>Need help? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span></p>
-            </div>
-          )}
-          <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
-            {fromStripe?"Step 2 -- Create Your Account":"Sign In to Your Account"}
-          </h2>
-          <button onClick={googleLogin}
-            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:4,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-            <span style={{fontWeight:800,color:"#4285f4",fontSize:16}}>G</span> Continue with Google
-          </button>
-          {!fromStripe&&<p style={{fontSize:11,color:"#f59e0b",marginBottom:14,textAlign:"center"}}>Only if your Google email matches your payment email</p>}
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
-            <div style={{flex:1,height:1,background:BDR}}/><span style={{color:"#334155",fontSize:12}}>or</span><div style={{flex:1,height:1,background:BDR}}/>
-          </div>
-          {fromStripe&&(
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>FULL NAME</label>
-              <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Dr. John Smith"
-                style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-            </div>
-          )}
-          <div style={{marginBottom:14}}>
-            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>EMAIL</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="doctor@hospital.com"
-              style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-            {!fromStripe&&<p style={{fontSize:11,color:"#f59e0b",marginTop:5}}>Use the same email you used for your Stripe payment</p>}
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>PASSWORD</label>
-            <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Minimum 8 characters"
-              style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          {authErr&&(
-            <div style={{background:authErr.startsWith("Check")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",border:"1px solid "+(authErr.startsWith("Check")?"#10b981":"#ef4444"),borderRadius:8,padding:"10px 13px",color:authErr.startsWith("Check")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>
-              {authErr}
-            </div>
-          )}
-          <button onClick={fromStripe?signup:login} disabled={authBusy}
-            style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
-            {authBusy?"Please wait...":fromStripe?"Create Account and Start Learning":"Sign In and Start Learning"}
-          </button>
-          {!fromStripe&&(
-            <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
-              New subscriber? <span onClick={()=>setScreen("landing")} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>View plans</span>
-            </p>
-          )}
-          {fromStripe&&(
-            <p style={{textAlign:"center",color:"#475569",fontSize:12,marginBottom:12}}>
-              Already have an account? <span onClick={()=>setFromStripe(false)} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>Sign In instead</span>
-            </p>
-          )}
-          <p style={{textAlign:"center"}}>
-            <span onClick={()=>setScreen("landing")} style={{color:"#334155",fontSize:12,cursor:"pointer"}}>Back to home</span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  return(
-    <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div onClick={()=>setTab("home")} style={{width:30,height:30,borderRadius:7,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD,cursor:"pointer"}}>M</div>
-            <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
-          </div>
-          <div style={{display:"flex",gap:2}}>
-            <NB id="home" label="Home" icon="H"/>
-            <NB id="mcq" label="MCQ Bank" icon="Q"/>
-            <NB id="guides" label="Guides" icon="G"/>
-            <NB id="progress" label="Progress" icon="P"/>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:12,fontWeight:600,color:"#f1f5f9"}}>{uname}</div>
-              <div style={{fontSize:10,color:"#475569"}}>{user&&user.email}</div>
-            </div>
-            <button onClick={()=>window.open(PORTAL_URL,"_blank")}
-              style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600}}>
-              Manage Plan
-            </button>
-            <button onClick={logout} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Sign Out</button>
-          </div>
-        </div>
-      </nav>
-      <div style={{padding:"18px 2%"}}>
-
-        {tab==="home"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {uname}!</h2>
-            <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Board Prep Dashboard</p>
-            <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid "+GOLD,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>Active</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Sessions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.s}</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Questions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.t}</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?Math.round(score.c/score.t*100)+"%":"--"}</div></div>
-              <button onClick={()=>window.open(PORTAL_URL,"_blank")}
-                style={{marginLeft:"auto",background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                Manage Subscription
-              </button>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
-              {[{icon:"Q",title:"MCQ Bank",desc:"Blueprint-aligned questions",id:"mcq",color:"#6366f1"},{icon:"G",title:"Guidelines",desc:"Official society resources",id:"guides",color:"#10b981"},{icon:"P",title:"My Progress",desc:"Track performance",id:"progress",color:"#f59e0b"}].map(a=>(
-                <div key={a.id} onClick={()=>{setTab(a.id);}}
-                  style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:16,cursor:"pointer"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                  <div style={{fontWeight:700,fontSize:13,color:a.color,marginBottom:2}}>{a.title}</div>
-                  <div style={{fontSize:11,color:"#475569"}}>{a.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="mcq"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>MCQ Bank</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Study or timed exam mode</p>
-            <div style={{display:"flex",gap:16,alignItems:"flex-start",flexDirection:"column"}}>
-              <button onClick={()=>setSidebarOpen(!sidebarOpen)}
-                style={{display:"flex",alignItems:"center",gap:8,background:CARD,border:"1px solid "+(sidebarOpen?GOLD:BDR),color:sidebarOpen?GOLD:"#94a3b8",padding:"8px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,width:"100%",justifyContent:"space-between"}}>
-                <span>⚙ {grp} — {topic} · {lvl.l}</span>
-                <span>{sidebarOpen?"▲ Hide":"▼ Options"}</span>
-              </button>
-              {sidebarOpen&&<div style={{width:"100%",background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,maxHeight:"60vh",overflowY:"auto"}}>
-                <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
-                {LEVELS.map(x=>(
-                  <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:7,border:"1px solid "+(lvl.l===x.l?GOLD:BDR),background:lvl.l===x.l?"rgba(201,168,76,0.1)":"transparent",color:lvl.l===x.l?GOLD:"#e2e8f0",fontSize:13,fontWeight:lvl.l===x.l?700:500,cursor:"pointer",marginBottom:5}}>
-                    {x.l}
-                  </button>
-                ))}
-                <div style={{height:1,background:BDR,margin:"14px 0"}}/>
-                <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:10,letterSpacing:1}}>SPECIALTY</p>
-                {Object.keys(GROUPS).map(g=>(
-                  <button key={g} onClick={()=>{setGrp(g);setTopic(GROUPS[g][0]);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"7px 12px",borderRadius:7,border:"1px solid "+(grp===g?GOLD:BDR),background:grp===g?"rgba(201,168,76,0.08)":"transparent",color:grp===g?GOLD:"#e2e8f0",fontSize:12,fontWeight:grp===g?700:500,cursor:"pointer",marginBottom:4}}>
-                    {g}
-                  </button>
-                ))}
-                {grp&&GROUPS[grp].length>1&&(
-                  <React.Fragment>
-                    <div style={{height:1,background:BDR,margin:"10px 0"}}/>
-                    <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8,letterSpacing:1}}>TOPIC</p>
-                    {GROUPS[grp].map(t=>(
-                      <button key={t} onClick={()=>{setTopic(t);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                        style={{width:"100%",textAlign:"left",padding:"6px 12px",borderRadius:6,border:"none",background:topic===t?"rgba(201,168,76,0.08)":"transparent",color:topic===t?GOLD:"#e2e8f0",fontSize:12,fontWeight:topic===t?700:500,cursor:"pointer",marginBottom:2}}>
-                        {t}
-                      </button>
-                    ))}
-                  </React.Fragment>
-                )}
-                <LabPanel/>
-              </div>}
-              <div style={{width:"100%"}}>
-                {revealText&&!busy&&qs.length===0&&(
-                  <div style={{background:CARD,border:"1px solid "+GOLD,borderRadius:13,padding:24,marginBottom:18}}>
-                    <p style={{fontSize:11,color:GOLD,fontWeight:700,margin:"0 0 10px",letterSpacing:1}}>GENERATING QUESTION</p>
-                    <p style={{color:"#e2e8f0",fontSize:15,lineHeight:1.9,margin:0}}>{revealText}<span style={{display:"inline-block",width:2,height:14,background:GOLD,marginLeft:3,animation:"pulse 0.7s infinite",verticalAlign:"middle"}}/></p>
-                  </div>
-                )}
-                {qs.length===0&&!busy&&!revealText&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,marginBottom:18}}>
-                    <div style={{display:"flex",gap:10,marginBottom:16}}>
-                      <button onClick={()=>setExamMode(false)}
-                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(!examMode?"#10b981":BDR),background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                        Study Mode
-                      </button>
-                      <button onClick={()=>setExamMode(true)}
-                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(examMode?"#ef4444":BDR),background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                        Exam Mode
-                      </button>
-                    </div>
-                    <div style={{background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:9,padding:"10px 14px",marginBottom:14}}>
-                      <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>Selected: <span style={{color:"#f1f5f9"}}>{grp} -- {topic}</span></p>
-                      <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Level: {lvl.l}</p>
-                    </div>
-                    <button onClick={generate} disabled={busy}
-                      style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"14px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                      {examMode?"Start Exam Mode":"Start Practicing"}
-                    </button>
-                  </div>
-                )}
-                {busy&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,textAlign:"center",marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                      <p style={{color:"#f1f5f9",fontSize:14,fontWeight:600,margin:0}}>Generating your question...</p>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:GOLD,animation:"pulse 1s infinite"}}/>
-                    </div>
-                  </div>
-                )}
-                {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
-                {score.t>0&&qs.length>0&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,color:"#64748b"}}>Answered: {score.t}</span>
-                    {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
-                    {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>{tLeft!==null?fmtT(tLeft):"--:--"}</span>}
-                    <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);setScore({t:0,c:0,s:0});}}
-                      style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700,marginLeft:"auto"}}>
-                      End Session
-                    </button>
-                  </div>
-                )}
-                {qs.length>0&&qs[0]&&!busy&&(()=>{
-                  try{
-                    var q=qs[0];var i=0;
-                    var answered=!!rev[i];
-                    var correct=answered&&sel[i]===q.correct;
-                    return(
-                      <div style={{background:CARD,border:"1px solid "+(rev[i]?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR),borderRadius:13,padding:24}}>
-                        <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                          <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum+1}</span>
-                          {answered&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
-                          {answered&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:correct?"#10b981":"#ef4444"}}>{correct?"Correct":"Incorrect"}</span>}
-                        </div>
-                        <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
-                        {q.showImageButton&&q.imageUrl&&!answered&&(
-                          <a href={q.imageUrl} target="_blank" rel="noopener noreferrer"
-                            style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,marginBottom:16,textDecoration:"none"}}>
-                            View Imaging Study on Radiopaedia
-                          </a>
-                        )}
-                        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-                          {Object.entries(q.choices).map(([l,t])=>(
-                            <button key={l} onClick={()=>{if(!answered)setSel(p=>({...p,[i]:l}));}}
-                              style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:answered?"default":"pointer",
-                                border:"1px solid "+(qColor(i,l)==="transparent"?BDR:qColor(i,l)),
-                                background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":qColor(i,l)+"22",
-                                color:answered&&l===q.correct?"#10b981":answered&&sel[i]===l?"#ef4444":"#cbd5e1",
-                                fontWeight:sel[i]===l?700:400,fontSize:14}}>
-                              <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
-                              {answered&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}> Correct answer</span>}
-                              {answered&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}> Your answer</span>}
-                            </button>
-                          ))}
-                        </div>
-                        {answered&&(
-                          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginBottom:16}}>
-                            <p style={{margin:"0 0 12px",fontSize:12,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}}>Attending Explanation</p>
-                            {q.explanation.split(/(?<=\.)\s+(?=[A-Z(])/).map(function(sentence,idx){return(
-                              React.createElement("p",{key:idx,style:{margin:"0 0 8px",color:"#e2e8f0",lineHeight:1.8,fontSize:14}},sentence)
-                            );})}
-                            <p style={{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}}>
-                              Always verify with current society guidelines. Inaccuracies? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span>
-                            </p>
-                            {q.imageUrl&&(
-                              <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+BDR}}>
-                                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Further Reading -- Reference Imaging</p>
-                                <a href={q.imageUrl} target="_blank" rel="noopener noreferrer"
-                                  style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>
-                                  View Reference Imaging on Radiopaedia
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                          {!answered?(
-                            <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                              <button onClick={()=>reveal(i)} disabled={!sel[i]}
-                                style={{background:sel[i]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[i]?GOLD:BDR),color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
-                                Submit Answer
-                              </button>
-                              {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}<span style={{fontSize:11,color:"#334155",marginLeft:8}}>Enter to submit</span>
-                            </div>
-                          ):(
-                            <button onClick={nextQuestion} disabled={busy}
-                              style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                              {busy?"Generating...":"Next Question (N)"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }catch(e){return React.createElement("div",{style:{color:"#ef4444",padding:20}},"Error displaying question. Click End Session and try again.");}
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab==="guides"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Official Guidelines</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Direct links to official society guidelines</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
-              {GUIDES.map(g=>(
-                <div key={g.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                  <div style={{width:36,height:36,borderRadius:8,background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:GOLD,fontSize:14}}>{g.i}</div>
-                  <div style={{fontWeight:700,fontSize:14,lineHeight:1.4,color:"#f1f5f9"}}>{g.t}</div>
-                  <span style={{background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",color:GOLD,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.s}</span>
-                  <a href={g.u} target="_blank" rel="noopener noreferrer"
-                    style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"9px",borderRadius:7,fontWeight:600,fontSize:12,textAlign:"center",display:"block",marginTop:"auto"}}>
-                    Open Official Guidelines
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="progress"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Your Progress</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Track your board prep performance</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:22}}>
-              {[{l:"Sessions",v:score.s,c:"#6366f1"},{l:"Questions",v:score.t,c:"#3b82f6"},{l:"Correct",v:score.c,c:"#10b981"},{l:"Accuracy",v:score.t>0?Math.round(score.c/score.t*100)+"%":"--",c:GOLD}].map(s=>(
-                <div key={s.l} style={{background:CARD,border:"1px solid "+s.c+"44",borderRadius:12,padding:18,textAlign:"center"}}>
-                  <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
-                  <div style={{fontSize:11,color:"#475569",marginTop:3}}>{s.l}</div>
-                </div>
-              ))}
-            </div>
-            {score.t===0?(
-              <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:36,textAlign:"center"}}>
-                <h3 style={{fontWeight:700,marginBottom:8,color:"#f1f5f9"}}>No questions answered yet</h3>
-                <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Start the MCQ Bank to begin tracking your progress!</p>
-                <button onClick={()=>setTab("mcq")} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 24px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Go to MCQ Bank</button>
-              </div>
-            ):(
-              <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:22}}>
-                <h3 style={{fontWeight:700,marginBottom:14,fontSize:15,color:"#f1f5f9"}}>Performance Summary</h3>
-                <div style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <span style={{fontSize:13,color:"#94a3b8"}}>Overall accuracy</span>
-                    <span style={{fontSize:13,fontWeight:700,color:GOLD}}>{Math.round(score.c/score.t*100)}%</span>
-                  </div>
-                  <div style={{height:10,background:"#1e293b",borderRadius:5,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:Math.round(score.c/score.t*100)+"%",background:"linear-gradient(90deg,"+NAVY+","+GOLD+")",borderRadius:5}}/>
-                  </div>
-                </div>
-                <p style={{color:"#475569",fontSize:13,lineHeight:1.6}}>
-                  {score.c/score.t>=0.8?"Excellent! You are well prepared for boards.":score.c/score.t>=0.6?"Good progress! Keep practicing your weak areas.":"Keep going! Consistent practice leads to board success."}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-      </div>
-      <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:"1px solid "+BDR}}>
-        MedBoard Pro · Anteneh Zenebe, MD, FACE · antenehzenebe@gmail.com
-        <div style={{marginTop:8,display:"flex",gap:16,justifyContent:"center"}}>
-          <span onClick={()=>setShowTos(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
-          <span onClick={()=>setShowPrivacy(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
-</script>
-</body>
-</html>
+// ─── BLUEPRINTS ───────────────────────────────────────────────────────────────
+
+var ABIM_IM_BLUEPRINT = [
+  { weight:14, category:"Cardiovascular Disease", topics:["Coronary artery disease and ACS (STEMI, NSTEMI)","Heart failure (HFrEF, HFpEF)","Atrial fibrillation - rate vs rhythm control","Valvular heart disease","Hypertension - staging and pharmacotherapy","Dyslipidemia and statin therapy","Pulmonary embolism","Infective endocarditis","Cardiac arrhythmias","Pericarditis and myocarditis","Aortic dissection"] },
+  { weight:9,  category:"Pulmonary Disease", topics:["COPD - GOLD staging and exacerbations","Asthma - step therapy","Community-acquired pneumonia","Hospital-acquired pneumonia","Interstitial lung disease and IPF","Obstructive sleep apnea","Pleural effusion - Light criteria","ARDS - Berlin criteria","Pulmonary hypertension","Pneumothorax"] },
+  { weight:9,  category:"Endocrinology, Diabetes, and Metabolism", topics:["Type 2 diabetes - GLP-1 RA and SGLT2i","Type 1 diabetes - insulin regimens and DKA","Hypothyroidism - diagnosis and levothyroxine","Hyperthyroidism and Graves disease","Adrenal insufficiency - primary vs secondary","Cushing syndrome","Primary aldosteronism","Pheochromocytoma","Osteoporosis - FRAX and bisphosphonates","Hypercalcemia and hyperparathyroidism","Prolactinoma and acromegaly"] },
+  { weight:9,  category:"Gastroenterology", topics:["Inflammatory bowel disease - Crohn vs UC","Cirrhosis - Child-Pugh, MELD, complications","GI bleeding - upper vs lower","Hepatitis B - serology and antivirals","Hepatitis C - DAA therapy","Acute pancreatitis","NAFLD and NASH","Peptic ulcer disease and H. pylori","Acute liver failure"] },
+  { weight:9,  category:"Infectious Disease", topics:["Sepsis and septic shock","HIV - ART initiation and OI prophylaxis","Tuberculosis - latent vs active","Urinary tract infections","Skin and soft tissue infections","C. difficile colitis","Meningitis - empiric antibiotics","COVID-19 antivirals"] },
+  { weight:9,  category:"Rheumatology", topics:["Rheumatoid arthritis - DMARDs and biologics","Systemic lupus erythematosus","Gout - acute management and ULT","Giant cell arteritis and PMR","Ankylosing spondylitis","Vasculitis - GPA and polyarteritis nodosa","Antiphospholipid syndrome"] },
+  { weight:6,  category:"Hematology", topics:["Iron deficiency anemia","Hemolytic anemia","Thrombocytopenia - ITP, TTP, HIT","Sickle cell disease","DVT and PE - DOAC selection","Heparin-induced thrombocytopenia"] },
+  { weight:6,  category:"Nephrology", topics:["Acute kidney injury - KDIGO staging","CKD - staging and SGLT2i","Glomerulonephritis - nephritic vs nephrotic","Hyponatremia - SIADH and correction","Hyperkalemia - EKG changes and management","Metabolic acidosis - anion gap"] },
+  { weight:6,  category:"Medical Oncology", topics:["Lung cancer - targeted therapies","Breast cancer - hormone receptor and HER2","Lymphoma - Hodgkin vs non-Hodgkin","Leukemia - CML and TKI therapy","Multiple myeloma - CRAB criteria","Oncologic emergencies"] },
+  { weight:4,  category:"Neurology", topics:["Ischemic stroke - tPA and thrombectomy","Seizures - AED selection","Multiple sclerosis - DMT","Parkinson disease","Dementia - Alzheimer vs vascular vs Lewy body","Myasthenia gravis"] },
+  { weight:4,  category:"Psychiatry", topics:["Major depressive disorder - SSRI selection","Bipolar disorder - mood stabilizers","Alcohol use disorder - CIWA and thiamine","Opioid use disorder - buprenorphine","Delirium - causes and management"] },
+  { weight:3,  category:"Preventive Medicine", topics:["Cancer screening - USPSTF recommendations","Biostatistics - sensitivity, specificity, NNT","Medical ethics - informed consent and capacity","Health disparities and social determinants"] },
+];
+
+var ABIM_ENDO_BLUEPRINT = [
+  { weight:24, category:"Diabetes Mellitus and Hypoglycemia", topics:["ADA 2025 Standards - glycemic targets","Type 2 diabetes - GLP-1 RA, SGLT2i, DPP-4i, tirzepatide","Type 1 diabetes - MDI vs AID systems and CGM","DKA and HHS - diagnosis and management","Hypoglycemia unawareness - prevention","Inpatient glycemic management","CVOT data - GLP-1 RA and SGLT2i in ASCVD, HF, CKD","Gestational diabetes - HAPO trial","MODY and LADA - genetic testing"] },
+  { weight:15, category:"Thyroid Disorders", topics:["Hypothyroidism - primary vs central, TSH interpretation","Hashimoto thyroiditis - TPO antibodies, subclinical management","Hyperthyroidism - Graves disease, toxic nodular goiter","Thyroid storm - Burch-Wartofsky score","Thyroid nodule - ATA ultrasound risk stratification and FNA","Thyroid cancer - RAI and TSH suppression","Thyroid disease in pregnancy - TSH targets","Amiodarone-induced thyroid disease","Central hypothyroidism"] },
+  { weight:15, category:"Calcium and Bone Disorders", topics:["Hypercalcemia - PTH vs PTHrP vs vitamin D mediated","Primary hyperparathyroidism - surgical criteria","Hypoparathyroidism - post-surgical management","Osteoporosis - DXA, FRAX, bisphosphonates, denosumab, romosozumab","Vitamin D deficiency - supplementation protocols","Paget disease of bone","Hypocalcemia - acute IV calcium and chronic management"] },
+  { weight:12, category:"Lipids, Obesity, and Nutrition", topics:["Dyslipidemia - ACC/AHA risk calculator and statin intensity","PCSK9 inhibitors - indications and CVOT evidence","Familial hypercholesterolemia","Hypertriglyceridemia - fibrates and omega-3","Obesity management - GLP-1 RA for weight loss","Bariatric surgery - metabolic outcomes","Metabolic syndrome"] },
+  { weight:10, category:"Adrenal Disorders", topics:["Primary adrenal insufficiency - autoimmune and stress dosing","Secondary adrenal insufficiency - ACTH stimulation test","Adrenal crisis - recognition and IV hydrocortisone","Cushing syndrome - UFC, late-night salivary cortisol, LDDST","Cushing disease vs ectopic ACTH - HDDST and IPSS","Primary aldosteronism - PAC/PRA ratio, CT, adrenal vein sampling","Pheochromocytoma - plasma metanephrines, alpha then beta blockade","Adrenal incidentaloma - imaging characterization and hormonal workup","Congenital adrenal hyperplasia - 21-hydroxylase deficiency"] },
+  { weight:10, category:"Pituitary Disorders", topics:["Pituitary adenoma - micro vs macro, functioning vs nonfunctional","Prolactinoma - cabergoline vs bromocriptine and pregnancy","Acromegaly - IGF-1, OGTT GH suppression, somatostatin analogs","Cushing disease - ACTH-dependent, petrosal sinus sampling","Central diabetes insipidus - water deprivation test and desmopressin","SIADH - euvolemic hyponatremia and vaptans","Hypopituitarism - replacement priorities","Pituitary apoplexy - emergency management"] },
+  { weight:7,  category:"Female Reproduction", topics:["PCOS - Rotterdam criteria, OCP and metformin","Menopause - vasomotor symptoms and HRT","Premature ovarian insufficiency","Amenorrhea - primary vs secondary workup","Hyperprolactinemia - differential diagnosis","Turner syndrome - 45X and estrogen replacement"] },
+  { weight:7,  category:"Male Reproduction", topics:["Male hypogonadism - primary vs secondary, testosterone therapy","Klinefelter syndrome - 47XXY","Male infertility - azoospermia workup","Testosterone therapy - formulations and monitoring","Delayed puberty vs constitutional growth delay"] },
+];
+
+var USMLE_STEP1_BLUEPRINT = [
+  { weight:16, category:"Reproductive and Endocrine Systems", topics:["Hypothalamic-pituitary-gonadal axis - feedback loops","Thyroid hormone synthesis - iodination and coupling steps","Adrenal cortex - zona glomerulosa, fasciculata, reticularis","Insulin and glucagon - fed vs fasted state physiology","Type 1 diabetes - autoimmune destruction, HLA-DR3/DR4","Congenital adrenal hyperplasia - enzyme deficiencies","Androgen insensitivity syndrome","5-alpha reductase deficiency"] },
+  { weight:13, category:"Behavioral Health and Nervous Systems", topics:["Neurotransmitters - dopamine, serotonin, GABA, glutamate","Antidepressants - SSRI, SNRI, TCA, MAOI mechanisms","Antipsychotics - D2 blockade and EPS","Mood stabilizers - lithium mechanism and toxicity","Opioid pharmacology - mu receptor and withdrawal","Autonomic pharmacology - alpha and beta agonists","Stroke syndromes - MCA, PCA, PICA territories"] },
+  { weight:13, category:"Respiratory and Renal Systems", topics:["Pulmonary function tests - obstructive vs restrictive","Hypoxemia mechanisms - V/Q mismatch and shunt","Acid-base disorders - metabolic vs respiratory compensation","Renal tubular physiology - PCT, loop, DCT transport","Diuretics - mechanism by segment","RAAS - angiotensin II and aldosterone effects","Nephritic vs nephrotic syndrome - pathologic types"] },
+  { weight:11, category:"Cardiovascular System", topics:["Cardiac action potential - pacemaker vs ventricular","Frank-Starling law - preload and afterload","Antiarrhythmics - Vaughan-Williams classification","Atherosclerosis - foam cells and fibrous plaque","Myocardial infarction - biomarkers and ECG changes","Congenital heart defects - VSD, ASD, PDA, TOF"] },
+  { weight:10, category:"Blood and Immune Systems", topics:["Anemia classification - microcytic, normocytic, macrocytic","Clotting cascade - intrinsic vs extrinsic pathway","Hypersensitivity reactions - Type I through IV","Immunodeficiencies - B vs T cell and combined","Complement system - classical vs alternative"] },
+  { weight:9,  category:"Gastrointestinal System", topics:["GI hormones - gastrin, secretin, CCK, GIP","Liver metabolism - glycolysis and gluconeogenesis","Bilirubin metabolism - prehepatic, hepatic, posthepatic","H. pylori - virulence factors and peptic ulcer disease","Hepatitis viruses - A, B, C, D, E serology"] },
+  { weight:5,  category:"Biostatistics and Epidemiology", topics:["Sensitivity and specificity - ROC curve","PPV and NPV - prevalence effect","Study designs - RCT, cohort, case-control","Number needed to treat calculation"] },
+];
+
+var USMLE_STEP2_BLUEPRINT = [
+  { weight:13, category:"Cardiovascular System", topics:["Chest pain evaluation - ACS and HEART score","STEMI management - door-to-balloon and thrombolytics","Heart failure management - GDMT and diuresis","Atrial fibrillation - CHA2DS2-VASc and anticoagulation","Hypertensive urgency vs emergency","Aortic stenosis - TAVR vs SAVR criteria"] },
+  { weight:12, category:"Renal, Urinary, and Reproductive Systems", topics:["Acute kidney injury - prerenal vs intrinsic","CKD complications - anemia and hyperkalemia","Hyponatremia - SIADH and correction","UTI - uncomplicated and pyelonephritis","Ovarian cancer - CA-125 and BRCA mutation","Testicular cancer - germ cell vs non-germ cell"] },
+  { weight:11, category:"Legal, Ethical Issues, and Patient Safety", topics:["Informed consent - capacity assessment","Confidentiality breaches - duty to warn","End-of-life care - withdrawal and futility","Medical errors - disclosure and root cause","Advance directives - DNR and POLST"] },
+  { weight:10, category:"Behavioral Health", topics:["Suicide risk assessment","Major depression - PHQ-9 and SSRI","Bipolar disorder - mood stabilizer selection","Substance use disorders - CAGE questionnaire","Eating disorders - refeeding syndrome"] },
+  { weight:10, category:"Nervous System", topics:["Stroke - NIHSS and tPA eligibility","Seizure - first unprovoked workup","Headache - migraine vs tension vs cluster","Multiple sclerosis - McDonald criteria","Vertigo - BPPV and central vs peripheral"] },
+  { weight:9,  category:"Musculoskeletal and Skin", topics:["Low back pain - red flags and imaging","Gout - acute management and allopurinol timing","Cellulitis - MRSA risk and antibiotics","Melanoma - biopsy and sentinel lymph node"] },
+  { weight:8,  category:"Respiratory System", topics:["Pneumonia - PORT/PSI and antibiotic selection","COPD exacerbation - bronchodilators and NIV","Pulmonary embolism - Wells score and anticoagulation","Lung cancer - LDCT screening and targeted therapy"] },
+  { weight:7,  category:"Endocrine System", topics:["Diabetes management - A1c targets and insulin adjustment","Thyroid nodule - ultrasound features and FNA","Adrenal insufficiency - stress dosing","Cushing syndrome - screening tests","Calcium disorders - hypercalcemia workup"] },
+  { weight:7,  category:"Pregnancy and Childbirth", topics:["Preeclampsia - BP criteria and management","Gestational diabetes - GCT and OGTT","Placenta previa vs abruptio placentae","Postpartum hemorrhage - oxytocin","Ectopic pregnancy - beta-hCG and methotrexate"] },
+  { weight:6,  category:"Gastrointestinal System", topics:["Upper GI bleeding - Rockall score and endoscopy","Acute pancreatitis - BISAP and fluid resuscitation","Cirrhosis complications - SBP and hepatorenal","IBD management - 5-ASA and biologics"] },
+];
+
+var USMLE_STEP3_BLUEPRINT = [
+  { weight:13, category:"Biostatistics and Population Health", topics:["Evidence-based medicine - meta-analysis interpretation","Screening test statistics - sensitivity and specificity","Clinical decision making - pre-test probability","Study design selection - RCT vs observational","Absolute vs relative risk reduction and NNT","Quality improvement - PDSA cycle"] },
+  { weight:11, category:"Cardiovascular System", topics:["Outpatient heart failure - GDMT titration","Secondary prevention post-MI - aspirin, statin, beta-blocker, ACEi","Hypertension management - drug selection by comorbidity","Atrial fibrillation - long-term anticoagulation","Peripheral vascular disease - ABI and revascularization"] },
+  { weight:10, category:"Nervous System", topics:["Outpatient stroke follow-up and secondary prevention","Epilepsy management - drug selection and driving restrictions","Parkinson disease - motor fluctuations","Dementia - Alzheimer vs vascular vs Lewy body","Headache management - migraine prophylaxis"] },
+  { weight:9,  category:"Communication and Ethics", topics:["Informed consent - capacity and surrogate decision makers","Advance care planning - DNR and goals of care","Breaking bad news - SPIKES protocol","Medical errors - disclosure and apology","End-of-life care - palliative vs hospice"] },
+  { weight:9,  category:"Respiratory System", topics:["COPD - LABA/LAMA combinations and oxygen criteria","Asthma - step-up therapy and biologics","Obstructive sleep apnea - CPAP adherence","Idiopathic pulmonary fibrosis - antifibrotic therapy"] },
+  { weight:8,  category:"Endocrine System", topics:["Diabetes - A1c targets by age and comorbidity","Thyroid nodule - long-term surveillance","Adrenal incidentaloma - follow-up imaging","Metabolic syndrome - lifestyle intervention"] },
+  { weight:7,  category:"Gastrointestinal System", topics:["Surveillance colonoscopy - adenoma follow-up intervals","Hepatitis C - DAA therapy and cirrhosis surveillance","IBD - maintenance therapy and dysplasia surveillance"] },
+  { weight:6,  category:"Renal and Urinary", topics:["CKD management - BP targets and SGLT2i","BPH - alpha-blockers and 5-alpha reductase inhibitors","Nephrolithiasis - metabolic workup and dietary modifications"] },
+  { weight:6,  category:"Behavioral Health", topics:["Depression management - augmentation strategies","Anxiety disorders - CBT and medication management","Substance use - motivational interviewing and MAT","ADHD in adults - stimulant therapy"] },
+  { weight:5,  category:"Musculoskeletal System", topics:["Osteoarthritis - non-pharmacologic and NSAID risks","RA monitoring - DAS28 and methotrexate toxicity","Gout prophylaxis - allopurinol titration","Osteoporosis - DEXA surveillance and medication holidays"] },
+];
+
+// ─── WEIGHTED RANDOM SELECTION ────────────────────────────────────────────────
+
+function weightedRandomCategory(blueprint) {
+  var total = blueprint.reduce(function(sum, b) { return sum + b.weight; }, 0);
+  var rand = Math.random() * total;
+  for (var i = 0; i < blueprint.length; i++) {
+    rand -= blueprint[i].weight;
+    if (rand <= 0) return blueprint[i];
+  }
+  return blueprint[blueprint.length - 1];
+}
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getBlueprintCategory(level, requestedTopic) {
+  var isRandom = requestedTopic.toLowerCase().includes("random");
+  if (!isRandom) return { forcedTopic: requestedTopic };
+  if (level.includes("ABIM Endocrinology")) return { blueprintCat: weightedRandomCategory(ABIM_ENDO_BLUEPRINT) };
+  if (level.includes("ABIM Internal Medicine")) return { blueprintCat: weightedRandomCategory(ABIM_IM_BLUEPRINT) };
+  if (level.includes("Step 1")) return { blueprintCat: weightedRandomCategory(USMLE_STEP1_BLUEPRINT) };
+  if (level.includes("Step 2")) return { blueprintCat: weightedRandomCategory(USMLE_STEP2_BLUEPRINT) };
+  if (level.includes("Step 3")) return { blueprintCat: weightedRandomCategory(USMLE_STEP3_BLUEPRINT) };
+  return { blueprintCat: weightedRandomCategory(ABIM_IM_BLUEPRINT) };
+}
+
+// ─── RADIOPAEDIA IMAGE LINKS ──────────────────────────────────────────────────
+
+var RADIOPAEDIA_CASES = {
+  "Pneumonia": "https://radiopaedia.org/search?q=pneumonia&lang=us",
+  "ARDS": "https://radiopaedia.org/search?q=ARDS+acute+respiratory+distress&lang=us",
+  "Pleural Effusion": "https://radiopaedia.org/search?q=pleural+effusion&lang=us",
+  "Pneumothorax": "https://radiopaedia.org/search?q=pneumothorax&lang=us",
+  "Pulmonary Embolism": "https://radiopaedia.org/search?q=pulmonary+embolism+CT&lang=us",
+  "Interstitial Lung Disease": "https://radiopaedia.org/search?q=interstitial+lung+disease+HRCT&lang=us",
+  "Heart Failure": "https://radiopaedia.org/search?q=heart+failure+cardiomegaly&lang=us",
+  "Aortic Dissection": "https://radiopaedia.org/search?q=aortic+dissection+CT&lang=us",
+  "Ischemic Stroke": "https://radiopaedia.org/search?q=ischemic+stroke+MRI+DWI&lang=us",
+  "Hemorrhagic Stroke": "https://radiopaedia.org/search?q=intracranial+hemorrhage+CT&lang=us",
+  "Multiple Sclerosis": "https://radiopaedia.org/search?q=multiple+sclerosis+MRI+lesions&lang=us",
+  "Thyroid Nodule Evaluation": "https://radiopaedia.org/search?q=thyroid+nodule+ultrasound&lang=us",
+  "Thyroid Cancer": "https://radiopaedia.org/search?q=thyroid+cancer+papillary+ultrasound&lang=us",
+  "Cushing's Syndrome": "https://radiopaedia.org/search?q=adrenal+adenoma+cushing+CT&lang=us",
+  "Primary Aldosteronism": "https://radiopaedia.org/search?q=adrenal+adenoma+CT+aldosteronoma&lang=us",
+  "Pheochromocytoma": "https://radiopaedia.org/search?q=pheochromocytoma+adrenal+MRI&lang=us",
+  "Acromegaly": "https://radiopaedia.org/search?q=pituitary+macroadenoma+acromegaly+MRI&lang=us",
+  "Prolactinoma": "https://radiopaedia.org/search?q=prolactinoma+pituitary+MRI&lang=us",
+  "Osteoporosis": "https://radiopaedia.org/search?q=osteoporosis+compression+fracture+DXA&lang=us",
+  "Hyperparathyroidism": "https://radiopaedia.org/search?q=hyperparathyroidism+sestamibi+scan&lang=us",
+  "Cirrhosis": "https://radiopaedia.org/search?q=cirrhosis+liver+CT+nodular&lang=us",
+  "Acute Pancreatitis": "https://radiopaedia.org/search?q=acute+pancreatitis+CT+necrosis&lang=us",
+  "Nephrolithiasis": "https://radiopaedia.org/search?q=kidney+stones+CT+urogram&lang=us",
+  "Rheumatoid Arthritis": "https://radiopaedia.org/search?q=rheumatoid+arthritis+joint+xray&lang=us",
+  "Ankylosing Spondylitis": "https://radiopaedia.org/search?q=ankylosing+spondylitis+sacroiliac+MRI&lang=us",
+  "Gout": "https://radiopaedia.org/search?q=gout+tophus+joint+xray&lang=us",
+  "Tuberculosis": "https://radiopaedia.org/search?q=tuberculosis+chest+xray+cavitation&lang=us",
+  "HIV": "https://radiopaedia.org/search?q=HIV+AIDS+opportunistic+infection+CT+PCP&lang=us",
+  "PCOS": "https://radiopaedia.org/search?q=polycystic+ovary+syndrome+ultrasound&lang=us",
+  "Hypothyroidism and Hashimotos": "https://radiopaedia.org/search?q=hashimoto+thyroiditis+ultrasound+heterogeneous&lang=us",
+  "Hyperthyroidism and Graves": "https://radiopaedia.org/search?q=graves+disease+thyroid+scan+diffuse+uptake&lang=us",
+};
+
+function getRadiopaediaLink(topic) {
+  var topicNorm = topic.toLowerCase().replace(/['\-]/g, " ");
+  for (var key in RADIOPAEDIA_CASES) {
+    if (topicNorm.includes(key.toLowerCase().split(" ")[0])) {
+      return RADIOPAEDIA_CASES[key];
+    }
+  }
+  return null;
+}
+
+// ─── FEW-SHOT EXEMPLARS (Dr. Anteneh Zenebe, MD, FACE) ───────────────────────
+
+var FEW_SHOT_PROMPT =
+  "Study these 8 exemplars for clinical depth, distractor logic, and guideline citation style:\n\n" +
+
+  "EX1(ABIM-Endo/Adrenal): 54yo man, resistant HTN, 15kg gain, DM, bruising, 3.8cm left adrenal mass, atrophic right adrenal, aldosterone 14/renin<0.6. " +
+  "Q:Best next step? A:Spironolactone B:Plasma metanephrines+1mg DST C:Adrenal venous sampling D:Left adrenalectomy E:Saline infusion test. " +
+  "CORRECT:B. WHY:Large adrenal tumor(>2.4cm) requires excluding pheochromocytoma AND hypercortisolism before surgery — contralateral atrophy suggests ACTH-independent Cushing. " +
+  "Surgery without cortisol testing risks adrenal crisis. Spironolactone(A) treats mineralocorticoid excess only. Venous sampling(C)/saline test(E) premature before full hormonal workup. Adrenalectomy(D) contraindicated without ruling out Cushing and pheo. " +
+  "PEARL:Adrenal tumors>2.4cm mandate complete hormonal evaluation(pheo+Cushing) before any intervention.\n\n" +
+
+  "EX2(ABIM-Endo/Pituitary): 28yo woman, 9mm pituitary incidentaloma abutting optic chiasm, normal labs(prolactin 28, IGF-1 normal), wants pregnancy soon. " +
+  "Q:Best management? A:Pituitary surgery referral B:Start cabergoline C:Start octreotide D:MRI in 2 years E:Routine MRI first trimester. " +
+  "CORRECT:A. WHY:Pituitary enlarges 3-fold in pregnancy — chiasm compression risk requires surgical referral per ES guidelines. " +
+  "Cabergoline/octreotide(B,C) not studied for nonfunctioning incidentalomas. MRI in 2 years(D) too long — repeat at 6-12 months for chiasm-adjacent lesions. Routine pregnancy MRI(E) not indicated. " +
+  "PEARL:Nonfunctioning adenoma near optic chiasm + planned pregnancy = surgical referral before conception.\n\n" +
+
+  "EX3(ABIM-Endo/Thyroid): 42yo man, TSH 12.1 mIU/L, free T4 normal, TPO/TG antibodies negative, normal thyroid US, child has same labs. " +
+  "Q:Most likely diagnosis? A:TSH receptor resistance B:Hashimoto thyroiditis C:Adrenal insufficiency D:Resistance to thyroid hormone E:Selenium excess. " +
+  "CORRECT:A. WHY:Elevated TSH+normal T4+negative antibodies+normal US+family pattern = TSHR inactivating variant. " +
+  "Hashimoto(B) excluded by negative antibodies+normal US. Adrenal insufficiency(C) causes mild TSH elevation not this degree. RTH(D) causes elevated T4 not normal T4. Selenium(E) does not cause this. " +
+  "PEARL:Subclinical hypothyroidism pattern + negative antibodies + family history = think TSHR gene mutation.\n\n" +
+
+  "EX4(ABIM-Endo/T1DM): 21yo woman, T1DM x3 years, HbA1c 6.8%, two normal eye exams(last 1 year ago), BP 116/72, eGFR 91. " +
+  "Q:What is indicated now? A:Neuropathy screening(monofilament) B:Urinary albumin/creatinine ratio C:Repeat dilated eye exam D:Resting ECG E:Fasting lipid profile. " +
+  "CORRECT:E. WHY:ADA recommends annual lipid profile from T1DM diagnosis. " +
+  "Neuropathy(A) and nephropathy(B) screening begin 5 years after T1DM diagnosis. Two consecutive normal eye exams extend to 2-year intervals(C not needed now). ECG(D) not indicated in asymptomatic young patient. " +
+  "PEARL:T1DM microvascular screening(nephropathy+neuropathy) begins 5 years post-diagnosis; lipid profile from day one.\n\n" +
+
+  "EX5(ABIM-IM/Adrenal): 38yo woman, 9-month rapid virilization, deepening voice, clitoromegaly, DHEAS 910 mcg/dL, testosterone 97 ng/dL. " +
+  "Q:Best next step? A:Abdominal CT B:Adrenal vein sampling C:Ovarian vein sampling D:Pelvic US E:Pituitary MRI. " +
+  "CORRECT:A. WHY:DHEAS>700 mcg/dL = adrenal source — abdominal CT is first step. " +
+  "Pelvic US(D) for ovarian source only when testosterone>200 with normal/mildly elevated DHEAS. Venous sampling(B,C) after imaging not before. Pituitary MRI(E) for ACTH-dependent adrenal hyperplasia only. " +
+  "PEARL:DHEAS>700 mcg/dL with rapid virilization = adrenal carcinoma until proven otherwise — CT first.\n\n" +
+
+  "EX6(ABIM-IM/Thyroid): 83yo woman, confirmed overt hyperthyroidism(TSH 0.05 x2, FT4 2.1), toxic MNG on scan, CAD and osteoporosis. " +
+  "Q:Management? A:Repeat TSH 6 weeks B:Start methimazole C:Start prednisone D:Start teprotumumab. " +
+  "CORRECT:B. WHY:Overt hyperthyroidism confirmed on serial testing + CAD/osteoporosis = must treat. " +
+  "Methimazole to achieve euthyroidism before RAI per ATA 2016. Watchful waiting(A) risks AFib and bone loss. Prednisone(C) for subacute thyroiditis only. Teprotumumab(D) for thyroid eye disease only. " +
+  "PEARL:Elderly CAD patient with overt hyperthyroidism — methimazole first, never RAI without achieving euthyroidism.\n\n" +
+
+  "EX7(ABIM-IM/Diabetes): 45yo man, T2DM, HbA1c 8.5%, symptomatic hypoglycemia at unpredictable times, on metformin+glargine+lispro. " +
+  "Q:Management? A:Discontinue metformin B:Increase glargine C:Initiate CGM D:Reduce glargine. " +
+  "CORRECT:C. WHY:ADA 2025 — CGM for all insulin users with hypoglycemia or above-target HbA1c. " +
+  "Increasing glargine(B) worsens hypoglycemia without knowing timing. Reducing glargine(D) worsens HbA1c. Metformin(A) does not cause hypoglycemia — no reason to stop. " +
+  "PEARL:Above-target HbA1c + hypoglycemia on insulin = CGM first — never adjust insulin blindly.\n\n" +
+
+  "EX8(ABIM-IM/Thyroid): 81yo man, CAD, overt hypothyroidism(TSH 25, FT4 0.5), bradycardia, delayed reflexes. " +
+  "Q:Treatment? A:Levothyroxine 25 mcg/day B:Levothyroxine 100 mcg/day C:Desiccated thyroid 60 mg/day D:Triiodothyronine 50 mcg/day. " +
+  "CORRECT:A. WHY:ATA 2016 — start low go slow in elderly CAD patients. Rapid correction increases cardiac O2 demand and risks MI. " +
+  "Full dose 100 mcg/day(B) contraindicated with CAD. Desiccated thyroid(C) has T3 component — cardiac risk. T3 monotherapy(D) causes rapid fluctuations — never for routine hypothyroidism. " +
+  "PEARL:Elderly + CAD + hypothyroidism = levothyroxine 25 mcg/day — start low go slow regardless of TSH severity.\n\n" +
+
+  "EX9(ABIM-IM/DKA): Patient with DKA, BP 92/58, K+ 5.8, glucose 487, pH 7.22, on SGLT2i. " +
+  "Q:Most appropriate next step? " +
+  "CORRECT: IV Normal Saline 1-1.5 L/hr FIRST, then insulin infusion 0.1 units/kg/hr after K+ confirmed >=3.5, hold SGLT2i until full DKA resolution, blood cultures for sepsis workup. " +
+  "WHY: ADA 2025 DKA protocol mandates fluid resuscitation BEFORE insulin. K+ must be >=3.5 before insulin or fatal arrhythmia risk. SGLT2i held entire episode not just 24 hours. Hypotonic saline contraindicated in hyperosmolar state. " +
+  "PEARL: In DKA — fluids first, check potassium before insulin, never restart SGLT2i until full biochemical resolution.\n\n" +
+  "EX10(ABIM-IM/Lipids): 54yo Black man, T2DM HbA1c 7.2%, BMI 34, LDL 118, TG 285, HDL 38, Lp(a) 62 nmol/L, eGFR 68, no prior statin. " +
+  "Q: Most appropriate next step? " +
+  "CORRECT: High-intensity statin (atorvastatin 40-80mg) plus lifestyle modification, recheck lipids in 4-12 weeks, THEN add icosapent ethyl only if TG remains above 150 mg/dL on stable statin. " +
+  "WHY: REDUCE-IT required stable statin x4 weeks before adding IPE - cannot diagnose persistent hypertriglyceridemia without first treating with statin. Starting IPE simultaneously (Choice A) jumps the gun on the evidence. Lp(a) 62 nmol/L is mildly elevated - threshold for high risk is 125 nmol/L per ESC/EAS - does not justify PCSK9i yet. Rosuvastatin monotherapy alone (Choice B) misses the opportunity for high-intensity statin in a high-risk T2DM patient with multiple risk factors. " +
+  "PEARL: In diabetic dyslipidemia - statin plus lifestyle FIRST, recheck at 4-12 weeks, add icosapent ethyl only if triglycerides remain above 150 mg/dL on stable statin. Never start IPE simultaneously with statin at first visit.\n\n" +
+  "EX11(ABIM-Endo/T2DM-Dual): 51yo Hispanic woman, newly diagnosed T2DM, HbA1c 8.9%, BMI 32, BP 138/86, eGFR 78, UACR 42 mg/g, on lisinopril. No prior CVD. " +
+  "Q: Most appropriate initial pharmacotherapy? " +
+  "CORRECT: Metformin 500mg BID titrated to 1000mg BID over 1-2 weeks PLUS GLP-1 RA (semaglutide initiated at 0.25mg weekly - NOT 0.5mg - for 4 weeks before titrating to 0.5mg per FDA labeling). " +
+  "WHY: ADA 2025 recommends dual therapy when HbA1c >8.5% with cardiorenal risk factors present. GLP-1 RA provides ASCVD and albuminuria reduction per SUSTAIN 6. Note: SGLT2i also strongly indicated for albuminuria (UACR >30) but not listed as choice - acknowledge in explanation. FLOW trial data applies to more advanced CKD (eGFR 25-75 with higher UACR) so SUSTAIN 6 is more directly applicable here. Metformin monotherapy insufficient for HbA1c 8.9%. Insulin premature without oral agent trial. Pioglitazone/sulfonylureas lack proven CVD/renal benefit. " +
+  "PEARL: Semaglutide ALWAYS starts at 0.25mg weekly x4 weeks then 0.5mg - never start at 0.5mg. In T2DM with albuminuria, both GLP-1 RA and SGLT2i are indicated - note both in explanation even if only one is in the answer choices.\n\n" +
+
+  "EX12(ABIM-IM/HFrEF+T2DM): 64yo man, T2DM, HFrEF (LVEF 35%) hospitalized 2 months ago, on metformin+lisinopril+carvedilol+furosemide, now euvolemic. HbA1c 7.4%, eGFR 58, UACR 18. " +
+  "Q: Most appropriate next pharmacotherapy step? " +
+  "CORRECT: Add empagliflozin 10mg daily. " +
+  "WHY: ADA 2025 mandates SGLT2i in HFrEF regardless of HbA1c target - EMPEROR-Reduced and DAPA-HF show significant reduction in HF hospitalizations and CV death even without diabetes. eGFR 58 is above threshold for initiation (eGFR >20). GLP-1 RA (semaglutide) has ASCVD benefit but NOT primary HF hospitalization reduction - SGLT2i takes priority in HFrEF. Pioglitazone absolutely contraindicated in heart failure - causes fluid retention. Sitagliptin HF-neutral but inferior to SGLT2i. Maintaining current regimen misses disease-modifying therapy. " +
+  "PEARL: HFrEF + diabetes = SGLT2i is non-negotiable regardless of HbA1c. Do not be distracted by well-controlled glucose - the indication is cardiac, not glycemic.\n\n" +
+
+  "EX13(ABIM-Endo/Catabolic-T2DM): 48yo man, no prior DM history, 6 weeks of severe fatigue, polyuria, polydipsia, 15-pound unintentional weight loss, BMI 24. Fasting glucose 345, HbA1c 11.8%, trace ketones, normal anion gap. " +
+  "Q: Most appropriate initial pharmacotherapy? " +
+  "CORRECT: Basal insulin (insulin glargine 10 units daily). " +
+  "WHY: ADA Standards require early insulin when HbA1c >10%, glucose >=300 mg/dL, OR active catabolism (weight loss + polyuria + polydipsia). This patient has ALL THREE triggers. GLP-1 RA will not reverse severe glucotoxicity rapidly AND promotes weight loss which is counterproductive in active catabolic state. SGLT2i risks euglycemic DKA given trace ketones and severe polyuria. Sulfonylureas ineffective when beta cells are glucotoxically stunned. Lifestyle modification alone absolutely insufficient for HbA1c 11.8% with catabolic symptoms. " +
+  "PEARL: Weight loss + polyuria + polydipsia + HbA1c >10% = start insulin first. Active catabolism means absolute insulin deficiency until proven otherwise. Once glucotoxicity resolves, reassess for de-escalation to oral/injectable agents.\n\n" +
+
+  "EX14(ABIM-Endo/CGM-AGP): 28yo woman, T1DM on CSII pump (no AID algorithm). AGP shows TIR 58%, TAR 36%, TBR 6%. Pattern: nocturnal hypoglycemia 55-65 mg/dL at 2-4 AM (asymptomatic), followed by rebound fasting hyperglycemia 190-230 mg/dL at 8 AM. Daytime glucose in range. " +
+  "Q: Most appropriate initial pump adjustment? " +
+  "CORRECT: Decrease nocturnal basal rate between 12 AM and 4 AM. " +
+  "WHY: Golden rule of AGP interpretation - fix hypoglycemia FIRST. TBR >4% must be addressed before any hyperglycemia treatment. Morning hyperglycemia is Somogyi rebound from nocturnal lows - increasing morning basal would dangerously worsen the nocturnal hypoglycemia. Increasing pre-dinner bolus worsens nocturnal low. Bedtime snack is outdated - reduce excessive basal insulin instead. " +
+  "PEARL: Always look at TBR first on any AGP. If TBR >4%, identify the pattern and reduce corresponding insulin before making ANY adjustments for hyperglycemia.\n\n" +
+
+  "EX15(ABIM-Endo/AID-Hypoglycemia): 34yo man, T1DM, recently transitioned from MDI to hybrid closed-loop AID system. Reports: CGM alerts at 65 mg/dL, treats with 15g carbs (standard Rule of 15 from MDI training), glucose consistently skyrockets to >250 mg/dL 2 hours later. " +
+  "Q: Best explanation and advice? " +
+  "CORRECT: AID algorithm predictively suspended basal insulin 20-45 minutes before the low via PLGS (Predictive Low Glucose Suspend) - patient already has reduced active insulin on board. Advise micro-treatment with 5-8g carbs instead of 15g. " +
+  "WHY: On AID systems the Rule of 15 must be unlearned. By the time CGM alerts at 65, pump has already been suspending insulin for 20-45 min. Adding 15g carbs on top of suspended insulin = inevitable rebound hyperglycemia. Never manually bolus for rescue carbs during hypoglycemia. Complex carbs with protein slow gastric emptying - wrong approach for active low. " +
+  "PEARL: AID systems require micro-treating mild lows with 5-8g carbs. The algorithm already applied the brakes - the Rule of 15 from MDI is obsolete on closed-loop systems.\n\n" +
+
+  "Now generate ONE new MCQ matching this exact depth and quality for the specified topic.";
+
+// ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
+
+function buildPrompt(level, requestedTopic) {
+  var result = getBlueprintCategory(level, requestedTopic);
+  var specificTopic, topicInstruction;
+
+  if (result.forcedTopic) {
+    specificTopic = result.forcedTopic;
+    topicInstruction = "TOPIC: " + specificTopic;
+  } else {
+    var cat = result.blueprintCat;
+    specificTopic = pickRandom(cat.topics).split(" - ")[0].split(" — ")[0];
+    topicInstruction = "TOPIC: " + specificTopic + " (" + cat.category + " — " + cat.weight + "% of " + level + ")";
+  }
+
+  var radiopaediaLink = getRadiopaediaLink(specificTopic);
+
+  var levelNote = "";
+  if (level.includes("Step 1")) {
+    levelNote = "LEVEL: USMLE Step 1 — Test pathophysiology and mechanisms (WHY things happen), not clinical management.";
+  } else if (level.includes("Step 2")) {
+    levelNote = "LEVEL: USMLE Step 2 CK — Test clinical decision-making, next best step, differential diagnosis with subtle clues.";
+  } else if (level.includes("Step 3")) {
+    levelNote = "LEVEL: USMLE Step 3 — Test outpatient management, chronic disease, preventive care, ethics, biostatistics.";
+  } else if (level.includes("ABIM Internal Medicine")) {
+    levelNote = "LEVEL: ABIM Internal Medicine boards — Test guideline-driven management with specific thresholds. Resident-to-attending level judgment.";
+  } else if (level.includes("ABIM Endocrinology")) {
+    levelNote = "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance per ADA 2025, Endocrine Society, AACE, ATA. Include advanced metabolic concepts where relevant.";
+  }
+
+  var societyMap = "";
+  var t = specificTopic.toLowerCase();
+  if (t.includes("thyroid") || t.includes("hashimoto") || t.includes("graves") || t.includes("hypothyroid") || t.includes("hyperthyroid")) {
+    societyMap = "Cite ATA and/or Endocrine Society for thyroid. NEVER cite ADA for thyroid disorders.";
+  } else if (t.includes("diabetes") || t.includes("insulin") || t.includes("cgm") || t.includes("glucose") || t.includes("dka") || t.includes("glp-1") || t.includes("sglt2") || t.includes("metformin")) {
+    societyMap = "Cite ADA 2025 Standards of Care and/or AACE for diabetes.";
+  } else if (t.includes("osteoporosis") || t.includes("bone") || t.includes("fracture") || t.includes("calcium") || t.includes("parathyroid") || t.includes("vitamin d")) {
+    societyMap = "Cite Endocrine Society and/or NOF/BHOF for bone and calcium disorders.";
+  } else if (t.includes("adrenal") || t.includes("cushing") || t.includes("aldosteronism") || t.includes("pheochromocytoma")) {
+    societyMap = "Cite Endocrine Society Clinical Practice Guidelines for adrenal disorders.";
+  } else if (t.includes("pituitary") || t.includes("acromegaly") || t.includes("prolactinoma")) {
+    societyMap = "Cite Endocrine Society Clinical Practice Guidelines for pituitary disorders.";
+  } else if (t.includes("heart failure") || t.includes("acs") || t.includes("stemi") || t.includes("atrial fibrillation") || t.includes("hypertension")) {
+    societyMap = "Cite ACC/AHA guidelines for cardiovascular management.";
+  } else if (t.includes("copd") || t.includes("asthma") || t.includes("pneumonia") || t.includes("ards")) {
+    societyMap = "Cite GOLD guidelines for COPD, GINA for asthma, IDSA/ATS for pneumonia.";
+  } else if (t.includes("kidney") || t.includes("renal") || t.includes("ckd") || t.includes("aki")) {
+    societyMap = "Cite KDIGO guidelines for kidney disease.";
+  } else if (t.includes("rheumatoid") || t.includes("lupus") || t.includes("gout") || t.includes("vasculitis")) {
+    societyMap = "Cite ACR and/or EULAR guidelines for rheumatologic conditions.";
+  } else if (t.includes("sepsis") || t.includes("hiv") || t.includes("tuberculosis") || t.includes("c. difficile")) {
+    societyMap = "Cite Surviving Sepsis Campaign, DHHS, ATS/CDC/IDSA, or IDSA/SHEA as appropriate.";
+  } else {
+    societyMap = "Cite the most relevant current specialty society guideline.";
+  }
+
+  // Board task rotation
+  var boardTasks;
+  if (level.includes("Step 1")) {
+    boardTasks = [
+      "most likely underlying mechanism of this patient's condition",
+      "most likely diagnosis",
+      "most appropriate diagnostic study",
+      "most likely pathophysiologic explanation for these findings",
+      "most likely cause of this patient's presentation",
+    ];
+  } else if (level.includes("Step 3")) {
+    boardTasks = [
+      "most appropriate next step in management",
+      "most appropriate long-term management strategy",
+      "most appropriate preventive recommendation",
+      "most appropriate monitoring strategy",
+      "most likely diagnosis",
+    ];
+  } else {
+    boardTasks = [
+      "most appropriate next step in management",
+      "most appropriate initial pharmacotherapy",
+      "most likely diagnosis",
+      "most appropriate diagnostic study",
+      "best long-term monitoring strategy",
+      "most appropriate next step in management",
+      "most likely underlying mechanism or etiology",
+      "most appropriate initial pharmacotherapy",
+      "most likely diagnosis",
+      "most appropriate next step in management",
+      "most appropriate change in management",
+      "most likely complication of this condition",
+      "most likely cause of this patient's presentation",
+    ];
+  }
+  var selectedTask = boardTasks[Math.floor(Math.random() * boardTasks.length)];
+
+  var imagingNote = radiopaediaLink
+    ? " Describe key imaging findings as a clinician would dictate (e.g., chest X-ray shows consolidation with air bronchograms)."
+    : "";
+
+  var cgmNote = (t.includes("cgm") || t.includes("aid") || t.includes("insulin pump"))
+    ? " Include CGM metrics: TIR%, TBR%, TAR%, GMI."
+    : "";
+
+  var jsonSchema = '{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"...","topic":"' + specificTopic + '","imageUrl":' + (radiopaediaLink ? '"' + radiopaediaLink + '"' : 'null') + ',"showImageButton":false}';
+
+  var systemText =
+    "You are a senior ABIM item-writing committee member and academic physician.\n\n" +
+    "YOUR CORE PHILOSOPHY: You do NOT write questions that simply ask what drug to give or what lab value confirms a diagnosis. You write questions that test CLINICAL REASONING and JUDGMENT the way a master clinician thinks at the bedside. Every question must force the learner to think through a clinical problem - not retrieve a memorized fact.\n\n" +
+    "QUESTION VARIETY - you rotate through ALL of these equally across ALL specialties and topics:\n" +
+    "- DIAGNOSIS questions: subtle presentation requiring synthesis of history, exam, and labs to identify correct diagnosis over plausible alternatives\n" +
+    "- NEXT BEST STEP questions: a decision point where the right move requires understanding pathophysiology and clinical context\n" +
+    "- MONITORING questions: what to check, when, and why - testing understanding of disease progression and treatment response\n" +
+    "- MECHANISM questions: why a treatment works or why a complication occurs - testing depth of pathophysiologic understanding\n" +
+    "- INTERPRETATION questions: labs, imaging, or clinical data requiring synthesis and pattern recognition\n" +
+    "- COMPLICATION questions: identifying when something has gone wrong and what to do next\n" +
+    "- MANAGEMENT questions: requires weighing comorbidities, contraindications, and context - NOT just first-line therapy recitation\n\n" +
+    "EXPLANATION PHILOSOPHY: Write like a brilliant attending teaching on rounds - not a textbook reciting facts. Tell the learner HOW to think about this problem. Name the specific cognitive trap each wrong answer represents. One guideline citation is sufficient - do NOT list statistics or trial names unless they directly explain WHY. The board pearl must be a clinical insight that changes how the learner thinks - never a restatement of the correct answer.\n\n" +
+    "CRITICAL RULES:\n" +
+    "1. Labs MUST match diagnosis: overt hypothyroidism = TSH>10 AND free T4 below reference range. Subclinical = TSH 4.5-10 AND normal free T4.\n" +
+    "2. Overt hyperthyroidism = TSH<0.01 AND free T4 above reference range.\n" +
+    "3. DKA DIAGNOSIS: glucose>250, pH<7.3, HCO3<18, ketonemia. ADA 2025 DKA MANAGEMENT SEQUENCE: STEP 1 is IV Normal Saline 0.9% at 1-1.5 L/hr for first hour - this is the FIRST and IMMEDIATE intervention before anything else. STEP 2 check potassium - if K+ below 3.5 mEq/L hold insulin and replace potassium IV first. STEP 3 start insulin infusion 0.1 units/kg/hr only after fluid resuscitation is underway AND K+ confirmed at or above 3.5 mEq/L. STEP 4 when glucose drops to 200-250 mg/dL add dextrose to IV fluids but continue insulin until anion gap closes. STEP 5 hold SGLT2 inhibitors throughout entire DKA episode - restart only after full biochemical resolution. NEVER start insulin before or simultaneously with fluids as first step. NEVER use 0.45% hypotonic saline as initial fluid. Primary adrenal insufficiency: low cortisol + HIGH ACTH.\n" +
+    "LIPID MANAGEMENT SEQUENCE (ACC/AHA + ADA 2025 - CRITICAL):\n" +
+    "DIABETES DRUG DOSING RULES (CRITICAL):\n" +
+    "   Semaglutide SC: ALWAYS start 0.25mg weekly x4 weeks, then 0.5mg. NEVER start at 0.5mg - FDA labeling requires 0.25mg initiation to mitigate GI side effects.\n" +
+    "   Semaglutide oral (Rybelsus): start 3mg daily x30 days, then 7mg.\n" +
+    "   Tirzepatide: start 2.5mg weekly x4 weeks, then increase by 2.5mg every 4 weeks as tolerated.\n" +
+    "   SGLT2i in HFrEF: add empagliflozin or dapagliflozin regardless of HbA1c when LVEF <40% per ADA 2025 - EMPEROR-Reduced and DAPA-HF evidence. Safe if eGFR >20.\n" +
+    "   Pioglitazone: ABSOLUTELY CONTRAINDICATED in heart failure - causes fluid retention.\n" +
+    "   Insulin first when: HbA1c >10%, glucose >=300 mg/dL, OR active catabolism (weight loss + polyuria + polydipsia).\n" +
+    "   GLP-1 RA: DO NOT use in active catabolic state - promotes weight loss which worsens catabolism.\n" +
+    "   SGLT2i: DO NOT use with trace ketones or suspected DKA - risk of euglycemic DKA.\n" +
+    "   AGP interpretation rule: ALWAYS fix TBR >4% BEFORE adjusting for hyperglycemia.\n" +
+    "   AID systems: Rule of 15 is obsolete. Micro-treat mild lows with 5-8g carbs only due to PLGS pre-suspension of basal insulin.\n" +
+    "   Icosapent ethyl (IPE/REDUCE-IT): NEVER start simultaneously with statin. Sequence is: (1) Start statin + lifestyle modification first. (2) Recheck lipids at 4-12 weeks. (3) ONLY add icosapent ethyl 2g BID if triglycerides REMAIN at or above 150 mg/dL on stable statin therapy. REDUCE-IT inclusion required stable statin x4 weeks with persistent TG 135-499 mg/dL.\n" +
+    "   Lipoprotein(a): Lp(a) above 125 nmol/L or above 50 mg/dL = high risk threshold per ESC/EAS. Lp(a) 62 nmol/L is only mildly elevated - does NOT justify PCSK9i or cardiology referral at first visit.\n" +
+    "   Statin intensity in T2DM age 40+: Moderate-to-high intensity statin (atorvastatin 40-80mg or rosuvastatin 20-40mg) is standard. No race-based statin avoidance - statin efficacy is not race-dependent.\n" +
+    "   Lipid recheck after statin initiation: 4-12 weeks per ACC/AHA - NOT 4 weeks alone which is the absolute minimum.\n" +
+    "4. NEVER say 'pathognomonic'. NEVER use EXCEPT/NOT phrasing. NEVER use 'always'/'never' in options.\n" +
+    "5. One clearly correct answer. Four plausible distractors representing real clinical cognitive errors (anchoring bias, premature closure, wrong subtype).\n" +
+    "6. All 5 options must be same type (all diagnoses OR all treatments — never mix).\n" +
+    "7. Correct answer MUST be defensible per current guidelines.\n" +
+    "8. " + societyMap + "\n\n" +
+    FEW_SHOT_PROMPT;
+
+  var userText =
+    levelNote + "\n\n" +
+    topicInstruction + "\n\n" +
+    "STEM: 3-4 sentences." + imagingNote + cgmNote + " End with exactly this question: Which of the following is the " + selectedTask + "?\n" +
+    "CHOICES: 5 options (A-E). One correct per current guidelines. Four plausible distractors.\n" +
+    "EXPLANATION: 3 sentences max. (1) Why correct answer is right + guideline citation. (2) Why the 2 most tempting wrong answers are wrong + cognitive trap named. (3) One board pearl.\n\n" +
+    "Return ONLY valid JSON — complete with all closing brackets. No markdown. No text outside JSON:\n" +
+    jsonSchema;
+
+  return { systemText: systemText, userText: userText, radiopaediaLink: radiopaediaLink, specificTopic: specificTopic };
+}
+
+// ─── NETLIFY HANDLER ──────────────────────────────────────────────────────────
+
+exports.handler = async function(event) {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
+  }
+
+  var topic, level, warmup;
+  try {
+    var body = JSON.parse(event.body);
+    topic = body.topic;
+    level = body.level;
+    warmup = body.warmup || false;
+    if (!topic || !level) throw new Error("Missing topic or level");
+  } catch (e) {
+    return { statusCode: 400, body: JSON.stringify({ error: "Invalid request body" }) };
+  }
+
+  if (warmup) {
+    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ warm: true }) };
+  }
+
+  try {
+    // Random patient demographics
+    var ages = [22,26,29,31,34,37,39,42,45,48,51,54,57,61,64,67,71,74,78];
+    var sexes = ["man","woman","woman","man","woman","man"];
+    var races = ["White","Black","Hispanic","Asian","Native American","Middle Eastern","South Asian","White","Black","Hispanic"];
+    var settings = ["outpatient primary care clinic","endocrinology outpatient clinic","emergency department","inpatient medicine ward","urgent care center","internal medicine resident clinic","endocrine subspecialty consult service"];
+    var randAge = ages[Math.floor(Math.random() * ages.length)];
+    var randSex = sexes[Math.floor(Math.random() * sexes.length)];
+    var randRace = races[Math.floor(Math.random() * races.length)];
+    var randSetting = settings[Math.floor(Math.random() * settings.length)];
+    var patientSeed = "MANDATORY: Patient is a " + randAge + "-year-old " + randRace + " " + randSex + " presenting to a " + randSetting + ". Use exactly these demographics.";
+
+    var promptData = buildPrompt(level, topic);
+    var enrichedUserText = patientSeed + "\n\n" + promptData.userText;
+
+    var raw = await callClaude(promptData.systemText, enrichedUserText);
+
+    var cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+    var jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) cleaned = jsonMatch[0];
+
+    var parsed = JSON.parse(cleaned);
+    parsed.imageUrl = parsed.imageUrl || promptData.radiopaediaLink || null;
+    parsed.showImageButton = parsed.showImageButton || false;
+    parsed.topic = parsed.topic || promptData.specificTopic;
+
+    var required = ["stem", "choices", "correct", "explanation"];
+    for (var i = 0; i < required.length; i++) {
+      if (!parsed[required[i]]) throw new Error("Missing field: " + required[i]);
+    }
+
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([parsed])
+    };
+
+  } catch (e) {
+    console.error("Generation error:", e.message);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Failed to generate question. Please try again." })
+    };
+  }
+};
