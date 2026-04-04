@@ -25,9 +25,9 @@ async function callClaude(systemText, userText) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1100,
-        temperature: 0.7,
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 900,
+        temperature: 0.6,
         system: systemText,
         messages: [{ role: "user", content: finalUserText }]
       })
@@ -281,6 +281,11 @@ var FEW_SHOT_PROMPT =
   "WHY: On AID systems the Rule of 15 must be unlearned. By the time CGM alerts at 65, pump has already been suspending insulin for 20-45 min. Adding 15g carbs on top of suspended insulin = inevitable rebound hyperglycemia. Never manually bolus for rescue carbs during hypoglycemia. Complex carbs with protein slow gastric emptying - wrong approach for active low. " +
   "PEARL: AID systems require micro-treating mild lows with 5-8g carbs. The algorithm already applied the brakes - the Rule of 15 from MDI is obsolete on closed-loop systems.\n\n" +
 
+  "EX16(ABIM-IM/Pancreatitis): 22yo woman, acute epigastric pain radiating to back, lipase 1240, amylase 890, TG 1500 mg/dL (HTG-induced), no gallstones, meets Revised Atlanta Criteria. " +
+  "Q: Most appropriate initial step in management? " +
+  "CORRECT: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr with frequent reassessment. " +
+  "WHY: WATERFALL trial (NEJM 2022) changed standard of care - aggressive hydration (250-500 mL/hr NS) was halted early due to higher volume overload with no outcome benefit. LR preferred over NS to avoid hyperchloremic metabolic acidosis worsening SIRS. Antibiotics not indicated in sterile pancreatitis - only for confirmed infected necrosis. Octreotide does not improve outcomes - outdated practice. NG tube only for persistent vomiting/ileus not routine. " +
+  "PEARL: Acute pancreatitis = moderate goal-directed LR not aggressive NS. WATERFALL 2022 ended the aggressive fluid dogma. When TG >1000 mg/dL consider HTG-induced pancreatitis.\n\n" +
   "Now generate ONE new MCQ matching this exact depth and quality for the specified topic.";
 
 // ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
@@ -403,6 +408,21 @@ function buildPrompt(level, requestedTopic) {
     "2. Overt hyperthyroidism = TSH<0.01 AND free T4 above reference range.\n" +
     "3. DKA DIAGNOSIS: glucose>250, pH<7.3, HCO3<18, ketonemia. ADA 2025 DKA MANAGEMENT SEQUENCE: STEP 1 is IV Normal Saline 0.9% at 1-1.5 L/hr for first hour - this is the FIRST and IMMEDIATE intervention before anything else. STEP 2 check potassium - if K+ below 3.5 mEq/L hold insulin and replace potassium IV first. STEP 3 start insulin infusion 0.1 units/kg/hr only after fluid resuscitation is underway AND K+ confirmed at or above 3.5 mEq/L. STEP 4 when glucose drops to 200-250 mg/dL add dextrose to IV fluids but continue insulin until anion gap closes. STEP 5 hold SGLT2 inhibitors throughout entire DKA episode - restart only after full biochemical resolution. NEVER start insulin before or simultaneously with fluids as first step. NEVER use 0.45% hypotonic saline as initial fluid. Primary adrenal insufficiency: low cortisol + HIGH ACTH.\n" +
     "LIPID MANAGEMENT SEQUENCE (ACC/AHA + ADA 2025 - CRITICAL):\n" +
+    "ACUTE PANCREATITIS - CURRENT PRACTICE (WATERFALL TRIAL 2022 - NEJM):\n" +
+    "   OUTDATED: Aggressive IV Normal Saline 250-500 mL/hr. DO NOT USE THIS.\n" +
+    "   CURRENT STANDARD: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr with frequent reassessment.\n" +
+    "   WHY LR not NS: Large volumes of NS cause hyperchloremic metabolic acidosis worsening SIRS and acinar injury.\n" +
+    "   WHY moderate not aggressive: WATERFALL trial (NEJM 2022) halted early - aggressive fluids caused higher volume overload with NO improvement in outcomes.\n" +
+    "   Antibiotics: ONLY for infected necrosis confirmed by CT/FNA - NEVER prophylactic in mild-moderate pancreatitis.\n" +
+    "   Octreotide: Does NOT improve outcomes - outdated practice - never recommend.\n" +
+    "   HTG-induced pancreatitis threshold: TG >1000 mg/dL (classic) often >2000 mg/dL. TG 680 is elevated but below classic HTG-pancreatitis threshold.\n" +
+    "   Question phrasing: Use most appropriate initial STEP IN MANAGEMENT not pharmacotherapy when answer is IV fluids.\n" +
+    "CURRENT EVIDENCE-BASED PRACTICE RULES (ALWAYS USE MOST UPDATED GUIDELINES):\n" +
+    "   Heart failure: Goal-directed therapy per ACC/AHA 2022 - titrate GDMT based on clinical response not fixed doses.\n" +
+    "   GI bleeding: Restrictive transfusion strategy (Hgb threshold 7 g/dL per TRICC/TRIGGER trials) not liberal.\n" +
+    "   Sepsis: Surviving Sepsis 2021 - 30 mL/kg crystalloid then reassess with dynamic measures not fixed bolus protocols.\n" +
+    "   Pneumonia: IDSA/ATS 2019 - severity-guided therapy, avoid over-treatment of low-risk CAP.\n" +
+    "   ALWAYS prioritize landmark practice-changing trial data over older dogma in explanations.\n" +
     "DIABETES DRUG DOSING RULES (CRITICAL):\n" +
     "   Semaglutide SC: ALWAYS start 0.25mg weekly x4 weeks, then 0.5mg. NEVER start at 0.5mg - FDA labeling requires 0.25mg initiation to mitigate GI side effects.\n" +
     "   Semaglutide oral (Rybelsus): start 3mg daily x30 days, then 7mg.\n" +
