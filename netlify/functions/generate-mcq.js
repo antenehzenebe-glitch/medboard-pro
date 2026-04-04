@@ -241,6 +241,11 @@ var FEW_SHOT_PROMPT =
   "Full dose 100 mcg/day(B) contraindicated with CAD. Desiccated thyroid(C) has T3 component — cardiac risk. T3 monotherapy(D) causes rapid fluctuations — never for routine hypothyroidism. " +
   "PEARL:Elderly + CAD + hypothyroidism = levothyroxine 25 mcg/day — start low go slow regardless of TSH severity.\n\n" +
 
+  "EX9(ABIM-IM/DKA): Patient with DKA, BP 92/58, K+ 5.8, glucose 487, pH 7.22, on SGLT2i. " +
+  "Q:Most appropriate next step? " +
+  "CORRECT: IV Normal Saline 1-1.5 L/hr FIRST, then insulin infusion 0.1 units/kg/hr after K+ confirmed >=3.5, hold SGLT2i until full DKA resolution, blood cultures for sepsis workup. " +
+  "WHY: ADA 2025 DKA protocol mandates fluid resuscitation BEFORE insulin. K+ must be >=3.5 before insulin or fatal arrhythmia risk. SGLT2i held entire episode not just 24 hours. Hypotonic saline contraindicated in hyperosmolar state. " +
+  "PEARL: In DKA — fluids first, check potassium before insulin, never restart SGLT2i until full biochemical resolution.\n\n" +
   "Now generate ONE new MCQ matching this exact depth and quality for the specified topic.";
 
 // ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
@@ -351,7 +356,7 @@ function buildPrompt(level, requestedTopic) {
     "CRITICAL RULES:\n" +
     "1. Labs MUST match diagnosis: overt hypothyroidism = TSH>10 AND free T4 below reference range. Subclinical = TSH 4.5-10 AND normal free T4.\n" +
     "2. Overt hyperthyroidism = TSH<0.01 AND free T4 above reference range.\n" +
-    "3. DKA: glucose>250, pH<7.3, HCO3<18. Primary adrenal insufficiency: low cortisol + HIGH ACTH.\n" +
+    "3. DKA DIAGNOSIS: glucose>250, pH<7.3, HCO3<18, ketonemia. ADA 2025 DKA MANAGEMENT SEQUENCE: STEP 1 is IV Normal Saline 0.9% at 1-1.5 L/hr for first hour - this is the FIRST and IMMEDIATE intervention before anything else. STEP 2 check potassium - if K+ below 3.5 mEq/L hold insulin and replace potassium IV first. STEP 3 start insulin infusion 0.1 units/kg/hr only after fluid resuscitation is underway AND K+ confirmed at or above 3.5 mEq/L. STEP 4 when glucose drops to 200-250 mg/dL add dextrose to IV fluids but continue insulin until anion gap closes. STEP 5 hold SGLT2 inhibitors throughout entire DKA episode - restart only after full biochemical resolution. NEVER start insulin before or simultaneously with fluids as first step. NEVER use 0.45% hypotonic saline as initial fluid. Primary adrenal insufficiency: low cortisol + HIGH ACTH.\n" +
     "4. NEVER say 'pathognomonic'. NEVER use EXCEPT/NOT phrasing. NEVER use 'always'/'never' in options.\n" +
     "5. One clearly correct answer. Four plausible distractors representing real clinical cognitive errors (anchoring bias, premature closure, wrong subtype).\n" +
     "6. All 5 options must be same type (all diagnoses OR all treatments — never mix).\n" +
