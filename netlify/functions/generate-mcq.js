@@ -1,6 +1,6 @@
 // generate-mcq.js — MedBoard Pro
-// Model: claude-haiku-4-5-20251001
-// Clean rebuild — no patches
+// Model: claude-sonnet-4-6
+// Updated: April 2026
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -25,7 +25,7 @@ async function callClaude(systemText, userText) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-sonnet-4-6",
         max_tokens: 900,
         temperature: 0.6,
         system: systemText,
