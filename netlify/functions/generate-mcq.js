@@ -156,6 +156,12 @@ function selectExemplars(topic) {
       result += ALL_EXEMPLARS[selected[m]] + "\n";
     }
   }
+  // Add Step-specific exemplar based on level
+  if (level && level.includes("Step 1")) {
+    result += "STEP 1 STYLE EXEMPLAR — TWO-STEP MECHANISM: 19yo man, DKA, glucose 520, pH 7.21, 4+ ketones. Q: Overactivity of which enzyme provides primary precursors for ketonuria? CORRECT: Hormone-sensitive lipase. WHY: In insulin deficiency, HSL is uninhibited in adipose tissue — breaks down triglycerides into free fatty acids → overwhelms TCA cycle → ketone body formation. Lipoprotein lipase (A) is DECREASED in insulin deficiency — common trap. Acetyl-CoA carboxylase (B) is rate-limiting for fatty acid SYNTHESIS — also inhibited in DKA. PEARL: Step 1 diagnose first, then go to biochemistry — never ask what drug to give.\n\n";
+  } else if (level && level.includes("Step 3")) {
+    result += "STEP 3 STYLE EXEMPLAR — CONTEXT CHANGE MANAGEMENT: 28yo woman, 7 weeks gestation, 2-year Graves disease on methimazole 10 mg, currently euthyroid (TSH 1.2, free T4 1.3). Q: Most appropriate management? CORRECT: Switch methimazole to PTU immediately. WHY: Methimazole is teratogenic in first trimester (aplasia cutis congenita, methimazole embryopathy) — switch to PTU even when euthyroid. RAI is absolute contraindication in pregnancy. Discontinuing therapy risks thyroid storm and fetal loss. Note: Switch back to methimazole in second trimester due to PTU hepatotoxicity risk. PEARL: Step 3 — management changes when clinical CONTEXT changes, not just when disease changes.\n\n";
+  }
   return result;
 }
 
@@ -304,11 +310,17 @@ function buildPrompt(level, requestedTopic) {
 
   // Level instruction
   var levelNote = "";
-  if (level.includes("Step 1")) levelNote = "LEVEL: USMLE Step 1 — Test pathophysiology and mechanisms. WHY things happen, not management.";
-  else if (level.includes("Step 2")) levelNote = "LEVEL: USMLE Step 2 CK — Test clinical decision-making, next best step, differential diagnosis.";
-  else if (level.includes("Step 3")) levelNote = "LEVEL: USMLE Step 3 — Outpatient management, chronic disease, preventive care, ethics, biostatistics.";
-  else if (level.includes("ABIM Internal Medicine")) levelNote = "LEVEL: ABIM Internal Medicine — Guideline-driven management. Include inpatient and outpatient scenarios. Reference SHM for inpatient topics.";
-  else if (level.includes("ABIM Endocrinology")) levelNote = "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance per ADA, Endocrine Society, AACE, ATA.";
+  if (level.includes("Step 1")) {
+    levelNote = "LEVEL: USMLE Step 1 — TWO-STEP REASONING EXAM. Step 1 is a basic science and pathophysiology exam. The student first diagnoses the patient from the vignette, then answers a question about the underlying mechanism, biochemistry, pharmacology (mechanism of action), embryology, or cellular pathology of that diagnosis. NEVER ask for next step in management. Ask WHY things happen. Test hormone-sensitive lipase not DKA management. Test HLA associations not drug choices. Test receptor mechanisms not drug doses. Distractors represent related pathways that are wrong in context.";
+  } else if (level.includes("Step 2")) {
+    levelNote = "LEVEL: USMLE Step 2 CK — CLINICAL DIAGNOSIS AND NEXT BEST STEP EXAM. Shift away from bench science into the clinic. Test the algorithmic approach: which test comes first, which treatment is indicated NOW vs later. Distractors include correct tests or treatments ordered in the WRONG SEQUENCE. CRITICAL SETTING RULE: If patient is in outpatient/urgent care/primary care clinic with a condition requiring hospital-level care (DKA, sepsis, STEMI, stroke), the correct answer is to TRANSFER or ADMIT — never manage as if they are already inpatient. The sequence matters as much as the diagnosis.";
+  } else if (level.includes("Step 3")) {
+    levelNote = "LEVEL: USMLE Step 3 — INDEPENDENT PRACTICE AND NUANCED MANAGEMENT EXAM. Test transitions of care, drug safety in special populations (pregnancy, renal failure, elderly), long-term prognosis, and management shifts when clinical context changes. Example: euthyroid Graves patient at 7 weeks gestation on methimazole — switch to PTU immediately (methimazole teratogenicity first trimester). Test what changes when a new condition is added to a known disease. Distractors represent failure to recognize context changes.";
+  } else if (level.includes("ABIM Internal Medicine")) {
+    levelNote = "LEVEL: ABIM Internal Medicine — Guideline-driven clinical judgment. Equally test inpatient and outpatient scenarios. Reference SHM for inpatient topics. Include disease acuity in management decisions — moderate-severe disease warrants more aggressive escalation than mild disease even with the same diagnosis.";
+  } else if (level.includes("ABIM Endocrinology")) {
+    levelNote = "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance per ADA, Endocrine Society, AACE, ATA. Test guideline thresholds, special populations, drug sequencing, and monitoring intervals. Include complex multi-comorbidity scenarios.";
+  }
 
   // Society mapping
   var societyMap = "";
@@ -407,7 +419,9 @@ function buildPrompt(level, requestedTopic) {
     "16. AGP: fix TBR >4% before any hyperglycemia adjustment.\n" +
     "17. AID systems: micro-treat mild lows with 5–8g carbs (not Rule of 15).\n" +
     "18. GI bleeding: restrictive transfusion (Hgb threshold 7 g/dL).\n" +
-    "19. " + societyMap + "\n\n" +
+    "19. OUTPATIENT SETTING RULE: If the patient is in an outpatient clinic, urgent care, or primary care office and has a condition requiring hospital-level care (DKA, HHS, sepsis, STEMI, stroke, hypertensive emergency, adrenal crisis, thyroid storm) — the correct answer involves TRANSFER TO ED or ADMIT TO HOSPITAL, never inpatient management protocols performed in the outpatient setting. DKA in outpatient clinic = stabilize airway, start IV access if available, then transfer to ED immediately. NEVER answer 'start insulin infusion and await labs' for a patient still in clinic.\n" +
+    "20. DISEASE ACUITY DRIVES MANAGEMENT: Match treatment intensity to disease severity. Moderate-to-severe disease warrants escalation even if milder options are technically correct for mild disease. Example: UC with CRP 48, albumin 2.8, fecal calprotectin 1840 on optimized 5-ASA = biologic induction, not another 5-ASA dose increase.\n" +
+    "21. " + societyMap + "\n\n" +
 
     exemplars;
 
