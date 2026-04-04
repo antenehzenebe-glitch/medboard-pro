@@ -365,18 +365,18 @@ function buildPrompt(level, requestedTopic) {
   } else {
     boardTasks = [
       "most appropriate next step in management",
-      "most appropriate initial pharmacotherapy",
+      "most likely diagnosis",
+      "most appropriate next step in management",
       "most likely diagnosis",
       "most appropriate diagnostic study",
       "best long-term monitoring strategy",
-      "most appropriate next step in management",
       "most likely underlying mechanism or etiology",
-      "most appropriate initial pharmacotherapy",
-      "most likely diagnosis",
       "most appropriate next step in management",
-      "most appropriate change in management",
       "most likely complication of this condition",
+      "most appropriate change in management",
       "most likely cause of this patient's presentation",
+      "most appropriate initial treatment",
+      "most appropriate next step in management",
     ];
   }
   var selectedTask = boardTasks[Math.floor(Math.random() * boardTasks.length)];
@@ -448,7 +448,10 @@ function buildPrompt(level, requestedTopic) {
   var userText =
     levelNote + "\n\n" +
     topicInstruction + "\n\n" +
-    "STEM: 3-4 sentences." + imagingNote + cgmNote + " End with exactly this question: Which of the following is the " + selectedTask + "?\n" +
+    "STEM PHRASING RULE: NEVER end the stem with 'most appropriate initial pharmacotherapy' or 'pharmacotherapy'. " +
+    "The lead-in must use the exact task selected: Which of the following is the " + selectedTask + "? " +
+    "If the correct answer is a non-drug intervention (fluids, procedure, monitoring, CPAP, surgery), the task MUST be 'most appropriate next step in management' not pharmacotherapy.\n" +
+    "STEM: 3-4 sentences." + imagingNote + cgmNote + " End with exactly this question: Which of the following is the " + selectedTask + "?\\n" +
     "CHOICES: 5 options (A-E). One correct per current guidelines. Four plausible distractors.\n" +
     "EXPLANATION: 3 sentences max. (1) Why correct answer is right + guideline citation. (2) Why the 2 most tempting wrong answers are wrong + cognitive trap named. (3) One board pearl.\n\n" +
     "Return ONLY valid JSON — complete with all closing brackets. No markdown. No text outside JSON:\n" +
