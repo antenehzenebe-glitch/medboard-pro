@@ -34,7 +34,7 @@ async function callClaude(systemText, userText) {
           {
             type: "web_search_20260209",
             name: "web_search",
-            max_uses: 2,
+            max_uses: 1,
             allowed_domains: [
               "diabetes.org", "ada.org", "endocrine.org", "thyroid.org",
               "acc.org", "heart.org", "chest.org", "thoracic.org",
@@ -517,10 +517,21 @@ exports.handler = async function(event) {
 
     var raw = await callClaude(promptData.systemText, enrichedUserText);
 
-    var cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-    var jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) cleaned = jsonMatch[0];
-
+    // Robust JSON extraction - handles markdown, extra text, web search artifacts
+    var cleaned = raw;
+    // Remove markdown code blocks
+    cleaned = cleaned.replace(/^```json\s*/im, "").replace(/^```\s*/im, "").replace(/```\s*$/im, "").trim();
+    // Find the outermost JSON object
+    var firstBrace = cleaned.indexOf("{");
+    var lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1) {
+      throw new Error("No JSON object found in response");
+    }
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    // Validate basic structure before parsing
+    if (!cleaned.includes('"stem"') || !cleaned.includes('"choices"') || !cleaned.includes('"correct"')) {
+      throw new Error("AI returned invalid JSON. Please try again.");
+    }
     var parsed = JSON.parse(cleaned);
     parsed.imageUrl = parsed.imageUrl || promptData.radiopaediaLink || null;
     parsed.showImageButton = parsed.showImageButton || false;
