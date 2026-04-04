@@ -462,7 +462,13 @@ function buildPrompt(level, requestedTopic) {
     "19. GI bleeding: restrictive transfusion strategy — Hgb threshold 7 g/dL per TRICC/TRIGGER trials.\n" +
     "20. Sepsis: 30 mL/kg crystalloid then reassess dynamically — Surviving Sepsis Campaign 2021.\n" +
     "21. Methimazole in pregnancy: TERATOGENIC in first trimester (aplasia cutis congenita, methimazole embryopathy) — switch to PTU in first trimester even if euthyroid. Switch back to methimazole in second trimester due to PTU hepatotoxicity.\n" +
-    "22. " + societyMap + "\n\n" +
+"22. " + societyMap + "\n\n" +
+    "STRUCTURAL ITEM-WRITING RULES (ABIM STANDARD):\n" +
+    "A. COVER-THE-OPTIONS TEST: The stem + lead-in must point to the correct answer domain WITHOUT seeing the choices. If a test-taker can eliminate all wrong answers just by matching a keyword in the stem to a matching keyword in the correct answer, the item is structurally flawed. Example of FLAWED cueing: stem asks for a CLINICAL risk, only one option is a clinical outcome — test-taker matches the word clinical and bypasses reasoning. Fix: all 5 options must be from the same category (all clinical outcomes, all ethical principles, all management steps).\n" +
+    "B. NEVER PATHOLOGIZE CULTURAL PRACTICES: Do not frame a patient's cultural preference, religious belief, family decision-making style, or communication practice as the 'underlying condition'. These are NOT medical conditions. If a vignette involves cultural competency, the question must ask about clinical communication, the physician's appropriate response, or the ethical principle at stake — not the patient's background as a disease entity.\n" +
+    "C. NO FABRICATED URGENCY: Do not invent clinical urgency that does not exist in evidence-based medicine to force a correct answer. Example of FLAWED urgency: claiming that delaying a routine asymptomatic screening colonoscopy by one week creates meaningful cancer risk. The adenoma-to-carcinoma sequence takes YEARS. A one-week delay in an asymptomatic screening colonoscopy has ZERO measurable long-term clinical risk. Only use urgency when it genuinely exists clinically.\n" +
+    "D. HOMOGENEOUS ANSWER CHOICES: All 5 options must be from the same category. If the question asks about a clinical outcome, ALL 5 options must be clinical outcomes. If the question asks about next step in management, ALL 5 options must be management steps. NEVER mix clinical outcomes with ethical principles with interpersonal risks in the same option set.\n" +
+    "E. MATCH QUESTION TYPE TO VIGNETTE FOCUS: If the vignette narrative focuses on physician-patient communication, cultural dynamics, and medical ethics — the question should test those domains. Do NOT pivot suddenly to oncology staging in a vignette that was entirely about communication. The question type must match the dominant clinical theme of the vignette.\n\n" +
 
     exemplars;
 
