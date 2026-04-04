@@ -838,10 +838,11 @@ function App(){
                 )}
                 {busy&&(
                   <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,textAlign:"center",marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                      <p style={{color:"#f1f5f9",fontSize:14,fontWeight:600,margin:0}}>Generating your question...</p>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:8}}>
+                      <p style={{color:"#f1f5f9",fontSize:14,fontWeight:600,margin:0}}>Preparing your question...</p>
                       <div style={{width:8,height:8,borderRadius:"50%",background:GOLD,animation:"pulse 1s infinite"}}/>
                     </div>
+                    <p style={{color:"#334155",fontSize:11,margin:0}}>Applying NBME/ABIM standards · Verifying guideline accuracy</p>
                   </div>
                 )}
                 {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
