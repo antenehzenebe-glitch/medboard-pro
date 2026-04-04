@@ -286,6 +286,29 @@ var FEW_SHOT_PROMPT =
   "CORRECT: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr with frequent reassessment. " +
   "WHY: WATERFALL trial (NEJM 2022) changed standard of care - aggressive hydration (250-500 mL/hr NS) was halted early due to higher volume overload with no outcome benefit. LR preferred over NS to avoid hyperchloremic metabolic acidosis worsening SIRS. Antibiotics not indicated in sterile pancreatitis - only for confirmed infected necrosis. Octreotide does not improve outcomes - outdated practice. NG tube only for persistent vomiting/ileus not routine. " +
   "PEARL: Acute pancreatitis = moderate goal-directed LR not aggressive NS. WATERFALL 2022 ended the aggressive fluid dogma. When TG >1000 mg/dL consider HTG-induced pancreatitis.\n\n" +
+  "EX17(ABIM-Endo/Thyroid Cancer): 61yo Black man, total thyroidectomy + central neck dissection for 2.6cm PTC with extrathyroidal extension + 2/8 positive central nodes (ATA intermediate risk). " +
+  "Q: Greatest long-term clinical risk associated with the underlying malignancy? " +
+  "CORRECT: D - Locoregional recurrence in cervical lymph nodes (15-20% in ATA intermediate risk per ATA 2015). " +
+  "KEY TRAP: Hypoparathyroidism is a surgical complication NOT a cancer complication. Question specifically asks about the malignancy not the surgery. " +
+  "WHY: Anaplastic transformation <1% exceedingly rare. Distant mets <5% in intermediate risk - lung most common not bone/brain (those are follicular/anaplastic). " +
+  "PHRASING RULE: When question asks about complication of CANCER specifically - use 'greatest long-term clinical risk associated with the underlying malignancy' NOT 'complication of this condition' which is ambiguous and allows surgical complication answers. " +
+  "PEARL: ATA intermediate risk PTC (extrathyroidal extension or N1) has 15-20% locoregional recurrence - lifelong neck ultrasound every 6-12 months mandatory.\n\n" +
+  "EX18(ABIM-IM/OSA): 31yo woman, BMI 29, AHI 32, newly diagnosed moderate-to-severe OSA, CPAP titration scheduled next week. Excessive daytime sleepiness, witnessed apneas, morning headaches. " +
+  "Q: Most appropriate next step in management? " +
+  "CORRECT: D - Defer all pharmacotherapy and await the CPAP titration study without pharmacologic intervention. " +
+  "KEY TRAPS: Modafinil(A) FDA-approved ONLY for RESIDUAL daytime sleepiness after CPAP has been optimized - prescribing it before CPAP is tried is premature closure assuming CPAP will fail. Tirzepatide(B) now FDA-approved (SURMOUNT-OSA trial) for OSA reduction in overweight/obesity BUT CPAP remains definitive immediate first-line - weight loss takes months while patient needs airway protection now. Zolpidem(C) CONTRAINDICATED in untreated OSA - worsens upper airway collapse and risks fatal apnea. " +
+  "PHRASING NOTE: Use 'most appropriate next step in management' not 'pharmacotherapy' when answer is non-pharmacologic. " +
+  "PEARL: OSA has no pharmacologic cure - CPAP is definitive first-line. Tirzepatide is adjunct not replacement. Never prescribe wake-promoting agents before attempting PAP optimization.\n\n" +
+
+  "EX19(ABIM-Endo/Sheehan): 35yo woman, 14 months post-massive PPH requiring blood transfusion, amenorrhea, fatigue, 10lb weight loss, hypotension, loss of axillary/pubic hair, NO hyperpigmentation. Labs: Na 131, K 4.1, TSH 0.4, free T4 0.5 - central hypothyroidism. " +
+  "Q: Most critical next step BEFORE starting levothyroxine? " +
+  "CORRECT: A - Check 8AM serum cortisol or cosyntropin stimulation test. " +
+  "LIFE-THREATENING TRAP: Starting levothyroxine in unrecognized central adrenal insufficiency precipitates acute adrenal crisis - thyroid hormone increases hepatic cortisol clearance and raises metabolic rate, rapidly depleting already-deficient cortisol reserves. " +
+  "WHY NOT empirical hydrocortisone(B): Patient is stable not in acute crisis - biochemically confirm adrenal axis first before committing to chronic steroids. " +
+  "WHY NOT MRI first(C): Imaging is diagnostic not physiological safeguard - does not protect patient from adrenal crisis. " +
+  "WHY NOT aldosterone/renin(D): Central AI has intact RAAS - aldosterone regulated by renin/K+ not ACTH. Normal K+ 4.1 and no hyperpigmentation confirm central not primary AI. " +
+  "WHY NOT levothyroxine first(E): FATAL ERROR - absolute contraindication in suspected panhypopituitarism without first assessing adrenal axis. " +
+  "PEARL: In hypopituitarism - CORTISOL FIRST, THYROID SECOND. Always rule out secondary adrenal insufficiency before treating secondary hypothyroidism. This rule saves lives.\n\n" +
   "Now generate ONE new MCQ matching this exact depth and quality for the specified topic.";
 
 // ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
@@ -423,6 +446,16 @@ function buildPrompt(level, requestedTopic) {
     "   Sepsis: Surviving Sepsis 2021 - 30 mL/kg crystalloid then reassess with dynamic measures not fixed bolus protocols.\n" +
     "   Pneumonia: IDSA/ATS 2019 - severity-guided therapy, avoid over-treatment of low-risk CAP.\n" +
     "   ALWAYS prioritize landmark practice-changing trial data over older dogma in explanations.\n" +
+    "OSA MANAGEMENT (SURMOUNT-OSA 2024 UPDATE):\n" +
+    "   CPAP/PAP therapy = definitive first-line for all OSA regardless of severity.\n" +
+    "   Tirzepatide FDA-approved (SURMOUNT-OSA trial 2024) to REDUCE OSA severity in overweight/obesity - adjunct NOT replacement for CPAP.\n" +
+    "   Modafinil = ONLY for residual daytime sleepiness AFTER CPAP optimized - NEVER before CPAP trial.\n" +
+    "   Zolpidem/benzodiazepines = CONTRAINDICATED in untreated OSA.\n" +
+    "HYPOPITUITARISM RULE (LIFE-THREATENING):\n" +
+    "   ALWAYS assess and treat adrenal insufficiency BEFORE starting levothyroxine in suspected panhypopituitarism.\n" +
+    "   Levothyroxine in unrecognized central AI = acute adrenal crisis (increases cortisol clearance + raises metabolic rate).\n" +
+    "   Sequence: (1) Check 8AM cortisol or cosyntropin stim test. (2) Replace cortisol if deficient. (3) Then start levothyroxine.\n" +
+    "   Sheehan syndrome: postpartum hemorrhage + amenorrhea + loss of pubic/axillary hair + no hyperpigmentation = central panhypopituitarism.\n" +
     "DIABETES DRUG DOSING RULES (CRITICAL):\n" +
     "   Semaglutide SC: ALWAYS start 0.25mg weekly x4 weeks, then 0.5mg. NEVER start at 0.5mg - FDA labeling requires 0.25mg initiation to mitigate GI side effects.\n" +
     "   Semaglutide oral (Rybelsus): start 3mg daily x30 days, then 7mg.\n" +
@@ -448,7 +481,7 @@ function buildPrompt(level, requestedTopic) {
   var userText =
     levelNote + "\n\n" +
     topicInstruction + "\n\n" +
-    "STEM PHRASING RULE: NEVER end the stem with 'most appropriate initial pharmacotherapy' or 'pharmacotherapy'. " +
+    "STEM PHRASING RULE: NEVER end the stem with 'most appropriate initial pharmacotherapy' or 'pharmacotherapy'. When asking about cancer complications use 'greatest long-term clinical risk associated with the underlying malignancy' not 'complication of this condition' which is ambiguous (allows surgical vs cancer confusion). " +
     "The lead-in must use the exact task selected: Which of the following is the " + selectedTask + "? " +
     "If the correct answer is a non-drug intervention (fluids, procedure, monitoring, CPAP, surgery), the task MUST be 'most appropriate next step in management' not pharmacotherapy.\n" +
     "STEM: 3-4 sentences." + imagingNote + cgmNote + " End with exactly this question: Which of the following is the " + selectedTask + "?\\n" +
