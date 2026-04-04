@@ -51,117 +51,118 @@ async function callClaude(systemText, userText) {
   }
 }
 
-// ─── ALL 20 EXEMPLARS — indexed by tag ───────────────────────────────────────
+// ─── ALL 20 EXEMPLARS indexed by tag ─────────────────────────────────────────
 
 var ALL_EXEMPLARS = {
+  adrenal: "EX(Adrenal mass): 54yo man, resistant HTN, 15kg gain, DM, bruising, 3.8cm left adrenal mass, atrophic right adrenal, aldosterone 14/renin<0.6. CORRECT: Plasma metanephrines + 1mg DST before surgery. WHY: >2.4cm adrenal tumor requires excluding pheo AND hypercortisolism — contralateral atrophy suggests ACTH-independent Cushing. Surgery without cortisol testing risks adrenal crisis. PEARL: Adrenal tumor >2.4cm = complete hormonal workup before any intervention.\n",
 
-  adrenal: "EX1(Adrenal mass): 54yo man, resistant HTN, 15kg gain, DM, bruising, 3.8cm left adrenal mass, atrophic right adrenal, aldosterone 14/renin<0.6. CORRECT: Plasma metanephrines + 1mg DST before surgery. WHY: >2.4cm adrenal tumor requires excluding pheo AND hypercortisolism — contralateral atrophy suggests ACTH-independent Cushing. Surgery without cortisol testing risks adrenal crisis. PEARL: Adrenal tumor >2.4cm = complete hormonal workup before any intervention.\n",
+  pituitary: "EX(Pituitary incidentaloma): 28yo woman, 9mm pituitary adenoma abutting optic chiasm, normal labs, wants pregnancy. CORRECT: Surgical referral. WHY: Pituitary enlarges 3-fold in pregnancy — chiasm compression risk requires pre-conception surgery per Endocrine Society. PEARL: Nonfunctioning adenoma near chiasm + planned pregnancy = surgical referral before conception.\n",
 
-  pituitary: "EX2(Pituitary incidentaloma): 28yo woman, 9mm pituitary adenoma abutting optic chiasm, normal labs, wants pregnancy. CORRECT: Surgical referral. WHY: Pituitary enlarges 3-fold in pregnancy — chiasm compression risk. PEARL: Nonfunctioning adenoma near chiasm + planned pregnancy = surgical referral before conception.\n",
+  thyroid_dx: "EX(TSH resistance): 42yo man, TSH 12.1, free T4 normal, negative antibodies, normal US, child has same labs. CORRECT: TSH receptor resistance (TSHR inactivating variant). WHY: Elevated TSH + normal T4 + negative antibodies + family pattern excludes Hashimoto. RTH causes elevated T4 not normal T4. PEARL: Subclinical hypothyroid pattern + negative antibodies + family history = think TSHR gene mutation.\n",
 
-  thyroid_dx: "EX3(TSH resistance): 42yo man, TSH 12.1, free T4 normal, negative antibodies, normal US, child has same labs. CORRECT: TSH receptor resistance (TSHR inactivating variant). WHY: Elevated TSH + normal T4 + negative antibodies + family pattern excludes Hashimoto. PEARL: Subclinical hypothyroid pattern + negative antibodies + family history = think TSHR gene mutation.\n",
+  diabetes_screening: "EX(T1DM screening): 21yo woman, T1DM x3 years, HbA1c 6.8%, two consecutive normal eye exams. CORRECT: Fasting lipid profile. WHY: ADA — annual lipid profile from T1DM diagnosis day one. Nephropathy and neuropathy screening begin 5 years post-diagnosis. Two consecutive normal eye exams extend ophthalmology interval to 2 years. PEARL: Microvascular screening begins 5 years post-T1DM; lipid profile from day one.\n",
 
-  diabetes_screening: "EX4(T1DM screening): 21yo woman, T1DM x3 years, HbA1c 6.8%, two consecutive normal eye exams. Q: What is indicated now? CORRECT: Fasting lipid profile. WHY: ADA — annual lipid profile from T1DM diagnosis day one. Nephropathy and neuropathy screening begin 5 years post-diagnosis. Two normal eye exams extend interval to 2 years. PEARL: Microvascular screening begins 5 years post-T1DM; lipid profile from day one.\n",
+  virilization: "EX(Virilization): 38yo woman, rapid virilization 9 months, deepening voice, clitoromegaly, DHEAS 910 mcg/dL, testosterone 97. CORRECT: Abdominal CT first. WHY: DHEAS >700 = adrenal source. Pelvic US only when testosterone >200 with normal DHEAS. Venous sampling only after imaging. PEARL: DHEAS >700 with rapid virilization = adrenal carcinoma until proven otherwise — CT first.\n",
 
-  virilization: "EX5(Virilization): 38yo woman, rapid virilization, deepening voice, clitoromegaly, DHEAS 910 mcg/dL. CORRECT: Abdominal CT first. WHY: DHEAS >700 = adrenal source. Pelvic US only when testosterone >200 with normal DHEAS. PEARL: DHEAS >700 with rapid virilization = adrenal carcinoma until proven otherwise — CT first.\n",
+  thyroid_tx: "EX(Elderly hyperthyroidism): 83yo woman, overt hyperthyroidism confirmed x2, toxic MNG, CAD, osteoporosis. CORRECT: Start methimazole. WHY: Must achieve euthyroidism before RAI per ATA. Watchful waiting risks AFib and bone loss in CAD patient. PEARL: Elderly CAD + overt hyperthyroidism = methimazole first, never RAI without euthyroidism.\n",
 
-  thyroid_tx: "EX6(Elderly hyperthyroidism): 83yo woman, overt hyperthyroidism confirmed x2, toxic MNG, CAD, osteoporosis. CORRECT: Start methimazole. WHY: Must achieve euthyroidism before RAI per ATA. Watchful waiting risks AFib and bone loss. PEARL: Elderly CAD + overt hyperthyroidism = methimazole first, never RAI without euthyroidism.\n",
+  levothyroxine: "EX(Elderly hypothyroidism): 81yo man, CAD, TSH 25, FT4 0.5, bradycardia, delayed reflexes. CORRECT: Levothyroxine 25 mcg/day. WHY: ATA — start low go slow in elderly CAD regardless of TSH severity. Full dose risks MI from increased cardiac O2 demand and oxygen consumption. PEARL: Elderly + CAD + hypothyroidism = 25 mcg/day start always.\n",
 
-  cgm: "EX7(CGM before insulin adjustment): 45yo man, T2DM, HbA1c 8.5%, symptomatic hypoglycemia at unpredictable times, on MDI. CORRECT: Initiate CGM. WHY: Never adjust insulin blindly — ADA recommends CGM for all insulin users with hypoglycemia or above-target A1c. PEARL: Above-target HbA1c + hypoglycemia on insulin = CGM first.\n",
+  dka: "EX(DKA management): Patient with DKA in ED, BP 92/58, K+ 5.8, glucose 487, pH 7.22, on SGLT2i, fever, pyuria. CORRECT: IV NS 0.9% 1–1.5 L/hr FIRST, then check K+, then insulin 0.1 units/kg/hr only after K+ ≥3.5, hold SGLT2i entire episode, blood cultures. WHY: Fluids before insulin always — hypovolemia is immediate threat. K+ below 3.5 = hold insulin or fatal arrhythmia. PEARL: Fluids first, check K+ before insulin, SGLT2i hold until full biochemical resolution.\n",
 
-  levothyroxine: "EX8(Elderly hypothyroidism): 81yo man, CAD, TSH 25, FT4 0.5, bradycardia. CORRECT: Levothyroxine 25 mcg/day. WHY: ATA — start low go slow in elderly CAD regardless of TSH severity. Full dose risks MI from increased cardiac O2 demand. PEARL: Elderly + CAD + hypothyroidism = 25 mcg/day start.\n",
+  dka_outpatient: "EX(DKA outpatient setting): 42yo woman with T1DM presents to outpatient primary care clinic with 2 days nausea, vomiting, glucose 524, pH 7.18, bicarbonate 10, strongly positive ketones. CORRECT: Administer IV 0.9% NS and transfer to emergency department immediately. WHY: Outpatient clinic cannot safely manage DKA — patient needs inpatient IV insulin drip, continuous monitoring, electrolyte replacement. A 500 mL NS bolus alone before transfer is appropriate to stabilize, but starting insulin infusion in clinic is dangerous without monitoring capability. PEARL: DKA in outpatient setting = stabilize and transfer to ED. Never manage DKA in clinic.\n",
 
-  dka: "EX9(DKA management): Patient with DKA, BP 92/58, K+ 5.8, glucose 487, pH 7.22, on SGLT2i, fever, pyuria. CORRECT: IV NS 0.9% 1–1.5 L/hr FIRST, then check K+, then insulin infusion 0.1 units/kg/hr only after K+ ≥3.5, hold SGLT2i entire episode, blood cultures. WHY: Fluids before insulin always. K+ below 3.5 = hold insulin or fatal arrhythmia. PEARL: Fluids first, check K+ before insulin, SGLT2i hold until full biochemical resolution.\n",
+  cgm: "EX(CGM before insulin adjustment): 45yo man, T2DM, HbA1c 8.5%, symptomatic hypoglycemia at unpredictable times, on MDI metformin+glargine+lispro. CORRECT: Initiate CGM. WHY: Never adjust insulin blindly — ADA recommends CGM for all insulin users with hypoglycemia or above-target A1c. Increasing glargine worsens hypoglycemia without knowing timing. PEARL: Above-target HbA1c + hypoglycemia on insulin = CGM first.\n",
 
-  lipids: "EX10(Lipids — REDUCE-IT sequencing): 54yo Black man, T2DM, LDL 118, TG 285, no prior statin. CORRECT: High-intensity statin + lifestyle first, recheck 4–12 weeks, THEN add IPE only if TG ≥150 on stable statin. WHY: REDUCE-IT required stable statin x4 weeks — cannot diagnose persistent hypertriglyceridemia without first treating. Starting both simultaneously jumps the gun. PEARL: Statin first, IPE only after confirming persistent hypertriglyceridemia on stable statin.\n",
+  agp: "EX(AGP interpretation): 28yo woman, T1DM on CSII pump (no AID), TBR 6%, nocturnal hypoglycemia 55–65 mg/dL at 2–4 AM, rebound morning hyperglycemia 190–230 mg/dL. CORRECT: Decrease nocturnal basal rate 12–4 AM. WHY: Fix TBR >4% before any hyperglycemia adjustment — golden rule. Morning hyperglycemia is Somogyi rebound. Increasing morning basal worsens the underlying hypoglycemia. PEARL: Always look at TBR first on AGP.\n",
 
-  t2dm_dual: "EX11(T2DM dual therapy): 51yo Hispanic woman, HbA1c 8.9%, UACR 42, eGFR 78, no CVD. CORRECT: Metformin + semaglutide starting at 0.25 mg weekly (NOT 0.5 mg). WHY: ADA — dual therapy when HbA1c >8.5% with cardiorenal risk. FDA labeling requires semaglutide start at 0.25 mg x4 weeks before titrating. SGLT2i also indicated for albuminuria — note in explanation. PEARL: Semaglutide ALWAYS starts 0.25 mg weekly. Never 0.5 mg at initiation.\n",
+  aid: "EX(AID micro-treat): 34yo man, T1DM on hybrid closed-loop AID system, treats CGM alert at 65 mg/dL with 15g carbs (Rule of 15 from MDI training), glucose skyrockets to >250 two hours later. CORRECT: AID algorithm suspended basal via PLGS 20–45 min before low — advise 5–8g carbs only. WHY: By the time CGM alerts at 65, pump already applied the brakes. 15g on suspended insulin = rebound. PEARL: Rule of 15 obsolete on AID systems. Micro-treat mild lows with 5–8g carbs.\n",
 
-  hfref_sglt2: "EX12(HFrEF + T2DM): 64yo man, HFrEF LVEF 35%, HbA1c 7.4%, eGFR 58, on metformin+lisinopril+carvedilol. CORRECT: Add empagliflozin 10 mg daily regardless of HbA1c. WHY: ADA — SGLT2i mandatory in HFrEF (LVEF <40%) regardless of glycemic control. EMPEROR-Reduced and DAPA-HF reduce HF hospitalizations and CV death. Pioglitazone absolutely contraindicated in HF. PEARL: HFrEF + diabetes = SGLT2i non-negotiable regardless of A1c.\n",
+  lipids: "EX(Lipids — REDUCE-IT sequencing): 54yo Black man, T2DM, LDL 118, TG 285, no prior statin, poor dietary adherence. CORRECT: High-intensity statin + lifestyle first, recheck 4–12 weeks, THEN add IPE only if TG ≥150 on stable statin. WHY: REDUCE-IT required stable statin x4 weeks — cannot diagnose persistent hypertriglyceridemia without treating first. Lp(a) 62 nmol/L is mildly elevated — high risk threshold is >125 nmol/L per ESC/EAS. PEARL: Statin first, IPE only after confirming persistent hypertriglyceridemia on stable statin.\n",
 
-  catabolic_dm: "EX13(Catabolic T2DM): 48yo man, no prior DM, HbA1c 11.8%, 15-lb weight loss, glucose 345, trace ketones, normal anion gap. CORRECT: Basal insulin glargine 10 units daily. WHY: ADA — insulin first when HbA1c >10%, glucose ≥300, OR active catabolism. GLP-1 RA contraindicated in active catabolic state — promotes weight loss worsening catabolism. SGLT2i risks euglycemic DKA with trace ketones. PEARL: Weight loss + polyuria + HbA1c >10% = insulin first. Active catabolism = absolute insulin deficiency.\n",
+  t2dm_dual: "EX(T2DM dual therapy): 51yo Hispanic woman, HbA1c 8.9%, UACR 42, eGFR 78, BMI 32, no CVD, on lisinopril. CORRECT: Metformin + semaglutide starting at 0.25 mg weekly (NOT 0.5 mg — FDA labeling requires 0.25 mg initiation to mitigate GI side effects). WHY: ADA — dual therapy when HbA1c >8.5% with cardiorenal risk. SGLT2i also indicated for albuminuria — note in explanation. PEARL: Semaglutide ALWAYS starts 0.25 mg weekly x4 weeks. Never 0.5 mg at initiation.\n",
 
-  agp: "EX14(AGP interpretation): 28yo woman, T1DM on CSII pump (no AID), TBR 6%, nocturnal hypoglycemia 55–65 mg/dL at 2–4 AM, rebound fasting hyperglycemia 190–230 mg/dL at 8 AM. CORRECT: Decrease nocturnal basal rate 12–4 AM. WHY: Golden rule — fix TBR >4% before any hyperglycemia adjustment. Morning hyperglycemia is Somogyi rebound from nocturnal low. Increasing morning basal worsens the underlying hypoglycemia. PEARL: Always look at TBR first on AGP. Fix hypoglycemia before hyperglycemia.\n",
+  hfref_sglt2: "EX(HFrEF + T2DM): 64yo man, HFrEF LVEF 35%, HbA1c 7.4%, eGFR 58, on metformin+lisinopril+carvedilol+furosemide, euvolemic. CORRECT: Add empagliflozin 10 mg daily regardless of HbA1c. WHY: ADA — SGLT2i mandatory in HFrEF (LVEF <40%) regardless of glycemic control per EMPEROR-Reduced and DAPA-HF. Pioglitazone absolutely contraindicated in HF. GLP-1 RA has ASCVD benefit but NOT HF hospitalization reduction. PEARL: HFrEF + diabetes = SGLT2i non-negotiable regardless of A1c.\n",
 
-  aid: "EX15(AID micro-treat): 34yo man, T1DM on hybrid closed-loop AID system, treats CGM alert at 65 mg/dL with 15g carbs (old Rule of 15), glucose skyrockets to >250 mg/dL two hours later. CORRECT: AID algorithm suspended basal insulin via PLGS 20–45 min before the low — advise micro-treat with 5–8g carbs only. WHY: By the time CGM alerts at 65, pump already applying brakes. Adding 15g on suspended insulin = rebound hyperglycemia. PEARL: Rule of 15 obsolete on AID systems. Micro-treat mild lows with 5–8g carbs.\n",
+  catabolic_dm: "EX(Catabolic T2DM): 48yo man, no prior DM, HbA1c 11.8%, 15-lb weight loss, glucose 345, trace ketones, normal anion gap, stable vitals, outpatient clinic. CORRECT: Basal insulin glargine 10 units daily. WHY: ADA — insulin first when HbA1c >10%, glucose ≥300, OR active catabolism. GLP-1 RA contraindicated in active catabolic state — promotes weight loss worsening catabolism. SGLT2i risks euglycemic DKA with trace ketones. PEARL: Weight loss + polyuria + HbA1c >10% = insulin first. Active catabolism = absolute insulin deficiency.\n",
 
-  pancreatitis: "EX16(Acute pancreatitis): 22yo woman, lipase 1240, TG 1500 (HTG-induced), meets Revised Atlanta criteria. CORRECT: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr. WHY: WATERFALL trial (NEJM 2022) — aggressive NS halted early due to higher volume overload with no outcome benefit. LR preferred over NS to avoid hyperchloremic acidosis worsening SIRS. Antibiotics only for confirmed infected necrosis, never prophylactic. PEARL: Moderate LR not aggressive NS. WATERFALL 2022 ended the aggressive fluid dogma.\n",
+  pancreatitis: "EX(Acute pancreatitis): 22yo woman, lipase 1240, TG 1500 (HTG-induced), meets Revised Atlanta criteria. CORRECT: Moderate goal-directed IV Lactated Ringer's 1.5 mL/kg/hr. WHY: WATERFALL trial (NEJM 2022) — aggressive NS halted early due to higher volume overload with no outcome benefit. LR preferred over NS to avoid hyperchloremic acidosis worsening SIRS. Antibiotics only for confirmed infected necrosis. PEARL: Moderate LR not aggressive NS. WATERFALL 2022 ended the aggressive fluid dogma.\n",
 
-  thyroid_ca: "EX17(Papillary thyroid cancer): 61yo man, 2.6cm PTC, extrathyroidal extension, 2/8 positive central nodes (ATA intermediate risk), post-thyroidectomy. Q: Greatest long-term clinical risk associated with the underlying malignancy? CORRECT: Locoregional recurrence in cervical lymph nodes (15–20% ATA intermediate risk). KEY TRAP: Hypoparathyroidism is a SURGICAL complication not a cancer complication. PHRASING RULE: Always use 'greatest long-term clinical risk associated with the underlying malignancy' not 'complication of this condition'. PEARL: ATA intermediate risk = 15–20% locoregional recurrence — lifelong neck US surveillance mandatory.\n",
+  thyroid_ca: "EX(Papillary thyroid cancer): 61yo man, 2.6cm PTC, extrathyroidal extension, 2/8 positive central nodes (ATA intermediate risk). Q: Greatest long-term clinical risk associated with the underlying malignancy? CORRECT: Locoregional recurrence in cervical lymph nodes (15–20% ATA intermediate risk). KEY TRAP: Hypoparathyroidism is a SURGICAL complication not a cancer complication. PHRASING RULE: Use 'greatest long-term clinical risk associated with the underlying malignancy' not 'complication of this condition'. PEARL: ATA intermediate risk = 15–20% locoregional recurrence — lifelong neck US surveillance mandatory.\n",
 
-  osa: "EX18(OSA management): 31yo woman, BMI 29, AHI 32, CPAP titration scheduled next week. CORRECT: Defer all pharmacotherapy and await CPAP titration. WHY: CPAP = definitive first-line. Tirzepatide FDA-approved adjunct (SURMOUNT-OSA 2024) but NOT CPAP replacement — weight loss takes months while patient needs airway protection now. Modafinil only after CPAP optimized, never before. Zolpidem contraindicated in untreated OSA — worsens upper airway collapse. PEARL: OSA has no pharmacologic cure. CPAP is definitive first-line.\n",
+  osa: "EX(OSA management): 31yo woman, BMI 29, AHI 32, CPAP titration scheduled next week. CORRECT: Defer all pharmacotherapy and await CPAP titration. WHY: CPAP = definitive first-line. Tirzepatide FDA-approved adjunct (SURMOUNT-OSA 2024) but NOT CPAP replacement — weight loss takes months while patient needs airway protection now. Modafinil only after CPAP optimized, never before. Zolpidem contraindicated in untreated OSA. PEARL: OSA has no pharmacologic cure. CPAP is definitive first-line.\n",
 
-  sheehan: "EX19(Sheehan syndrome): 35yo woman, 14 months post-massive PPH requiring transfusion, amenorrhea, fatigue, 10-lb weight loss, hypotension, loss of axillary/pubic hair, NO hyperpigmentation. Lab: Na 131, K 4.1 (normal), TSH 0.4, free T4 0.5 — central hypothyroidism. Q: Most critical next step BEFORE starting levothyroxine? CORRECT: Check 8AM serum cortisol or cosyntropin stimulation test. FATAL TRAP: Levothyroxine before cortisol replacement precipitates acute adrenal crisis — thyroid hormone increases cortisol clearance and raises metabolic rate, rapidly depleting deficient cortisol. Normal K+ 4.1 confirms central not primary AI (RAAS intact). PEARL: Hypopituitarism = CORTISOL FIRST, THYROID SECOND. This rule saves lives.\n",
+  sheehan: "EX(Sheehan syndrome): 35yo woman, 14 months post-massive PPH, amenorrhea, fatigue, 10-lb weight loss, hypotension, loss of axillary/pubic hair, NO hyperpigmentation, Na 131, K 4.1 (normal), TSH 0.4, free T4 0.5 — central hypothyroidism confirmed. Q: Most critical next step BEFORE starting levothyroxine? CORRECT: Check 8AM serum cortisol or cosyntropin stimulation test. FATAL TRAP: Levothyroxine before cortisol replacement precipitates acute adrenal crisis. Normal K+ confirms central (not primary) AI — RAAS intact. PEARL: Hypopituitarism = CORTISOL FIRST, THYROID SECOND. This rule saves lives.\n",
 
-  hypoparathyroid: "EX20(Hypoparathyroidism): 29yo woman, 8 months post-thyroidectomy, symptomatic hypocalcemia, carpopedal spasm. On calcium carbonate 2500 mg TID (= 1000 mg elemental TID = 3g elemental/day, above 2.5g threshold), calcitriol 0.5 mcg BID (at ceiling). 24-hr urine calcium 410 mg/day (above 300 mg/day threshold). CORRECT: Add palopegteriparatide (Yorvipath) — FDA approved August 2024 for chronic hypoparathyroidism refractory to conventional therapy. NEVER rhPTH 1-84 (Natpara — recalled FDA 2019, globally discontinued, Special Use Program closed December 2025). CALCIUM MATH: Carbonate is 40% elemental — 1000mg carbonate = 400mg elemental. ALWAYS calculate elemental not salt weight. PEARL: Conventional therapy ceiling = 24hr urine Ca >300 mg/day on >2.5g elemental + calcitriol >0.5mcg BID. Modern answer is Yorvipath.\n"
+  hypoparathyroid: "EX(Hypoparathyroidism): 29yo woman, post-thyroidectomy, carpopedal spasm, calcium 7.2, PTH undetectable. On calcium carbonate 2500mg TID (= 1000mg elemental TID = 3g elemental/day, above 2.5g threshold), calcitriol 0.5mcg BID (at ceiling). 24-hr urine calcium 410 mg/day (above 300 mg/day threshold). CORRECT: Add palopegteriparatide (Yorvipath) — FDA approved August 2024. NEVER rhPTH 1-84 (Natpara — recalled FDA 2019, globally discontinued). CALCIUM MATH: Carbonate is 40% elemental — 1000mg carbonate = 400mg elemental. ALWAYS calculate elemental not salt weight. PEARL: Conventional therapy ceiling = 24hr urine Ca >300 mg/day on >2.5g elemental + calcitriol >0.5mcg BID. Modern answer is Yorvipath.\n",
+
+  ibd: "EX(UC refractory to 5-ASA): 64yo woman, moderate-to-severe UC (8–10 bloody stools/day), on optimized mesalamine 4.8g/day + mesalamine enemas x6 weeks with initial response but progressive worsening, CRP 48, fecal calprotectin 1840, albumin 2.8, HR 102. CORRECT: Discontinue mesalamine and initiate infliximab induction therapy with IV methylprednisolone bridging. WHY: Active inflammation despite optimized 5-ASA (CRP 48, fecal calprotectin >1800, hypoalbuminemia, tachycardia) = moderate-to-severe UC refractory to 5-ASA — biologic induction per ACG guidelines (Rubin et al. 2019). Adding oral prednisone alone (Option B) is the steroid bridge without definitive therapy — represents steroid dependence trap. Budesonide MMX (Option C) is for mild-to-moderate UC only — no role in this acuity. DISEASE ACUITY RULE: Match treatment intensity to disease severity. Fecal calprotectin >1500 + hypoalbuminemia + tachycardia = biologic induction, not another 5-ASA escalation. PEARL: 5-ASA has no role in a UC patient on optimized 5-ASA with fecal calprotectin >1500 plus hypoalbuminemia — the next step is biologic induction, not another steroid course.\n",
+
+  step1_mechanism: "STEP 1 EXEMPLAR (Two-step mechanism): 19yo man, DKA, glucose 520, pH 7.21, 4+ ketones. Q: Overactivity of which enzyme provides primary precursors for ketonuria? CORRECT: Hormone-sensitive lipase. WHY: In insulin deficiency, HSL is uninhibited in adipose tissue — breaks down triglycerides into free fatty acids → overwhelms TCA cycle → ketone body formation. Lipoprotein lipase is DECREASED in insulin deficiency (common trap). Acetyl-CoA carboxylase is rate-limiting for fatty acid SYNTHESIS — also inhibited in DKA. PEARL: Step 1 — diagnose first, then go to biochemistry. Never ask what drug to give.\n",
+
+  step3_context: "STEP 3 EXEMPLAR (Context-change management): 28yo woman, 7 weeks gestation, 2-year Graves disease on methimazole 10mg, currently euthyroid (TSH 1.2, free T4 1.3). CORRECT: Switch methimazole to PTU immediately. WHY: Methimazole is teratogenic in first trimester (aplasia cutis congenita, methimazole embryopathy) — switch to PTU even when euthyroid. RAI is absolute contraindication in pregnancy. Discontinuing therapy risks thyroid storm and fetal loss. Note: Switch back to methimazole in second trimester due to PTU hepatotoxicity risk. PEARL: Step 3 — management changes when clinical CONTEXT changes. Euthyroid status does not override teratogenicity risk.\n"
 };
 
-// ─── SELECT RELEVANT EXEMPLARS BY TOPIC ──────────────────────────────────────
+// ─── SELECT RELEVANT EXEMPLARS BY TOPIC AND LEVEL ────────────────────────────
 
-function selectExemplars(topic) {
+function selectExemplars(topic, level) {
   var t = topic.toLowerCase();
   var selected = [];
 
-  // Always include 1 endocrine and 1 general medicine exemplar
-  // Pick topic-relevant ones first, then fill with variety
   var tagMap = [
-    { tags: ["adrenal","cushing","aldoster","pheochro","cortisol"], key: "adrenal" },
-    { tags: ["pituitary","prolactin","acromegaly","apoplexy","sheehan"], key: "pituitary" },
-    { tags: ["sheehan","postpartum","hypopituit","panhypopituit"], key: "sheehan" },
-    { tags: ["thyroid","hashimoto","graves","hypothyroid","hyperthyroid","tsh"], key: "thyroid_dx" },
-    { tags: ["thyroid cancer","papillary","ptc","ata risk"], key: "thyroid_ca" },
-    { tags: ["methimazole","rai","thyrotoxic","toxic nodule"], key: "thyroid_tx" },
-    { tags: ["levothyroxine","levo","hypothyroid","myxedema"], key: "levothyroxine" },
+    { tags: ["adrenal","cushing","aldoster","pheochro","cortisol","virilism"], key: "adrenal" },
+    { tags: ["virilization","dheas","androgen","hirsutism","clitoromegaly"], key: "virilization" },
+    { tags: ["pituitary","prolactin","acromegaly","apoplexy"], key: "pituitary" },
+    { tags: ["sheehan","postpartum hemorrhage","hypopituit","panhypopituit"], key: "sheehan" },
+    { tags: ["thyroid nodule","thyroid cancer","ptc","papillary","ata risk","thyroidectomy"], key: "thyroid_ca" },
+    { tags: ["methimazole","rai","thyrotoxic","toxic nodule","graves","hyperthyroid"], key: "thyroid_tx" },
+    { tags: ["levothyroxine","hypothyroid","myxedema","tsh elevated"], key: "levothyroxine" },
+    { tags: ["tsh resistance","tshr","thyroid gene"], key: "thyroid_dx" },
     { tags: ["dka","diabetic ketoacidosis","ketoacidosis"], key: "dka" },
-    { tags: ["cgm","ambulatory glucose","agp","time in range","tir"], key: "cgm" },
-    { tags: ["agp","time in range","tir","tbr","sensor"], key: "agp" },
-    { tags: ["aid","closed loop","insulin pump","hybrid"], key: "aid" },
-    { tags: ["type 2 diabetes","t2dm","semaglutide","glp-1","sglt2","metformin","tirzepatide"], key: "t2dm_dual" },
+    { tags: ["cgm","ambulatory glucose","sensor","time in range"], key: "cgm" },
+    { tags: ["agp","tbr","tir","tar","gmi","nocturnal hypoglycemia"], key: "agp" },
+    { tags: ["aid","closed loop","insulin pump","hybrid closed"], key: "aid" },
+    { tags: ["t1dm","type 1 diabetes","microvascular screening"], key: "diabetes_screening" },
+    { tags: ["type 2 diabetes","t2dm","semaglutide","glp-1","sglt2","metformin","tirzepatide","dual therapy"], key: "t2dm_dual" },
     { tags: ["heart failure","hfref","lvef","empagliflozin","dapagliflozin"], key: "hfref_sglt2" },
-    { tags: ["catabolism","catabolic","weight loss","glucose 300","hba1c 10"], key: "catabolic_dm" },
-    { tags: ["lipid","statin","triglyceride","icosapent","pcsk9","dyslipidemia"], key: "lipids" },
-    { tags: ["pancreatitis","lipase","amylase"], key: "pancreatitis" },
-    { tags: ["osa","sleep apnea","cpap","apnea"], key: "osa" },
-    { tags: ["calcium","parathyroid","hypoparathyroid","yorvipath","natpara"], key: "hypoparathyroid" },
-    { tags: ["virilization","dheas","androgen","hirsutism"], key: "virilization" },
-    { tags: ["t1dm","type 1 diabetes","screening","microvascular"], key: "diabetes_screening" },
+    { tags: ["catabolic","catabolism","weight loss polyuria","hba1c 11","glucose 300"], key: "catabolic_dm" },
+    { tags: ["lipid","statin","triglyceride","icosapent","pcsk9","dyslipidemia","lp(a)"], key: "lipids" },
+    { tags: ["pancreatitis","lipase","amylase","waterfall"], key: "pancreatitis" },
+    { tags: ["sleep apnea","cpap","osa","apnea hypopnea"], key: "osa" },
+    { tags: ["calcium","parathyroid","hypoparathyroid","yorvipath","natpara","calcitriol"], key: "hypoparathyroid" },
+    { tags: ["ulcerative colitis","crohn","ibd","inflammatory bowel","mesalamine","infliximab","biologic"], key: "ibd" },
   ];
 
-  // Find matching exemplars
   for (var i = 0; i < tagMap.length; i++) {
     for (var j = 0; j < tagMap[i].tags.length; j++) {
       if (t.includes(tagMap[i].tags[j])) {
-        if (selected.indexOf(tagMap[i].key) === -1) {
-          selected.push(tagMap[i].key);
-        }
+        if (selected.indexOf(tagMap[i].key) === -1) selected.push(tagMap[i].key);
         break;
       }
     }
   }
 
-  // Always add a variety of exemplars if fewer than 3 matched
-  var fallbacks = ["dka", "lipids", "thyroid_dx", "hfref_sglt2", "pancreatitis", "osa", "sheehan", "hypoparathyroid"];
+  // Fill to 3 with variety if needed
+  var fallbacks = ["dka", "lipids", "sheehan", "hfref_sglt2", "pancreatitis", "ibd", "thyroid_ca", "hypoparathyroid"];
   for (var k = 0; k < fallbacks.length && selected.length < 3; k++) {
-    if (selected.indexOf(fallbacks[k]) === -1) {
-      selected.push(fallbacks[k]);
-    }
+    if (selected.indexOf(fallbacks[k]) === -1) selected.push(fallbacks[k]);
   }
 
-  // Cap at 4 exemplars max for speed
+  // Cap at 4 for speed
   selected = selected.slice(0, 4);
 
   var result = "Study these exemplars for clinical depth, reasoning style, and distractor logic:\n\n";
   for (var m = 0; m < selected.length; m++) {
-    if (ALL_EXEMPLARS[selected[m]]) {
-      result += ALL_EXEMPLARS[selected[m]] + "\n";
-    }
+    if (ALL_EXEMPLARS[selected[m]]) result += ALL_EXEMPLARS[selected[m]] + "\n";
   }
-  // Add Step-specific exemplar based on level
+
+  // Add level-specific exemplar
   if (level && level.includes("Step 1")) {
-    result += "STEP 1 STYLE EXEMPLAR — TWO-STEP MECHANISM: 19yo man, DKA, glucose 520, pH 7.21, 4+ ketones. Q: Overactivity of which enzyme provides primary precursors for ketonuria? CORRECT: Hormone-sensitive lipase. WHY: In insulin deficiency, HSL is uninhibited in adipose tissue — breaks down triglycerides into free fatty acids → overwhelms TCA cycle → ketone body formation. Lipoprotein lipase (A) is DECREASED in insulin deficiency — common trap. Acetyl-CoA carboxylase (B) is rate-limiting for fatty acid SYNTHESIS — also inhibited in DKA. PEARL: Step 1 diagnose first, then go to biochemistry — never ask what drug to give.\n\n";
+    result += ALL_EXEMPLARS["step1_mechanism"] + "\n";
   } else if (level && level.includes("Step 3")) {
-    result += "STEP 3 STYLE EXEMPLAR — CONTEXT CHANGE MANAGEMENT: 28yo woman, 7 weeks gestation, 2-year Graves disease on methimazole 10 mg, currently euthyroid (TSH 1.2, free T4 1.3). Q: Most appropriate management? CORRECT: Switch methimazole to PTU immediately. WHY: Methimazole is teratogenic in first trimester (aplasia cutis congenita, methimazole embryopathy) — switch to PTU even when euthyroid. RAI is absolute contraindication in pregnancy. Discontinuing therapy risks thyroid storm and fetal loss. Note: Switch back to methimazole in second trimester due to PTU hepatotoxicity risk. PEARL: Step 3 — management changes when clinical CONTEXT changes, not just when disease changes.\n\n";
+    result += ALL_EXEMPLARS["step3_context"] + "\n";
   }
+
   return result;
 }
 
@@ -169,64 +170,64 @@ function selectExemplars(topic) {
 
 var ABIM_IM_BLUEPRINT = [
   { weight:14, category:"Cardiovascular Disease", topics:["Coronary artery disease and ACS","Heart failure (HFrEF, HFpEF)","Atrial fibrillation","Valvular heart disease","Hypertension","Dyslipidemia and statin therapy","Pulmonary embolism","Infective endocarditis","Cardiac arrhythmias","Pericarditis and myocarditis","Aortic dissection"] },
-  { weight:9,  category:"Pulmonary Disease", topics:["COPD - GOLD staging","Asthma - step therapy","Community-acquired pneumonia","Interstitial lung disease and IPF","Obstructive sleep apnea","Pleural effusion","ARDS","Pulmonary hypertension","Pneumothorax"] },
+  { weight:9,  category:"Pulmonary Disease", topics:["COPD - GOLD staging","Asthma - step therapy","Community-acquired pneumonia","Interstitial lung disease and IPF","Obstructive sleep apnea","Pleural effusion - Light criteria","ARDS","Pulmonary hypertension","Pneumothorax"] },
   { weight:9,  category:"Endocrinology, Diabetes, and Metabolism", topics:["Type 2 diabetes - GLP-1 RA and SGLT2i","Type 1 diabetes and DKA","Hypothyroidism","Hyperthyroidism and Graves disease","Adrenal insufficiency","Cushing syndrome","Primary aldosteronism","Pheochromocytoma","Osteoporosis","Hypercalcemia and hyperparathyroidism","Prolactinoma and acromegaly"] },
-  { weight:9,  category:"Gastroenterology", topics:["Inflammatory bowel disease","Cirrhosis complications","GI bleeding","Hepatitis B","Hepatitis C","Acute pancreatitis","NAFLD and NASH","Peptic ulcer disease"] },
-  { weight:9,  category:"Infectious Disease", topics:["Sepsis and septic shock","HIV","Tuberculosis","Urinary tract infections","Skin and soft tissue infections","C. difficile colitis","Meningitis"] },
-  { weight:9,  category:"Rheumatology", topics:["Rheumatoid arthritis","Systemic lupus erythematosus","Gout","Giant cell arteritis and PMR","Ankylosing spondylitis","Vasculitis","Antiphospholipid syndrome"] },
-  { weight:6,  category:"Hematology", topics:["Iron deficiency anemia","Hemolytic anemia","Thrombocytopenia - ITP, TTP, HIT","Sickle cell disease","DVT and PE","Heparin-induced thrombocytopenia"] },
-  { weight:6,  category:"Nephrology", topics:["Acute kidney injury","CKD and SGLT2i","Glomerulonephritis","Hyponatremia","Hyperkalemia","Metabolic acidosis"] },
-  { weight:6,  category:"Medical Oncology", topics:["Lung cancer","Breast cancer","Lymphoma","Leukemia","Multiple myeloma","Oncologic emergencies"] },
-  { weight:4,  category:"Neurology", topics:["Ischemic stroke","Seizures","Multiple sclerosis","Parkinson disease","Dementia","Myasthenia gravis"] },
-  { weight:4,  category:"Psychiatry", topics:["Major depressive disorder","Bipolar disorder","Alcohol use disorder","Opioid use disorder","Delirium"] },
-  { weight:3,  category:"Preventive Medicine", topics:["Cancer screening - USPSTF","Biostatistics - NNT, sensitivity, specificity","Medical ethics","Health disparities"] },
+  { weight:9,  category:"Gastroenterology", topics:["Inflammatory bowel disease - Crohn vs UC","Cirrhosis - Child-Pugh, MELD, complications","GI bleeding - upper vs lower","Hepatitis B - serology and antivirals","Hepatitis C - DAA therapy","Acute pancreatitis - WATERFALL 2022","NAFLD and NASH","Peptic ulcer disease and H. pylori","Acute liver failure"] },
+  { weight:9,  category:"Infectious Disease", topics:["Sepsis and septic shock","HIV - ART initiation","Tuberculosis - latent vs active","Urinary tract infections","Skin and soft tissue infections","C. difficile colitis","Meningitis - empiric antibiotics"] },
+  { weight:9,  category:"Rheumatology", topics:["Rheumatoid arthritis - DMARDs and biologics","Systemic lupus erythematosus","Gout - acute management and ULT","Giant cell arteritis and PMR","Ankylosing spondylitis","Vasculitis - GPA","Antiphospholipid syndrome"] },
+  { weight:6,  category:"Hematology", topics:["Iron deficiency anemia","Hemolytic anemia","Thrombocytopenia - ITP, TTP, HIT","Sickle cell disease","DVT and PE - DOAC selection","Heparin-induced thrombocytopenia"] },
+  { weight:6,  category:"Nephrology", topics:["Acute kidney injury - KDIGO staging","CKD - staging and SGLT2i","Glomerulonephritis - nephritic vs nephrotic","Hyponatremia - SIADH and correction","Hyperkalemia - EKG changes and management","Metabolic acidosis - anion gap"] },
+  { weight:6,  category:"Medical Oncology", topics:["Lung cancer - targeted therapies","Breast cancer - hormone receptor and HER2","Lymphoma - Hodgkin vs non-Hodgkin","Leukemia - CML and TKI therapy","Multiple myeloma - CRAB criteria","Oncologic emergencies"] },
+  { weight:4,  category:"Neurology", topics:["Ischemic stroke - tPA and thrombectomy","Seizures - AED selection","Multiple sclerosis - DMT","Parkinson disease","Dementia - Alzheimer vs vascular vs Lewy body","Myasthenia gravis"] },
+  { weight:4,  category:"Psychiatry", topics:["Major depressive disorder - SSRI selection","Bipolar disorder - mood stabilizers","Alcohol use disorder - CIWA and thiamine","Opioid use disorder - buprenorphine","Delirium - causes and management"] },
+  { weight:3,  category:"Preventive Medicine", topics:["Cancer screening - USPSTF","Biostatistics - NNT, sensitivity, specificity","Medical ethics - informed consent","Health disparities and social determinants"] },
 ];
 
 var ABIM_ENDO_BLUEPRINT = [
-  { weight:24, category:"Diabetes Mellitus and Hypoglycemia", topics:["ADA Standards - glycemic targets","Type 2 diabetes - GLP-1 RA, SGLT2i, tirzepatide","Type 1 diabetes - MDI vs AID systems","DKA and HHS","Hypoglycemia unawareness","Inpatient glycemic management","CVOT data - GLP-1 RA and SGLT2i","Gestational diabetes","MODY and LADA"] },
-  { weight:15, category:"Thyroid Disorders", topics:["Hypothyroidism - primary vs central","Hashimoto thyroiditis","Hyperthyroidism - Graves disease","Thyroid storm","Thyroid nodule - ATA risk stratification","Thyroid cancer - RAI and surveillance","Thyroid disease in pregnancy","Amiodarone-induced thyroid disease","Central hypothyroidism"] },
-  { weight:15, category:"Calcium and Bone Disorders", topics:["Hypercalcemia - PTH vs PTHrP","Primary hyperparathyroidism","Hypoparathyroidism - palopegteriparatide (Yorvipath)","Osteoporosis - DXA, FRAX, bisphosphonates","Vitamin D deficiency","Paget disease of bone","Hypocalcemia"] },
-  { weight:12, category:"Lipids, Obesity, and Nutrition", topics:["Dyslipidemia - ACC/AHA statin intensity","PCSK9 inhibitors","Familial hypercholesterolemia","Hypertriglyceridemia","Obesity management - GLP-1 RA","Bariatric surgery","Metabolic syndrome"] },
-  { weight:10, category:"Adrenal Disorders", topics:["Primary adrenal insufficiency","Secondary adrenal insufficiency","Adrenal crisis","Cushing syndrome","Cushing disease vs ectopic ACTH","Primary aldosteronism","Pheochromocytoma","Adrenal incidentaloma","Congenital adrenal hyperplasia"] },
-  { weight:10, category:"Pituitary Disorders", topics:["Pituitary adenoma","Prolactinoma","Acromegaly","Cushing disease","Central diabetes insipidus","SIADH","Hypopituitarism - replacement priorities","Pituitary apoplexy","Sheehan syndrome"] },
-  { weight:7,  category:"Female Reproduction", topics:["PCOS","Menopause and HRT","Premature ovarian insufficiency","Amenorrhea workup","Hyperprolactinemia","Turner syndrome"] },
-  { weight:7,  category:"Male Reproduction", topics:["Male hypogonadism","Klinefelter syndrome","Male infertility","Testosterone therapy","Delayed puberty"] },
+  { weight:24, category:"Diabetes Mellitus and Hypoglycemia", topics:["ADA Standards - glycemic targets","Type 2 diabetes - GLP-1 RA, SGLT2i, tirzepatide","Type 1 diabetes - MDI vs AID systems and CGM","DKA and HHS - diagnosis and management","Hypoglycemia unawareness - prevention","Inpatient glycemic management","CVOT data - GLP-1 RA and SGLT2i","Gestational diabetes","MODY and LADA - genetic testing"] },
+  { weight:15, category:"Thyroid Disorders", topics:["Hypothyroidism - primary vs central","Hashimoto thyroiditis - TPO antibodies","Hyperthyroidism - Graves disease, toxic nodular goiter","Thyroid storm - Burch-Wartofsky score","Thyroid nodule - ATA ultrasound risk stratification","Thyroid cancer - RAI and TSH suppression","Thyroid disease in pregnancy","Amiodarone-induced thyroid disease","Central hypothyroidism"] },
+  { weight:15, category:"Calcium and Bone Disorders", topics:["Hypercalcemia - PTH vs PTHrP vs vitamin D","Primary hyperparathyroidism - surgical criteria","Hypoparathyroidism - palopegteriparatide (Yorvipath)","Osteoporosis - DXA, FRAX, bisphosphonates, denosumab, romosozumab","Vitamin D deficiency","Paget disease of bone","Hypocalcemia - acute IV calcium and chronic management"] },
+  { weight:12, category:"Lipids, Obesity, and Nutrition", topics:["Dyslipidemia - ACC/AHA statin intensity","PCSK9 inhibitors - CVOT evidence","Familial hypercholesterolemia","Hypertriglyceridemia - fibrates and omega-3","Obesity management - GLP-1 RA for weight loss","Bariatric surgery - metabolic outcomes","Metabolic syndrome"] },
+  { weight:10, category:"Adrenal Disorders", topics:["Primary adrenal insufficiency - autoimmune","Secondary adrenal insufficiency - ACTH stimulation test","Adrenal crisis - IV hydrocortisone","Cushing syndrome - UFC, late-night salivary cortisol","Cushing disease vs ectopic ACTH - IPSS","Primary aldosteronism - PAC/PRA, AVS","Pheochromocytoma - plasma metanephrines","Adrenal incidentaloma - hormonal workup","Congenital adrenal hyperplasia"] },
+  { weight:10, category:"Pituitary Disorders", topics:["Pituitary adenoma - micro vs macro","Prolactinoma - cabergoline and pregnancy","Acromegaly - IGF-1, somatostatin analogs","Cushing disease - petrosal sinus sampling","Central diabetes insipidus - desmopressin","SIADH - euvolemic hyponatremia","Hypopituitarism - replacement priorities","Pituitary apoplexy","Sheehan syndrome"] },
+  { weight:7,  category:"Female Reproduction", topics:["PCOS - Rotterdam criteria","Menopause - vasomotor symptoms and HRT","Premature ovarian insufficiency","Amenorrhea - primary vs secondary workup","Hyperprolactinemia","Turner syndrome - estrogen replacement"] },
+  { weight:7,  category:"Male Reproduction", topics:["Male hypogonadism - primary vs secondary","Klinefelter syndrome - 47XXY","Male infertility - azoospermia workup","Testosterone therapy - monitoring","Delayed puberty vs constitutional growth delay"] },
 ];
 
 var USMLE_STEP1_BLUEPRINT = [
-  { weight:16, category:"Reproductive and Endocrine Systems", topics:["HPG axis - feedback loops","Thyroid hormone synthesis","Adrenal cortex zones","Insulin and glucagon physiology","Type 1 diabetes - HLA-DR3/DR4","CAH - enzyme deficiencies","Androgen insensitivity","5-alpha reductase deficiency"] },
-  { weight:13, category:"Behavioral Health and Nervous Systems", topics:["Neurotransmitters","Antidepressant mechanisms","Antipsychotics - D2 blockade","Mood stabilizers - lithium","Opioid pharmacology","Autonomic pharmacology","Stroke syndromes"] },
-  { weight:13, category:"Respiratory and Renal Systems", topics:["PFTs - obstructive vs restrictive","Hypoxemia mechanisms","Acid-base disorders","Renal tubular physiology","Diuretics by segment","RAAS","Nephritic vs nephrotic"] },
-  { weight:11, category:"Cardiovascular System", topics:["Cardiac action potential","Frank-Starling law","Antiarrhythmics - Vaughan-Williams","Atherosclerosis","MI biomarkers and ECG","Congenital heart defects"] },
-  { weight:10, category:"Blood and Immune Systems", topics:["Anemia classification","Clotting cascade","Hypersensitivity reactions","Immunodeficiencies","Complement system"] },
-  { weight:9,  category:"Gastrointestinal System", topics:["GI hormones","Liver metabolism","Bilirubin metabolism","H. pylori","Hepatitis viruses serology"] },
-  { weight:5,  category:"Biostatistics and Epidemiology", topics:["Sensitivity and specificity","PPV and NPV","Study designs","NNT calculation"] },
+  { weight:16, category:"Reproductive and Endocrine Systems", topics:["Hypothalamic-pituitary-gonadal axis - feedback loops","Thyroid hormone synthesis - iodination steps","Adrenal cortex zones - glomerulosa, fasciculata, reticularis","Insulin and glucagon - fed vs fasted state physiology","Type 1 diabetes - HLA-DR3/DR4, autoimmune destruction","CAH - 21-hydroxylase deficiency enzyme block","Androgen insensitivity syndrome - 46XY female phenotype","5-alpha reductase deficiency - ambiguous genitalia"] },
+  { weight:13, category:"Behavioral Health and Nervous Systems", topics:["Neurotransmitters - dopamine, serotonin, GABA, glutamate","Antidepressants - SSRI, SNRI, TCA, MAOI mechanisms","Antipsychotics - D2 receptor blockade and EPS","Mood stabilizers - lithium mechanism and toxicity","Opioid pharmacology - mu receptor and naloxone","Autonomic pharmacology - alpha and beta receptors","Stroke syndromes - MCA, PCA, PICA territories"] },
+  { weight:13, category:"Respiratory and Renal Systems", topics:["PFTs - obstructive vs restrictive patterns","Hypoxemia mechanisms - V/Q mismatch vs shunt","Acid-base disorders - compensatory responses","Renal tubular physiology - PCT, loop, DCT transport","Diuretics - site of action by segment","RAAS - angiotensin II and aldosterone effects","Nephritic vs nephrotic - pathologic types"] },
+  { weight:11, category:"Cardiovascular System", topics:["Cardiac action potential - pacemaker vs ventricular","Frank-Starling law - preload and afterload","Antiarrhythmics - Vaughan-Williams classification","Atherosclerosis - foam cells and fibrous plaque","MI biomarkers - troponin, CK-MB timing","Congenital heart defects - VSD, ASD, PDA, TOF"] },
+  { weight:10, category:"Blood and Immune Systems", topics:["Anemia classification - microcytic, normocytic, macrocytic","Clotting cascade - intrinsic vs extrinsic pathway","Hypersensitivity reactions - Type I through IV","Immunodeficiencies - B vs T cell and combined","Complement system - classical vs alternative pathway"] },
+  { weight:9,  category:"Gastrointestinal System", topics:["GI hormones - gastrin, secretin, CCK, GIP actions","Liver metabolism - glycolysis and gluconeogenesis","Bilirubin metabolism - prehepatic, hepatic, posthepatic","H. pylori - urease and virulence factors","Hepatitis viruses - A, B, C, D, E serology patterns"] },
+  { weight:5,  category:"Biostatistics and Epidemiology", topics:["Sensitivity vs specificity - ROC curve","PPV and NPV - prevalence effect","Study designs - RCT, cohort, case-control","NNT and NNH calculation"] },
 ];
 
 var USMLE_STEP2_BLUEPRINT = [
-  { weight:13, category:"Cardiovascular System", topics:["Chest pain - ACS and HEART score","STEMI management","Heart failure - GDMT","Atrial fibrillation - CHA2DS2-VASc","Hypertensive urgency vs emergency","Aortic stenosis - TAVR vs SAVR"] },
-  { weight:12, category:"Renal, Urinary, and Reproductive Systems", topics:["Acute kidney injury","CKD complications","Hyponatremia - SIADH","UTI and pyelonephritis","Ovarian cancer","Testicular cancer"] },
-  { weight:11, category:"Legal, Ethical Issues, and Patient Safety", topics:["Informed consent","Confidentiality","End-of-life care","Medical errors","Advance directives"] },
-  { weight:10, category:"Behavioral Health", topics:["Suicide risk assessment","Major depression","Bipolar disorder","Substance use disorders","Eating disorders - refeeding"] },
-  { weight:10, category:"Nervous System", topics:["Stroke - tPA eligibility","Seizure workup","Headache types","Multiple sclerosis","Vertigo - BPPV vs central"] },
-  { weight:9,  category:"Musculoskeletal and Skin", topics:["Low back pain - red flags","Gout - acute management","Cellulitis - MRSA","Melanoma workup"] },
-  { weight:8,  category:"Respiratory System", topics:["Pneumonia - PORT/PSI","COPD exacerbation","Pulmonary embolism - Wells","Lung cancer - screening"] },
-  { weight:7,  category:"Endocrine System", topics:["Diabetes - A1c targets","Thyroid nodule - FNA","Adrenal insufficiency stress dosing","Cushing screening","Hypercalcemia workup"] },
-  { weight:7,  category:"Pregnancy and Childbirth", topics:["Preeclampsia","Gestational diabetes","Placenta previa vs abruption","Postpartum hemorrhage","Ectopic pregnancy"] },
-  { weight:6,  category:"Gastrointestinal System", topics:["Upper GI bleeding - Rockall","Acute pancreatitis - BISAP","Cirrhosis - SBP and hepatorenal","IBD management"] },
+  { weight:13, category:"Cardiovascular System", topics:["Chest pain - ACS evaluation and HEART score","STEMI management - door-to-balloon time","Heart failure - GDMT and diuresis","Atrial fibrillation - CHA2DS2-VASc anticoagulation","Hypertensive urgency vs emergency","Aortic stenosis - TAVR vs SAVR criteria"] },
+  { weight:12, category:"Renal, Urinary, and Reproductive Systems", topics:["Acute kidney injury - prerenal vs intrinsic","CKD complications - anemia and hyperkalemia","Hyponatremia - SIADH and correction rate","UTI - uncomplicated vs pyelonephritis","Ovarian cancer - CA-125 and BRCA","Testicular cancer - germ cell workup"] },
+  { weight:11, category:"Legal, Ethical Issues, and Patient Safety", topics:["Informed consent - capacity assessment","Confidentiality - duty to warn","End-of-life care - withdrawal and futility","Medical errors - disclosure","Advance directives - DNR and POLST"] },
+  { weight:10, category:"Behavioral Health", topics:["Suicide risk assessment - protective factors","Major depression - PHQ-9 and SSRI","Bipolar disorder - mood stabilizer selection","Substance use disorders - CAGE questionnaire","Eating disorders - refeeding syndrome"] },
+  { weight:10, category:"Nervous System", topics:["Stroke - NIHSS and tPA eligibility window","Seizure - first unprovoked workup","Headache - migraine vs tension vs cluster","Multiple sclerosis - McDonald criteria","Vertigo - BPPV vs central causes"] },
+  { weight:9,  category:"Musculoskeletal and Skin", topics:["Low back pain - red flags and imaging","Gout - acute management and allopurinol timing","Cellulitis - MRSA risk and antibiotics","Melanoma - biopsy and sentinel lymph node"] },
+  { weight:8,  category:"Respiratory System", topics:["Pneumonia - PORT/PSI and antibiotic selection","COPD exacerbation - bronchodilators and NIV","Pulmonary embolism - Wells score","Lung cancer - LDCT screening and targeted therapy"] },
+  { weight:7,  category:"Endocrine System", topics:["Diabetes - A1c targets and insulin adjustment","Thyroid nodule - ultrasound features and FNA","Adrenal insufficiency - stress dosing","Cushing syndrome - screening tests","Calcium disorders - hypercalcemia workup"] },
+  { weight:7,  category:"Pregnancy and Childbirth", topics:["Preeclampsia - BP criteria and management","Gestational diabetes - GCT and OGTT","Placenta previa vs abruptio placentae","Postpartum hemorrhage - oxytocin protocol","Ectopic pregnancy - beta-hCG and methotrexate"] },
+  { weight:6,  category:"Gastrointestinal System", topics:["Upper GI bleeding - Rockall score and endoscopy","Acute pancreatitis - BISAP and fluid resuscitation","Cirrhosis complications - SBP and hepatorenal syndrome","IBD - disease acuity and biologic escalation"] },
 ];
 
 var USMLE_STEP3_BLUEPRINT = [
-  { weight:13, category:"Biostatistics and Population Health", topics:["Evidence-based medicine","Screening statistics","Clinical decision making - pre-test probability","Study design","NNT and ARR","Quality improvement - PDSA"] },
-  { weight:11, category:"Cardiovascular System", topics:["Outpatient heart failure - GDMT titration","Secondary prevention post-MI","Hypertension by comorbidity","Atrial fibrillation - anticoagulation","Peripheral vascular disease"] },
-  { weight:10, category:"Nervous System", topics:["Stroke secondary prevention","Epilepsy - driving restrictions","Parkinson disease","Dementia types","Migraine prophylaxis"] },
-  { weight:9,  category:"Communication and Ethics", topics:["Informed consent - capacity","Advance care planning","Breaking bad news - SPIKES","Medical errors disclosure","Palliative vs hospice"] },
-  { weight:9,  category:"Respiratory System", topics:["COPD - LABA/LAMA","Asthma biologics","OSA - CPAP adherence","IPF - antifibrotic therapy"] },
-  { weight:8,  category:"Endocrine System", topics:["Diabetes - A1c by age and comorbidity","Thyroid nodule surveillance","Adrenal incidentaloma follow-up","Metabolic syndrome"] },
-  { weight:7,  category:"Gastrointestinal System", topics:["Colonoscopy surveillance intervals","Hepatitis C - DAA and cirrhosis surveillance","IBD maintenance therapy"] },
-  { weight:6,  category:"Renal and Urinary", topics:["CKD - BP targets and SGLT2i","BPH management","Nephrolithiasis workup"] },
-  { weight:6,  category:"Behavioral Health", topics:["Depression - augmentation","Anxiety - CBT and medication","Substance use - MAT","ADHD in adults"] },
-  { weight:5,  category:"Musculoskeletal System", topics:["Osteoarthritis - non-pharmacologic","RA monitoring - DAS28","Gout prophylaxis","Osteoporosis - medication holidays"] },
+  { weight:13, category:"Biostatistics and Population Health", topics:["Evidence-based medicine - meta-analysis interpretation","Screening statistics - sensitivity and specificity","Clinical decision making - pre-test probability","Study design selection","Absolute vs relative risk reduction and NNT","Quality improvement - PDSA cycle"] },
+  { weight:11, category:"Cardiovascular System", topics:["Outpatient heart failure - GDMT titration","Secondary prevention post-MI","Hypertension management - drug by comorbidity","Atrial fibrillation - long-term anticoagulation","Peripheral vascular disease - ABI"] },
+  { weight:10, category:"Nervous System", topics:["Outpatient stroke - secondary prevention","Epilepsy - driving restrictions","Parkinson disease - motor fluctuations","Dementia - Alzheimer vs vascular vs Lewy body","Migraine prophylaxis"] },
+  { weight:9,  category:"Communication and Ethics", topics:["Informed consent - capacity and surrogates","Advance care planning - DNR and goals of care","Breaking bad news - SPIKES protocol","Medical errors - disclosure and apology","Palliative vs hospice"] },
+  { weight:9,  category:"Respiratory System", topics:["COPD - LABA/LAMA combinations and oxygen criteria","Asthma - step-up therapy and biologics","OSA - CPAP adherence and adjunct therapy","IPF - antifibrotic therapy"] },
+  { weight:8,  category:"Endocrine System", topics:["Diabetes - A1c targets by age and comorbidity","Thyroid nodule - long-term surveillance","Adrenal incidentaloma - follow-up imaging","Metabolic syndrome - lifestyle intervention"] },
+  { weight:7,  category:"Gastrointestinal System", topics:["Surveillance colonoscopy - adenoma intervals","Hepatitis C - DAA and cirrhosis surveillance","IBD - maintenance therapy and dysplasia surveillance"] },
+  { weight:6,  category:"Renal and Urinary", topics:["CKD management - BP targets and SGLT2i","BPH - alpha-blockers and 5-alpha reductase inhibitors","Nephrolithiasis - metabolic workup"] },
+  { weight:6,  category:"Behavioral Health", topics:["Depression - augmentation strategies","Anxiety - CBT and medication management","Substance use - motivational interviewing and MAT","ADHD in adults - stimulant therapy"] },
+  { weight:5,  category:"Musculoskeletal System", topics:["Osteoarthritis - non-pharmacologic and NSAID risks","RA monitoring - DAS28 and methotrexate toxicity","Gout prophylaxis - allopurinol titration","Osteoporosis - DEXA surveillance and medication holidays"] },
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -308,46 +309,79 @@ function buildPrompt(level, requestedTopic) {
   var t = specificTopic.toLowerCase();
   var radiopaediaLink = getRadiopaediaLink(specificTopic);
 
-  // Level instruction
+  // ─── LEVEL-SPECIFIC PHILOSOPHY ────────────────────────────────────────────
+
   var levelNote = "";
   if (level.includes("Step 1")) {
-    levelNote = "LEVEL: USMLE Step 1 — TWO-STEP REASONING EXAM. Step 1 is a basic science and pathophysiology exam. The student first diagnoses the patient from the vignette, then answers a question about the underlying mechanism, biochemistry, pharmacology (mechanism of action), embryology, or cellular pathology of that diagnosis. NEVER ask for next step in management. Ask WHY things happen. Test hormone-sensitive lipase not DKA management. Test HLA associations not drug choices. Test receptor mechanisms not drug doses. Distractors represent related pathways that are wrong in context.";
+    levelNote =
+      "LEVEL: USMLE Step 1 — TWO-STEP REASONING. This is a basic science and pathophysiology exam.\n" +
+      "Step 1: Diagnose the patient from the vignette.\n" +
+      "Step 2: Answer a question about the UNDERLYING MECHANISM, BIOCHEMISTRY, ENZYME, RECEPTOR, PHARMACOLOGY, or CELLULAR PATHOLOGY of that diagnosis.\n" +
+      "NEVER ask 'most appropriate next step in management' on Step 1.\n" +
+      "NEVER ask which drug to prescribe.\n" +
+      "ASK: Which enzyme? Which receptor? Which pathway? Why does this happen biochemically?\n" +
+      "EXAMPLE TASKS: 'most likely underlying mechanism', 'most likely pathophysiologic explanation', 'overactivity of which enzyme', 'most likely cause of this lab finding'\n" +
+      "Distractors = related pathways, enzymes, or receptors that are wrong in this specific context.";
   } else if (level.includes("Step 2")) {
-    levelNote = "LEVEL: USMLE Step 2 CK — CLINICAL DIAGNOSIS AND NEXT BEST STEP EXAM. Shift away from bench science into the clinic. Test the algorithmic approach: which test comes first, which treatment is indicated NOW vs later. Distractors include correct tests or treatments ordered in the WRONG SEQUENCE. CRITICAL SETTING RULE: If patient is in outpatient/urgent care/primary care clinic with a condition requiring hospital-level care (DKA, sepsis, STEMI, stroke), the correct answer is to TRANSFER or ADMIT — never manage as if they are already inpatient. The sequence matters as much as the diagnosis.";
+    levelNote =
+      "LEVEL: USMLE Step 2 CK — CLINICAL DIAGNOSIS AND NEXT BEST STEP.\n" +
+      "Test the algorithmic approach: which test first, which treatment is indicated NOW vs later.\n" +
+      "Distractors = correct tests or treatments in the WRONG SEQUENCE.\n" +
+      "CRITICAL OUTPATIENT SETTING RULE: If patient is in outpatient clinic, urgent care, or primary care and has a condition requiring hospital-level care (DKA, sepsis, STEMI, stroke, adrenal crisis, thyroid storm, hypertensive emergency) — the correct answer is TRANSFER TO ED or ADMIT. NEVER answer 'start IV insulin infusion' or 'start IV fluids protocol' for a patient still sitting in clinic. The correct management of DKA in the outpatient setting is to give a brief stabilizing IV bolus and transfer to the ED immediately.";
   } else if (level.includes("Step 3")) {
-    levelNote = "LEVEL: USMLE Step 3 — INDEPENDENT PRACTICE AND NUANCED MANAGEMENT EXAM. Test transitions of care, drug safety in special populations (pregnancy, renal failure, elderly), long-term prognosis, and management shifts when clinical context changes. Example: euthyroid Graves patient at 7 weeks gestation on methimazole — switch to PTU immediately (methimazole teratogenicity first trimester). Test what changes when a new condition is added to a known disease. Distractors represent failure to recognize context changes.";
+    levelNote =
+      "LEVEL: USMLE Step 3 — INDEPENDENT PRACTICE AND NUANCED MANAGEMENT.\n" +
+      "Test transitions of care, drug safety in special populations (pregnancy, renal failure, elderly), long-term monitoring, and management changes when clinical context shifts.\n" +
+      "KEY CONCEPT: A patient who is stable on therapy may still need a medication CHANGE based on a new context (e.g., pregnancy, new organ failure, new comorbidity).\n" +
+      "Example: Euthyroid Graves patient on methimazole who becomes pregnant in first trimester = switch to PTU immediately even though she is well controlled.\n" +
+      "Distractors = failure to recognize context changes, or correct drug at wrong timing.";
   } else if (level.includes("ABIM Internal Medicine")) {
-    levelNote = "LEVEL: ABIM Internal Medicine — Guideline-driven clinical judgment. Equally test inpatient and outpatient scenarios. Reference SHM for inpatient topics. Include disease acuity in management decisions — moderate-severe disease warrants more aggressive escalation than mild disease even with the same diagnosis.";
+    levelNote =
+      "LEVEL: ABIM Internal Medicine — Guideline-driven clinical judgment at the attending level.\n" +
+      "Test BOTH inpatient and outpatient management with equal frequency.\n" +
+      "Reference Society of Hospital Medicine (SHM) guidelines for inpatient hospital medicine topics.\n" +
+      "DISEASE ACUITY RULE: Match treatment intensity to disease severity. Moderate-to-severe disease warrants escalation even if milder options are technically correct for mild disease.\n" +
+      "Example: UC with CRP 48, albumin 2.8, fecal calprotectin >1800 on optimized 5-ASA = biologic induction (infliximab), not another 5-ASA dose increase or another steroid course.";
   } else if (level.includes("ABIM Endocrinology")) {
-    levelNote = "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance per ADA, Endocrine Society, AACE, ATA. Test guideline thresholds, special populations, drug sequencing, and monitoring intervals. Include complex multi-comorbidity scenarios.";
+    levelNote =
+      "LEVEL: ABIM Endocrinology subspecialty — Fellowship-level nuance per ADA, Endocrine Society, AACE, ATA.\n" +
+      "Test guideline thresholds, drug sequencing, monitoring intervals, special populations, and multi-comorbidity scenarios.\n" +
+      "Include complex cases where the diagnosis is known but the question tests WHAT TO DO NEXT given specific lab thresholds, imaging findings, or comorbidities.";
   }
 
-  // Society mapping
+  // ─── SOCIETY MAPPING ──────────────────────────────────────────────────────
+
   var societyMap = "";
   if (t.includes("thyroid") || t.includes("hashimoto") || t.includes("graves") || t.includes("hypothyroid") || t.includes("hyperthyroid")) societyMap = "Cite ATA and/or Endocrine Society. NEVER cite ADA for thyroid disorders.";
-  else if (t.includes("diabetes") || t.includes("insulin") || t.includes("cgm") || t.includes("glucose") || t.includes("dka") || t.includes("glp-1") || t.includes("sglt2") || t.includes("metformin") || t.includes("tirzepatide")) societyMap = "Cite current ADA Standards and/or AACE for diabetes.";
+  else if (t.includes("diabetes") || t.includes("insulin") || t.includes("cgm") || t.includes("glucose") || t.includes("dka") || t.includes("glp-1") || t.includes("sglt2") || t.includes("metformin") || t.includes("tirzepatide")) societyMap = "Cite current ADA Standards of Care and/or AACE for diabetes.";
   else if (t.includes("osteoporosis") || t.includes("bone") || t.includes("calcium") || t.includes("parathyroid") || t.includes("vitamin d") || t.includes("hypoparathyroid")) societyMap = "Cite Endocrine Society and/or BHOF for bone and calcium disorders.";
   else if (t.includes("adrenal") || t.includes("cushing") || t.includes("aldosteronism") || t.includes("pheochromocytoma")) societyMap = "Cite Endocrine Society Clinical Practice Guidelines for adrenal disorders.";
   else if (t.includes("pituitary") || t.includes("acromegaly") || t.includes("prolactinoma") || t.includes("sheehan")) societyMap = "Cite Endocrine Society Clinical Practice Guidelines for pituitary disorders.";
   else if (t.includes("heart failure") || t.includes("acs") || t.includes("stemi") || t.includes("atrial fibrillation") || t.includes("hypertension") || t.includes("dyslipidemia")) societyMap = "Cite ACC/AHA guidelines. Reference GDMT principles for heart failure.";
-  else if (t.includes("copd") || t.includes("asthma") || t.includes("pneumonia") || t.includes("ards") || t.includes("sleep apnea") || t.includes("osa")) societyMap = "Cite GOLD for COPD, GINA for asthma, IDSA/ATS for pneumonia, AASM for OSA.";
-  else if (t.includes("kidney") || t.includes("renal") || t.includes("ckd") || t.includes("aki")) societyMap = "Cite KDIGO guidelines.";
-  else if (t.includes("rheumatoid") || t.includes("lupus") || t.includes("gout") || t.includes("vasculitis")) societyMap = "Cite ACR and/or EULAR guidelines.";
-  else if (t.includes("sepsis") || t.includes("hiv") || t.includes("tuberculosis") || t.includes("meningitis")) societyMap = "Cite Surviving Sepsis Campaign, DHHS, or IDSA as appropriate.";
-  else if (t.includes("pancreatitis")) societyMap = "Cite ACG guidelines and WATERFALL trial (NEJM 2022).";
-  else if (t.includes("gi bleeding") || t.includes("cirrhosis") || t.includes("hepatitis")) societyMap = "Cite AASLD and ACG guidelines.";
-  else if (t.includes("hospital") || t.includes("inpatient")) societyMap = "Cite Society of Hospital Medicine (SHM) guidelines.";
+  else if (t.includes("copd") || t.includes("asthma") || t.includes("pneumonia") || t.includes("ards")) societyMap = "Cite GOLD for COPD, GINA for asthma, IDSA/ATS for pneumonia.";
+  else if (t.includes("sleep apnea") || t.includes("osa")) societyMap = "Cite AASM guidelines for sleep disorders.";
+  else if (t.includes("kidney") || t.includes("renal") || t.includes("ckd") || t.includes("aki")) societyMap = "Cite KDIGO guidelines for kidney disease.";
+  else if (t.includes("rheumatoid") || t.includes("lupus") || t.includes("gout") || t.includes("vasculitis")) societyMap = "Cite ACR and/or EULAR guidelines for rheumatologic conditions.";
+  else if (t.includes("sepsis") || t.includes("septic") || t.includes("meningitis")) societyMap = "Cite Surviving Sepsis Campaign guidelines.";
+  else if (t.includes("hiv")) societyMap = "Cite DHHS HIV treatment guidelines.";
+  else if (t.includes("tuberculosis")) societyMap = "Cite ATS/CDC/IDSA tuberculosis guidelines.";
+  else if (t.includes("pancreatitis")) societyMap = "Cite ACG guidelines and WATERFALL trial (NEJM 2022) for acute pancreatitis.";
+  else if (t.includes("gi bleeding") || t.includes("cirrhosis") || t.includes("hepatitis") || t.includes("liver")) societyMap = "Cite AASLD and ACG guidelines for liver and GI disorders.";
+  else if (t.includes("inflammatory bowel") || t.includes("crohn") || t.includes("ulcerative colitis") || t.includes("ibd")) societyMap = "Cite ACG Clinical Guidelines on UC and Crohn disease (Rubin et al. 2019 for UC, Lichtenstein et al. for Crohn).";
+  else if (t.includes("hospital") || t.includes("inpatient")) societyMap = "Cite Society of Hospital Medicine (SHM) guidelines for inpatient management.";
   else societyMap = "Cite the most current relevant specialty society guideline.";
 
-  // Board task rotation
+  // ─── BOARD TASK ROTATION ──────────────────────────────────────────────────
+
   var boardTasks;
   if (level.includes("Step 1")) {
     boardTasks = [
       "most likely underlying mechanism of this patient's condition",
-      "most likely diagnosis",
-      "most appropriate diagnostic study",
       "most likely pathophysiologic explanation for these findings",
-      "most likely cause of this patient's presentation",
+      "most likely cause of this laboratory abnormality",
+      "most likely underlying cause of this patient's presentation",
+      "most likely diagnosis",
+      "most appropriate initial diagnostic study to confirm the diagnosis",
     ];
   } else if (level.includes("Step 3")) {
     boardTasks = [
@@ -356,6 +390,7 @@ function buildPrompt(level, requestedTopic) {
       "most appropriate preventive recommendation",
       "most appropriate monitoring strategy",
       "most likely diagnosis",
+      "most appropriate change in management given this new clinical development",
     ];
   } else {
     boardTasks = [
@@ -380,58 +415,68 @@ function buildPrompt(level, requestedTopic) {
 
   var jsonSchema = '{"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"...","topic":"' + specificTopic + '","imageUrl":' + (radiopaediaLink ? '"' + radiopaediaLink + '"' : 'null') + ',"showImageButton":false}';
 
-  // Select only relevant exemplars for this topic
-  var exemplars = selectExemplars(specificTopic);
+  var exemplars = selectExemplars(specificTopic, level);
 
   // ─── SYSTEM TEXT ────────────────────────────────────────────────────────────
 
   var systemText =
-    "You are a senior ABIM item-writing committee member, fellowship program director, and academic physician.\n\n" +
+    "You are a senior ABIM item-writing committee member, fellowship program director, and academic physician at a major academic medical center.\n\n" +
 
-    "CORE PHILOSOPHY: You test CLINICAL REASONING and JUDGMENT — not drug recall. Every question forces the learner to think through a problem the way a master clinician does at the bedside.\n\n" +
+    "CORE PHILOSOPHY: You test CLINICAL REASONING and JUDGMENT — not drug recall or fact retrieval. Every question forces the learner to think through a clinical problem the way a master clinician does at the bedside.\n\n" +
 
-    "QUESTION TYPES — rotate equally across all specialties:\n" +
-    "Diagnosis | Next best step | Monitoring | Mechanism | Interpretation | Complication | Management\n\n" +
+    "QUESTION TYPES — rotate equally across ALL specialties and topics:\n" +
+    "Diagnosis | Next best step | Monitoring | Mechanism | Interpretation | Complication | Management\n" +
+    "Do NOT default to management questions. Actively rotate through diagnosis, mechanism, monitoring, and interpretation.\n\n" +
 
-    "EXPLANATION STYLE: Brilliant attending teaching on rounds — not a textbook. Name the cognitive trap each wrong answer represents. One guideline citation only. Board pearl = insight that changes thinking, never a restatement of the answer.\n\n" +
+    "EXPLANATION STYLE:\n" +
+    "Write like a brilliant attending teaching on rounds — not a textbook reciting statistics.\n" +
+    "Sentence 1: Why the correct answer is right + one guideline citation.\n" +
+    "Sentence 2: Why the 2 most tempting wrong answers are wrong + name the cognitive trap each represents.\n" +
+    "Sentence 3: Board pearl — a clinical insight that changes how the learner thinks. Never restate the correct answer.\n\n" +
 
     "PHRASING RULES:\n" +
-    "- NEVER use 'most appropriate initial pharmacotherapy' — use 'most appropriate next step in management'\n" +
-    "- Cancer complications: use 'greatest long-term clinical risk associated with the underlying malignancy'\n" +
-    "- Non-drug correct answers (fluids, CPAP, monitoring, surgery): use 'most appropriate next step in management'\n\n" +
+    "- NEVER use 'most appropriate initial pharmacotherapy' as the lead-in question\n" +
+    "- Use 'most appropriate next step in management' for all clinical decision questions\n" +
+    "- For cancer/disease complications: use 'greatest long-term clinical risk associated with the underlying malignancy'\n" +
+    "- For outpatient patients with conditions requiring hospital care: answer is TRANSFER or ADMIT — never inpatient protocols in an outpatient setting\n\n" +
 
-    "CLINICAL ACCURACY RULES:\n" +
+    "CLINICAL ACCURACY RULES — ALL MUST BE FOLLOWED:\n" +
     "1. Labs MUST match diagnosis. Overt hypothyroidism = TSH >10 AND free T4 below range. Subclinical = TSH 4.5–10 AND normal T4. Overt hyperthyroidism = TSH <0.01 AND free T4 above range.\n" +
-    "2. DKA sequence: FLUIDS FIRST (NS 1–1.5 L/hr) → check K+ → insulin only if K+ ≥3.5 → dextrose when glucose 200–250 → hold SGLT2i entire episode. NEVER insulin before fluids.\n" +
-    "3. Primary AI: low cortisol + HIGH ACTH + hyperkalemia + hyperpigmentation. Secondary AI: low cortisol + low ACTH + normal K+ + no hyperpigmentation.\n" +
-    "4. Semaglutide SC: ALWAYS start 0.25 mg weekly x4 weeks. NEVER 0.5 mg at initiation.\n" +
-    "5. Tirzepatide: start 2.5 mg weekly x4 weeks.\n" +
-    "6. SGLT2i in HFrEF: mandatory regardless of HbA1c when LVEF <40%.\n" +
-    "7. Pioglitazone: ABSOLUTELY CONTRAINDICATED in heart failure.\n" +
-    "8. Insulin first when: HbA1c >10% OR glucose ≥300 OR active catabolism.\n" +
-    "9. Pancreatitis: moderate goal-directed LR 1.5 mL/kg/hr (WATERFALL 2022) — NOT aggressive NS.\n" +
-    "10. Calcium carbonate = 40% elemental calcium. 1000 mg carbonate = 400 mg elemental.\n" +
-    "11. Natpara (rhPTH 1-84): RECALLED 2019, DISCONTINUED. Use palopegteriparatide (Yorvipath) FDA approved August 2024.\n" +
-    "12. Hypoparathyroidism PTH replacement threshold: >2.5g ELEMENTAL calcium/day + 24hr urine Ca >300 mg/day.\n" +
-    "13. Hypopituitarism: CORTISOL FIRST, THYROID SECOND — levothyroxine before cortisol = fatal adrenal crisis.\n" +
-    "14. REDUCE-IT: statin + lifestyle first → recheck 4–12 weeks → IPE only if TG ≥150 on stable statin.\n" +
-    "15. OSA: CPAP definitive first-line. Tirzepatide adjunct (SURMOUNT-OSA 2024), not replacement. Modafinil only after CPAP optimized. Zolpidem contraindicated.\n" +
-    "16. AGP: fix TBR >4% before any hyperglycemia adjustment.\n" +
-    "17. AID systems: micro-treat mild lows with 5–8g carbs (not Rule of 15).\n" +
-    "18. GI bleeding: restrictive transfusion (Hgb threshold 7 g/dL).\n" +
-    "19. OUTPATIENT SETTING RULE: If the patient is in an outpatient clinic, urgent care, or primary care office and has a condition requiring hospital-level care (DKA, HHS, sepsis, STEMI, stroke, hypertensive emergency, adrenal crisis, thyroid storm) — the correct answer involves TRANSFER TO ED or ADMIT TO HOSPITAL, never inpatient management protocols performed in the outpatient setting. DKA in outpatient clinic = stabilize airway, start IV access if available, then transfer to ED immediately. NEVER answer 'start insulin infusion and await labs' for a patient still in clinic.\n" +
-    "20. DISEASE ACUITY DRIVES MANAGEMENT: Match treatment intensity to disease severity. Moderate-to-severe disease warrants escalation even if milder options are technically correct for mild disease. Example: UC with CRP 48, albumin 2.8, fecal calprotectin 1840 on optimized 5-ASA = biologic induction, not another 5-ASA dose increase.\n" +
-    "21. " + societyMap + "\n\n" +
+    "2. DKA in ED or inpatient: FLUIDS FIRST (NS 0.9% 1–1.5 L/hr) → check K+ → insulin only if K+ ≥3.5 → dextrose when glucose 200–250 → hold SGLT2i entire episode. NEVER start insulin before fluids.\n" +
+    "3. DKA in OUTPATIENT setting: stabilize with brief IV access and bolus if available, then TRANSFER TO ED immediately. Never manage DKA in outpatient clinic.\n" +
+    "4. Primary AI: low cortisol + HIGH ACTH + hyperkalemia + hyperpigmentation. Secondary AI: low cortisol + low ACTH + normal K+ + no hyperpigmentation (RAAS intact).\n" +
+    "5. Semaglutide SC (Ozempic): ALWAYS start 0.25 mg weekly x4 weeks, then 0.5 mg. NEVER 0.5 mg at initiation.\n" +
+    "6. Tirzepatide: start 2.5 mg weekly x4 weeks, increase by 2.5 mg every 4 weeks.\n" +
+    "7. SGLT2i in HFrEF: mandatory regardless of HbA1c when LVEF <40% (EMPEROR-Reduced, DAPA-HF).\n" +
+    "8. Pioglitazone: ABSOLUTELY CONTRAINDICATED in heart failure — causes sodium and water retention.\n" +
+    "9. Insulin first when: HbA1c >10%, glucose ≥300 mg/dL, OR active catabolism (weight loss + polyuria + polydipsia).\n" +
+    "10. GLP-1 RA: DO NOT use in active catabolic state — promotes weight loss worsening catabolism.\n" +
+    "11. Pancreatitis: moderate goal-directed LR 1.5 mL/kg/hr (WATERFALL 2022 NEJM) — NOT aggressive NS. Antibiotics only for confirmed infected necrosis.\n" +
+    "12. Calcium carbonate = 40% elemental calcium. 1000 mg carbonate = 400 mg elemental. ALWAYS calculate elemental, not salt weight.\n" +
+    "13. Natpara (rhPTH 1-84): RECALLED FDA 2019, globally DISCONTINUED. Current PTH replacement = palopegteriparatide (Yorvipath), FDA approved August 2024.\n" +
+    "14. Hypopituitarism: CORTISOL FIRST, THYROID SECOND — levothyroxine before cortisol = fatal adrenal crisis.\n" +
+    "15. REDUCE-IT sequencing: statin + lifestyle first → recheck 4–12 weeks → IPE only if TG ≥150 on stable statin x4 weeks.\n" +
+    "16. OSA: CPAP = definitive first-line. Tirzepatide = adjunct only (SURMOUNT-OSA 2024). Modafinil only after CPAP optimized. Zolpidem = contraindicated in untreated OSA.\n" +
+    "17. AGP: fix TBR >4% before any hyperglycemia adjustment. AID systems: micro-treat mild lows with 5–8g carbs (Rule of 15 is obsolete).\n" +
+    "18. IBD acuity: fecal calprotectin >1500 + hypoalbuminemia + tachycardia on optimized 5-ASA = biologic induction (infliximab), not another steroid course.\n" +
+    "19. GI bleeding: restrictive transfusion strategy — Hgb threshold 7 g/dL per TRICC/TRIGGER trials.\n" +
+    "20. Sepsis: 30 mL/kg crystalloid then reassess dynamically — Surviving Sepsis Campaign 2021.\n" +
+    "21. Methimazole in pregnancy: TERATOGENIC in first trimester (aplasia cutis congenita, methimazole embryopathy) — switch to PTU in first trimester even if euthyroid. Switch back to methimazole in second trimester due to PTU hepatotoxicity.\n" +
+    "22. " + societyMap + "\n\n" +
 
     exemplars;
 
   var userText =
     levelNote + "\n\n" +
     topicInstruction + "\n\n" +
-    "STEM: 3–4 sentences." + imagingNote + cgmNote + " End with: Which of the following is the " + selectedTask + "?\n" +
-    "CHOICES: 5 options (A–E). One clearly correct. Four plausible distractors — real cognitive traps.\n" +
-    "EXPLANATION: 3 sentences only. (1) Why correct + one guideline citation. (2) Why 2 most tempting wrong answers are wrong + cognitive trap named. (3) Board pearl — insight that changes thinking.\n\n" +
-    "Return ONLY valid JSON with all closing brackets. No markdown. No text outside JSON:\n" +
+    "STEM: Write a 3–4 sentence clinical vignette." + imagingNote + cgmNote + "\n" +
+    "End the stem with exactly: Which of the following is the " + selectedTask + "?\n\n" +
+    "CHOICES: 5 options (A–E). One clearly correct answer per current guidelines. Four plausible distractors representing real cognitive traps (anchoring bias, premature closure, wrong sequence, wrong disease subtype).\n\n" +
+    "EXPLANATION: Exactly 3 sentences.\n" +
+    "Sentence 1: Why correct answer is right + one guideline citation.\n" +
+    "Sentence 2: Why the 2 most tempting wrong answers are wrong + name the cognitive trap each represents.\n" +
+    "Sentence 3: Board pearl — insight that changes clinical thinking, not a restatement.\n\n" +
+    "Return ONLY valid JSON — complete with all closing brackets. No markdown, no text outside JSON:\n" +
     jsonSchema;
 
   return { systemText, userText, radiopaediaLink, specificTopic };
