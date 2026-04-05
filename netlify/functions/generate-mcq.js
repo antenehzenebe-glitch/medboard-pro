@@ -4,6 +4,7 @@
 // Dr. Anteneh Zenebe, MD, FACE — Howard University College of Medicine
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 async function sleep(ms) {
   return new Promise(function(resolve) { setTimeout(resolve, ms); });
@@ -35,7 +36,11 @@ async function callClaude(systemText, userText) {
     });
 
     if (response.status === 529 || response.status === 503 || response.status === 502) {
-      if (attempt === maxRetries - 1) throw new Error("API busy. Please try again.");
+      if (attempt === maxRetries - 1) {
+        // Claude is overloaded — fall back to Gemini
+        console.log("Claude overloaded — falling back to Gemini 2.0 Flash");
+        return await callGemini(systemText, finalUserText);
+      }
       continue;
     }
     if (!response.ok) {
@@ -46,12 +51,74 @@ async function callClaude(systemText, userText) {
     var data = await response.json();
     if (!data.content || !data.content.length) throw new Error("Empty API response");
 
-    // Handle both plain text and tool-use response formats
     var textBlock = data.content.find(function(b) { return b.type === "text"; });
     if (!textBlock || !textBlock.text) throw new Error("No text in response");
     return textBlock.text;
   }
   throw new Error("All retries failed");
+}
+
+async function callGemini(systemText, userText) {
+  if (!GEMINI_API_KEY) throw new Error("Gemini API key not configured");
+
+  var response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemText }] },
+        contents: [{ role: "user", parts: [{ text: userText }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.6,
+          maxOutputTokens: 1024
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    var errText = await response.text();
+    throw new Error("Gemini API error " + response.status + ": " + errText.substring(0, 200));
+  }
+
+  var data = await response.json();
+  if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+    throw new Error("Empty Gemini response");
+  }
+  return data.candidates[0].content.parts[0].text;
+}
+
+// ─── SUPABASE ASYNC SAVE ─────────────────────────────────────────────────────
+// Saves generated MCQ to database in background — user never waits for this
+
+const SUPABASE_URL = "https://vhzeeskhvkujihuvddcc.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+
+async function saveMcqToSupabase(parsed, level) {
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify({
+        exam_level: level,
+        topic: parsed.topic || "",
+        stem: parsed.stem || "",
+        choices: parsed.choices || {},
+        correct_answer: parsed.correct || "",
+        explanation: parsed.explanation || ""
+      })
+    });
+  } catch (e) {
+    // Silent fail — never block user experience
+    console.log("Supabase save skipped:", e.message);
+  }
 }
 
 // ─── EXEMPLARS ────────────────────────────────────────────────────────────────
@@ -486,6 +553,9 @@ exports.handler = async function(event) {
     parsed.imageUrl = parsed.imageUrl || promptData.radiopaediaLink || null;
     parsed.showImageButton = false;
     parsed.topic = parsed.topic || promptData.specificTopic;
+
+    // Save to Supabase asynchronously — does not block response
+    saveMcqToSupabase(parsed, level).catch(function(){});
 
     return {
       statusCode: 200,
