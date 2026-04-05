@@ -346,33 +346,63 @@ function App(){
 
   async function generate(){
     stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);setRevealText("");
-    fetch("/.netlify/functions/generate-mcq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic:topic,level:lvl.v,count:1})})
-    .then(function(res){
-      if(!res.ok)return res.json().then(function(e){throw new Error(e.error||"Server error "+res.status);});
-      return res.json();
-    })
-    .then(function(data){
-      if(!Array.isArray(data))throw new Error("Invalid response");
-      setBusy(false);
-      var words=data[0].stem.split(" ");
-      var i=0;
-      setRevealText("");
-      var timer=setInterval(function(){
-        if(i>=words.length){
-          clearInterval(timer);
-          setQs(data);
-          setRevealText("");
-          setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
-          if(examMode)startT(data.length,data);
-          return;
+    var maxAttempts=3;
+    var lastError="";
+    for(var attempt=0;attempt<maxAttempts;attempt++){
+      try{
+        if(attempt>0) await new Promise(function(r){setTimeout(r,2000);});
+        var res=await fetch("/.netlify/functions/generate-mcq",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({topic:topic,level:lvl.v,count:1})
+        });
+        if(!res.ok){
+          var e=await res.json().catch(function(){return{error:"Server error "+res.status};});
+          throw new Error(e.error||"Server error "+res.status);
         }
-        setRevealText(function(t){return t+(i===0?"": " ")+words[i];});
-        i++;
-      },20);
-    })
-    .catch(function(e){setMcqErr("Failed to generate questions: "+e.message);setBusy(false);});
+        var data=await res.json();
+        if(!Array.isArray(data))throw new Error("Invalid response");
+        setBusy(false);
+        var words=data[0].stem.split(" ");
+        var wi=0;
+        setRevealText("");
+        var timer=setInterval(function(){
+          if(wi>=words.length){
+            clearInterval(timer);
+            setQs(data);
+            setRevealText("");
+            setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
+            if(examMode)startT(data.length,data);
+            return;
+          }
+          setRevealText(function(t){return t+(wi===0?"": " ")+words[wi];});
+          wi++;
+        },15);
+        return;
+      }catch(e){
+        lastError=e.message;
+        if((e.message==="Failed to fetch"||e.message.includes("502")||e.message.includes("503"))&&attempt<maxAttempts-1){
+          setMcqErr("Warming up... please wait a moment.");
+          continue;
+        }
+        break;
+      }
+    }
+    setMcqErr("Failed to generate questions: "+lastError);
+    setBusy(false);
   }
 
+  // Warm up function after each answer to prevent cold start on next question
+  React.useEffect(function(){
+    if(qs.length>0){
+      setTimeout(function(){
+        fetch("/.netlify/functions/generate-mcq",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({topic:topic,level:lvl.v,warmup:true})
+        }).catch(function(){});
+      },3000);
+    }
+  },[qs.length]);
 
   function nextQuestion(){setQNum(function(n){return n+1;});generate();}
   function reveal(i){
