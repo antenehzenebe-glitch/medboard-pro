@@ -1,30 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>MedBoard Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;background:#0a0a0f;color:#f1f5f9}
 button,select,input{font-family:inherit}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-
-a{text-decoration:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
-<body>
-<div id="root"></div>
 <script type="text/babel">
+const {createClient}=supabase;
 const SB_URL="https://vhzeeskhvkujihuvddcc.supabase.co";
 const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
-const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const sb=createClient(SB_URL,SB_KEY);
 const NAVY="#002868",GOLD="#C9A84C",BG="#0a0a0f",CARD="rgba(255,255,255,0.04)",BDR="#1e293b",SECS=90;
 const PORTAL_URL="https://billing.stripe.com/p/login/fZufZ9fDJ4NVbNM5iS2sM00";
 const PAYMENT_LINKS={
@@ -60,14 +57,7 @@ const GROUPS={
   "Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
   "Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
 };
-const LEVELS=[
-  {l:"USMLE Step 1",v:"USMLE Step 1 (M2 basic science and pathophysiology)"},
-  {l:"USMLE Step 2 CK",v:"USMLE Step 2 CK (M3/M4 clinical decision-making)"},
-  {l:"USMLE Step 3",v:"USMLE Step 3 (PGY-1/2 clinical management -- MCQ only)"},
-  {l:"ABIM Internal Medicine",v:"ABIM Internal Medicine boards (residents)"},
-  {l:"ABIM Endocrinology",v:"ABIM Endocrinology and Metabolism subspecialty (fellows)"},
-];
-const GUIDES=[
+GUIDES=[
   {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"D",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
   {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"E",u:"https://www.endocrine.org/clinical-practice-guidelines"},
   {id:3,t:"AACE Clinical Guidance",s:"Endocrinology",i:"A",u:"https://pro.aace.com/clinical-guidance"},
@@ -93,43 +83,17 @@ const GUIDES=[
   {id:23,t:"Society of Hospital Medicine — Clinical Guidelines",s:"Hospital Medicine",i:"H",u:"https://www.hospitalmedicine.org/clinical-topics/all-clinical-resources"},
   {id:24,t:"AASM Sleep Medicine Guidelines",s:"Sleep",i:"Z",u:"https://aasm.org/clinical-resources/practice-standards/practice-guidelines"},
 ];
-const FAQS=[
-  {q:"Who created MedBoard Pro?",a:"Dr. Anteneh Zenebe, MD, FACE -- Assistant Clinical Professor and Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine."},
-  {q:"What exams does it cover?",a:"USMLE Step 1, Step 2 CK, and Step 3, ABIM Internal Medicine boards, and ABIM Endocrinology and Metabolism subspecialty boards."},
-  {q:"How is it different from UWorld or Amboss?",a:"MedBoard Pro offers unmatched endocrinology depth, AI-generated vignettes on demand across 500+ topics, and guidelines from 20+ US and European societies -- built by a fellowship program director."},
-  {q:"Which guidelines are used?",a:"ADA, AACE, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO, IDSA, NCCN, USPSTF and all major US and European societies."},
-  {q:"Is there a free trial?",a:"Yes -- 14-day free trial. A credit card is required but you will not be charged until Day 15. Cancel anytime before then at no charge."},
-  {q:"Can I cancel anytime?",a:"Absolutely. Cancel any time with no penalties or hidden fees."},
+
+const LEVELS=[
+  {v:"USMLE Step 1",l:"Step 1"},
+  {v:"USMLE Step 2 CK",l:"Step 2"},
+  {v:"USMLE Step 3",l:"Step 3"},
+  {v:"ABIM Internal Medicine",l:"ABIM IM"},
+  {v:"ABIM Endocrinology",l:"ABIM Endo"},
 ];
-const TOS_SECTIONS=[
-  {t:"1. Acceptance of Terms",b:"By accessing or using MedBoard Pro, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform."},
-  {t:"2. Subscription and Payment",b:"MedBoard Pro offers paid subscription plans with a 14-day free trial. Your credit card will not be charged until Day 15. Subscriptions auto-renew. Cancel anytime via the Manage Subscription portal. All payments processed by Stripe."},
-  {t:"3. Cancellation Policy",b:"You may cancel anytime with no penalties. Cancellation takes effect at end of current billing period. No refunds for partial periods. To cancel, click Manage Subscription inside the app or email antenehzenebe@gmail.com."},
-  {t:"4. Intellectual Property",b:"All content on MedBoard Pro including MCQ questions, explanations, curriculum design, and study manuals is the intellectual property of Dr. Anteneh Zenebe, MD, FACE, protected by US copyright law. Use is for personal board preparation only."},
-  {t:"5. No Medical Advice",b:"MedBoard Pro is an educational platform for board exam preparation only. Content does not constitute medical advice, diagnosis, or treatment. Do not use as a substitute for professional medical judgment."},
-  {t:"6. No Real Patient Data",b:"MedBoard Pro does not use, store, or display any real patient data. All clinical vignettes are entirely fictional and AI-generated for educational purposes."},
-  {t:"7. Acceptable Use",b:"You agree to use MedBoard Pro solely for lawful personal educational purposes. You may not share credentials, resell access, or scrape content. Violations result in immediate termination without refund."},
-  {t:"8. Disclaimer of Warranties",b:"MedBoard Pro is provided as-is without warranties of any kind. We do not guarantee the platform will be error-free or that it will result in passing any board examination."},
-  {t:"9. Limitation of Liability",b:"To the maximum extent permitted by law, MedBoard Pro and Dr. Anteneh Zenebe shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform."},
-  {t:"10. Governing Law",b:"These Terms are governed by the laws of the District of Columbia, United States of America."},
-  {t:"11. Changes to Terms",b:"We reserve the right to modify these terms at any time. Continued use after changes constitutes acceptance."},
-  {t:"12. Contact",b:"Dr. Anteneh Zenebe, MD, FACE -- antenehzenebe@gmail.com -- Howard University College of Medicine, Washington, DC."},
-];
-const PRIVACY_SECTIONS=[
-  {t:"1. Information We Collect",b:"MedBoard Pro collects only your email address and full name when you create an account, and subscription status managed by Stripe. We do not collect your credit card number."},
-  {t:"2. How We Use Your Information",b:"Your email is used to manage your account, send subscription receipts via Stripe, and communicate platform updates. We do not use your information for advertising or third-party marketing."},
-  {t:"3. Payment Processing",b:"All payment processing is handled by Stripe, Inc. MedBoard Pro never sees, stores, or has access to your credit card details. Stripe is PCI-DSS Level 1 certified."},
-  {t:"4. Data Storage",b:"Your account data is stored securely using Supabase, a SOC 2 Type II certified cloud database provider. Data is encrypted at rest and in transit."},
-  {t:"5. No Data Selling",b:"MedBoard Pro does not sell, rent, trade, or transfer your personal information to any third party for commercial purposes."},
-  {t:"6. No Real Patient Data",b:"MedBoard Pro does not process any real patient health information. All clinical content is fictional and AI-generated for educational purposes."},
-  {t:"7. Cookies",b:"MedBoard Pro uses only essential session cookies required to maintain your login state. We do not use tracking or advertising cookies."},
-  {t:"8. GDPR Rights",b:"EU users have the right to access, correct, or delete personal data and the right to data portability. Contact antenehzenebe@gmail.com. We will respond within 30 days."},
-  {t:"9. CCPA Rights",b:"California residents have the right to know what personal information is collected and the right to delete it. MedBoard Pro does not sell personal information."},
-  {t:"10. Data Security",b:"We implement appropriate technical and organizational measures to protect your personal information against unauthorized access or disclosure."},
-  {t:"11. Children's Privacy",b:"MedBoard Pro is designed for medical students, residents, and physicians. We do not knowingly collect information from anyone under 18."},
-  {t:"12. Changes to This Policy",b:"We may update this Privacy Policy periodically. We will notify you of material changes by email."},
-  {t:"13. Contact Us",b:"Dr. Anteneh Zenebe, MD, FACE -- antenehzenebe@gmail.com -- Howard University College of Medicine, Washington, DC 20060."},
-];
+
+function fmtT(s){return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+
 function LabPanel(){
   const [labTab,setLabTab]=React.useState("labs");
   const [openCat,setOpenCat]=React.useState(null);
@@ -264,6 +228,7 @@ function App(){
   const [lvl,setLvl]=React.useState(LEVELS[3]);
   const [examMode,setExamMode]=React.useState(false);
   const [examDone,setExamDone]=React.useState(false);
+  const [examAnswered,setExamAnswered]=React.useState({});
   const [tLeft,setTLeft]=React.useState(null);
   const [tActive,setTActive]=React.useState(false);
   const [qs,setQs]=React.useState([]);
@@ -308,829 +273,747 @@ function App(){
     return function(){sub.data.subscription.unsubscribe();};
   },[]);
 
-  function login(){
-    setAuthErr("");setAuthBusy(true);
-    sb.auth.signInWithPassword({email:email,password:pw}).then(function(res){
-      if(res.error)setAuthErr(res.error.message);
-      else{setScreen("app");setTab("mcq");}
-      setAuthBusy(false);
-    });
-  }
-  function signup(){
-    setAuthErr("");setAuthBusy(true);
-    if(pw.length<8){setAuthErr("Password must be at least 8 characters");setAuthBusy(false);return;}
-    sb.auth.signUp({email:email,password:pw,options:{data:{full_name:nm}}}).then(function(res){
-      if(res.error)setAuthErr(res.error.message);
-      else setAuthErr("Check your email to confirm your account, then sign in!");
-      setAuthBusy(false);
-    });
-  }
-  function googleLogin(){sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:"https://medboardpro.org"}});}
-  function logout(){
-    sb.auth.signOut();setUser(null);setScreen("landing");
-    setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});setQNum(0);
-  }
-  function getPrice(p){return p.period==="year"?p.price:annual?Math.round(p.price*0.8):p.price;}
-  function fmtT(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
-  function stopT(){clearInterval(tRef.current);setTActive(false);}
-  function revealAll(questions){
-    if(examMode){
-      setExamDone(true);
-    } else {
-      setRev(function(p){var n=Object.assign({},p);questions.forEach(function(_,i){n[i]=true;});return n;});
-    }
-  }
-  function startT(total,questions){
-    setTLeft(total*SECS);setTActive(true);
+
+// ─── EXAM MODE STATE MACHINE ──────────────────────────────────────────────────
+// STATES: idle | generating | studying | exam_running | exam_review
+// This ensures clean separation between study and exam flows
+
+function App(){
+  // Auth
+  const [user,setUser]=React.useState(null);
+  const [authLoading,setAuthLoading]=React.useState(true);
+  const [email,setEmail]=React.useState("");
+  const [pw,setPw]=React.useState("");
+  const [nm,setNm]=React.useState("");
+  const [authMode,setAuthMode]=React.useState("login");
+  const [authErr,setAuthErr]=React.useState("");
+  const [authMsg,setAuthMsg]=React.useState("");
+
+  // Navigation
+  const [tab,setTab]=React.useState("mcq");
+  const [labTab,setLabTab]=React.useState("labs");
+  const [sidebarOpen,setSidebarOpen]=React.useState(false);
+
+  // Question selection
+  const [grp,setGrp]=React.useState("Random");
+  const [topic,setTopic]=React.useState("Random -- All Specialties");
+  const [lvl,setLvl]=React.useState(LEVELS[3]);
+
+  // ─── EXAM STATE MACHINE ────────────────────────────────────────────────────
+  // appState: "idle" | "generating" | "studying" | "exam_running" | "exam_review"
+  const [appState,setAppState]=React.useState("idle");
+  const [examMode,setExamMode]=React.useState(false);
+
+  // Question data
+  const [qs,setQs]=React.useState([]);
+  const [sel,setSel]=React.useState({});       // selected answers {0: "A"}
+  const [rev,setRev]=React.useState({});       // revealed in study mode {0: true}
+  const [submitted,setSubmitted]=React.useState({});  // submitted in exam mode {0: true}
+
+  // Scoring
+  const [score,setScore]=React.useState({t:0,c:0});
+
+  // Timer
+  const [tLeft,setTLeft]=React.useState(null);
+  const tRef=React.useRef(null);
+  const [examStartTime,setExamStartTime]=React.useState(null);
+  const [examDuration,setExamDuration]=React.useState(0);
+
+  // UI
+  const [busy,setBusy]=React.useState(false);
+  const [mcqErr,setMcqErr]=React.useState("");
+  const [revealText,setRevealText]=React.useState("");
+  const [qNum,setQNum]=React.useState(0);
+
+  React.useEffect(function(){
+    sb.auth.getSession().then(function(r){setUser(r.data.session?.user||null);setAuthLoading(false);});
+    const{data:{subscription}}=sb.auth.onAuthStateChange(function(_,s){setUser(s?.user||null);});
+    return function(){subscription.unsubscribe();};
+  },[]);
+
+  // ─── TIMER ────────────────────────────────────────────────────────────────
+  function startTimer(seconds){
+    clearInterval(tRef.current);
+    setTLeft(seconds);
+    setExamStartTime(Date.now());
     tRef.current=setInterval(function(){
       setTLeft(function(t){
-        if(t<=1){clearInterval(tRef.current);setTActive(false);revealAll(questions);return 0;}
+        if(t<=1){
+          clearInterval(tRef.current);
+          finishExam();
+          return 0;
+        }
         return t-1;
       });
     },1000);
   }
-  const [revealText,setRevealText]=React.useState("");
 
+  function stopTimer(){
+    clearInterval(tRef.current);
+    if(examStartTime) setExamDuration(Math.floor((Date.now()-examStartTime)/1000));
+  }
+
+  // ─── EXAM FLOW ────────────────────────────────────────────────────────────
+  function finishExam(){
+    stopTimer();
+    setAppState("exam_review");
+  }
+
+  // ─── AUTH ─────────────────────────────────────────────────────────────────
+  function googleLogin(){sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:"https://medboardpro.org"}});}
+  function logout(){sb.auth.signOut();}
+
+  async function handleAuth(e){
+    e.preventDefault();setAuthErr("");setAuthMsg("");
+    try{
+      if(authMode==="signup"){
+        const{error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:nm}}});
+        if(error)throw error;
+        setAuthMsg("Check your email to confirm your account.");
+      } else if(authMode==="reset"){
+        const{error}=await sb.auth.resetPasswordForEmail(email);
+        if(error)throw error;
+        setAuthMsg("Password reset email sent.");
+      } else {
+        const{error}=await sb.auth.signInWithPassword({email,password:pw});
+        if(error)throw error;
+      }
+    }catch(e){setAuthErr(e.message);}
+  }
+
+  // ─── SUPABASE SAVES (background, never block UI) ──────────────────────────
+  async function saveMcqToDb(question){
+    try{
+      await sb.from("mcqs").insert({
+        exam_level:lvl.v,topic:question.topic||"",stem:question.stem||"",
+        choices:question.choices||{},correct_answer:question.correct||"",
+        explanation:question.explanation||""
+      });
+    }catch(e){}
+  }
+
+  async function saveUserResponse(question,choice,isCorrect){
+    try{
+      const{data:{session}}=await sb.auth.getSession();
+      if(!session?.user)return;
+      const{data:mcqRows}=await sb.from("mcqs").select("id").eq("stem",question.stem).limit(1);
+      const mcqId=mcqRows?.[0]?.id;
+      if(!mcqId)return;
+      await sb.from("user_responses").insert({
+        user_id:session.user.id,mcq_id:mcqId,
+        selected_choice:choice,is_correct:isCorrect
+      });
+    }catch(e){}
+  }
+
+  // ─── GENERATE ─────────────────────────────────────────────────────────────
   async function generate(){
-    stopT();setBusy(true);setMcqErr("");setQs([]);setSel({});setRev({});setTLeft(null);setRevealText("");setExamDone(false);
-    var maxAttempts=3;
-    var lastError="";
-    for(var attempt=0;attempt<maxAttempts;attempt++){
+    // Reset all state cleanly
+    stopTimer();
+    setAppState("generating");
+    setQs([]);setSel({});setRev({});setSubmitted({});
+    setScore({t:0,c:0});setMcqErr("");setRevealText("");setQNum(0);
+    setTLeft(null);setExamDuration(0);setExamStartTime(null);
+    setBusy(true);
+
+    const maxAttempts=3;
+    let lastError="";
+
+    for(let attempt=0;attempt<maxAttempts;attempt++){
       try{
-        if(attempt>0) await new Promise(function(r){setTimeout(r,2000);});
-        var res=await fetch("/.netlify/functions/generate-mcq",{
+        if(attempt>0) await new Promise(r=>setTimeout(r,2000));
+        const res=await fetch("/.netlify/functions/generate-mcq",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({topic:topic,level:lvl.v,count:1})
+          body:JSON.stringify({topic,level:lvl.v,count:1})
         });
         if(!res.ok){
-          var e=await res.json().catch(function(){return{error:"Server error "+res.status};});
+          const e=await res.json().catch(()=>({error:"Server error "+res.status}));
           throw new Error(e.error||"Server error "+res.status);
         }
-        var data=await res.json();
+        const data=await res.json();
         if(!Array.isArray(data))throw new Error("Invalid response");
+
         setBusy(false);
-        var words=data[0].stem.split(" ");
-        var wi=0;
+        saveMcqToDb(data[0]).catch(()=>{});
+
+        // Start timer IMMEDIATELY in exam mode before typewriter
+        if(examMode){
+          startTimer(SECS);
+          setAppState("exam_running");
+          setQs(data);  // Show question immediately in exam mode
+          return;
+        }
+
+        // Study mode: typewriter reveal
+        setAppState("studying");
+        const words=data[0].stem.split(" ");
+        let wi=0;
         setRevealText("");
-        var timer=setInterval(function(){
+        const timer=setInterval(function(){
           if(wi>=words.length){
             clearInterval(timer);
             setQs(data);
             setRevealText("");
-            setScore(function(s){return{t:s.t,c:s.c,s:s.s+1};});
-            if(examMode)startT(data.length,data);
             return;
           }
-          setRevealText(function(t){return t+(wi===0?"": " ")+words[wi];});
+          setRevealText(t=>t+(wi===0?"": " ")+words[wi]);
           wi++;
         },15);
         return;
       }catch(e){
         lastError=e.message;
-        if((e.message==="Failed to fetch"||e.message.includes("502")||e.message.includes("503"))&&attempt<maxAttempts-1){
-          setMcqErr("Warming up... please wait a moment.");
+        if((e.message==="Failed to fetch"||e.message.includes("50"))&&attempt<maxAttempts-1){
+          setMcqErr("Reconnecting...");
           continue;
         }
         break;
       }
     }
-    setMcqErr("Failed to generate questions: "+lastError);
     setBusy(false);
+    setAppState("idle");
+    setMcqErr("Failed to generate questions: "+lastError);
   }
 
-  // Warm up function after each answer to prevent cold start on next question
+  // Warmup ping after question loads
   React.useEffect(function(){
     if(qs.length>0){
       setTimeout(function(){
         fetch("/.netlify/functions/generate-mcq",{
           method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({topic:topic,level:lvl.v,warmup:true})
-        }).catch(function(){});
+          body:JSON.stringify({topic,level:lvl.v,warmup:true})
+        }).catch(()=>{});
       },3000);
     }
   },[qs.length]);
 
-  function nextQuestion(){setQNum(function(n){return n+1;});generate();}
-  function reveal(i){
+  // ─── STUDY MODE: submit answer ────────────────────────────────────────────
+  function revealAnswer(i){
     if(!sel[i]||!qs[i])return;
-    var ok=sel[i]===qs[i].correct;
-    setScore(function(s){return{t:s.t+1,c:s.c+(ok?1:0),s:s.s};});
-    saveMcqToDb(qs[i], lvl&&lvl.v).catch(function(){});
-    saveUserResponse(qs[i],sel[i],ok).catch(function(){});
-    if(examMode){
-      // Exam mode: record selection silently, advance to next question
-      setSel(function(p){var n=Object.assign({},p);n[i]=p[i];return n;});
-      setTimeout(function(){nextQuestion();},300);
-    } else {
-      // Study mode: reveal answer and explanation
-      setRev(function(p){var n=Object.assign({},p);n[i]=true;return n;});
-    }
+    const ok=sel[i]===qs[i].correct;
+    setRev(p=>({...p,[i]:true}));
+    setScore(s=>({t:s.t+1,c:s.c+(ok?1:0)}));
+    saveMcqToDb(qs[i]).catch(()=>{});
+    saveUserResponse(qs[i],sel[i],ok).catch(()=>{});
   }
 
-  // ─── SUPABASE BACKGROUND SAVES ───────────────────────────────────────────
-  // Uses the existing supabase client (already initialized at top of file)
-  // All saves are async — user never waits for these
-
-  async function saveMcqToDb(question, examLevel) {
-    try {
-      const { error } = await supabase.from("mcqs").insert({
-        exam_level: examLevel || "",
-        topic: question.topic || "",
-        stem: question.stem || "",
-        choices: question.choices || {},
-        correct_answer: question.correct || "",
-        explanation: question.explanation || ""
-      });
-      if (error) console.log("MCQ save note:", error.message);
-    } catch(e) {
-      // Silent — never block user
-    }
+  // ─── EXAM MODE: submit answer ─────────────────────────────────────────────
+  function submitExamAnswer(i){
+    if(!sel[i]||!qs[i]||submitted[i])return;
+    const ok=sel[i]===qs[i].correct;
+    setSubmitted(p=>({...p,[i]:true}));
+    setScore(s=>({t:s.t+1,c:s.c+(ok?1:0)}));
+    saveUserResponse(qs[i],sel[i],ok).catch(()=>{});
+    // Auto-advance to next question
+    setTimeout(function(){
+      finishExam(); // Single question per session, finish after answering
+    },200);
   }
 
-  async function saveUserResponse(question, selectedChoice, isCorrect) {
-    try {
-      // Get current logged-in user
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user) return; // Not logged in — skip silently
-
-      const userId = session.user.id;
-
-      // Find the mcq_id by matching the stem
-      const { data: mcqRows } = await supabase
-        .from("mcqs")
-        .select("id")
-        .eq("stem", question.stem)
-        .limit(1);
-
-      const mcqId = mcqRows && mcqRows[0] && mcqRows[0].id;
-      if (!mcqId) return; // MCQ not saved yet — skip
-
-      // Save the user response
-      await supabase.from("user_responses").insert({
-        user_id: userId,
-        mcq_id: mcqId,
-        selected_choice: selectedChoice,
-        is_correct: isCorrect
-      });
-    } catch(e) {
-      // Silent — never block user experience
-    }
-  }
-
+  // ─── ANSWER CHOICE COLOR ──────────────────────────────────────────────────
   function qColor(i,l){
     if(!qs[i])return"transparent";
-    if(!rev[i])return sel[i]===l?GOLD:"transparent";
-    if(l===qs[i].correct)return"#10b981";
-    if(sel[i]===l)return"#ef4444";
-    return"transparent";
+    // Study mode: show colors after reveal
+    if(appState==="studying"&&rev[i]){
+      if(l===qs[i].correct)return"#10b981";
+      if(sel[i]===l)return"#ef4444";
+      return"transparent";
+    }
+    // Exam review: show colors
+    if(appState==="exam_review"){
+      if(l===qs[i].correct)return"#10b981";
+      if(sel[i]===l)return"#ef4444";
+      return"transparent";
+    }
+    // Selection highlight (before submit)
+    return sel[i]===l?GOLD:"transparent";
   }
-  var uname=user&&user.user_metadata&&user.user_metadata.full_name?user.user_metadata.full_name:user&&user.email?user.email.split("@")[0]:"Doctor";
 
-  function NB(props){
-    return React.createElement("button",{
-      onClick:function(){setTab(props.id);},
-      style:{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",border:"none",borderRadius:8,cursor:"pointer",background:tab===props.id?"rgba(201,168,76,0.12)":"transparent",borderBottom:tab===props.id?"2px solid "+GOLD:"2px solid transparent",color:tab===props.id?GOLD:"#94a3b8",fontWeight:700,fontSize:12,minWidth:52}
-    },React.createElement("span",{style:{fontSize:18}},props.icon),props.label);
+  // ─── KEYBOARD SHORTCUTS ────────────────────────────────────────────────────
+  React.useEffect(function(){
+    function handleKey(e){
+      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+      const i=0;
+      if(!qs[i])return;
+      const keys={a:"A",b:"B",c:"C",d:"D",e:"E"};
+      const letter=keys[e.key.toLowerCase()];
+      if(letter&&appState!=="exam_review"){
+        const answered=(appState==="studying"&&rev[i])||(appState==="exam_running"&&submitted[i]);
+        if(!answered)setSel(p=>({...p,[i]:letter}));
+      }
+      if(e.key==="Enter"){
+        const answered=(appState==="studying"&&rev[i])||(appState==="exam_running"&&submitted[i]);
+        if(!answered&&sel[i]){
+          if(appState==="studying")revealAnswer(i);
+          else if(appState==="exam_running")submitExamAnswer(i);
+        }
+      }
+      if(e.key==="n"||e.key==="N"){
+        generate();
+      }
+    }
+    window.addEventListener("keydown",handleKey);
+    return()=>window.removeEventListener("keydown",handleKey);
+  },[qs,sel,rev,submitted,appState]);
+
+  // ─── RENDER: NOT LOGGED IN ─────────────────────────────────────────────────
+  if(authLoading)return React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:GOLD,fontSize:18,fontWeight:700}},"Loading MedBoard Pro...");
+  if(!user)return React.createElement(LandingPage,{authMode,setAuthMode,email,setEmail,pw,setPw,nm,setNm,authErr,authMsg,handleAuth,googleLogin});
+
+  const q=qs[0];
+  const studyAnswered=!!(rev[0]);
+  const examAnswered=!!(submitted[0]);
+
+  // ─── RENDER: EXAM REVIEW SCREEN ───────────────────────────────────────────
+  if(appState==="exam_review"){
+    const pct=score.t>0?Math.round(score.c/score.t*100):0;
+    const passed=pct>=70;
+    const mins=Math.floor(examDuration/60);
+    const secs=examDuration%60;
+    return React.createElement("div",{style:{minHeight:"100vh",background:BG,padding:"0 0 60px"}},
+      // Header
+      React.createElement("div",{style:{background:"rgba(0,0,0,0.6)",borderBottom:"1px solid "+BDR,padding:"0 5%",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,cursor:"pointer"},onClick:()=>setTab("mcq")},
+          React.createElement("div",{style:{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:14}},"M"),
+          React.createElement("span",{style:{fontWeight:800,color:"#f1f5f9",fontSize:16}},
+            React.createElement("span",{style:{color:GOLD}},"Med"),
+            React.createElement("span",{style:{color:"#f1f5f9"}},"Board"),
+            React.createElement("span",{style:{color:GOLD,fontSize:10,verticalAlign:"super",marginLeft:1}}),"Pro"
+          )
+        ),
+        React.createElement("span",{style:{color:"#94a3b8",fontSize:14}},"Exam Review"),
+        React.createElement("button",{onClick:logout,style:{background:"transparent",border:"1px solid "+BDR,color:"#64748b",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12}},
+          user.user_metadata?.full_name||user.email?.split("@")[0]||"Sign Out"
+        )
+      ),
+      React.createElement("div",{style:{maxWidth:800,margin:"40px auto",padding:"0 5%"}},
+        // Score card
+        React.createElement("div",{style:{background:CARD,border:"2px solid "+(passed?"#10b981":GOLD),borderRadius:20,padding:"40px 32px",textAlign:"center",marginBottom:32,animation:"fadeIn 0.4s ease"}},
+          React.createElement("div",{style:{fontSize:52,marginBottom:12}},"🎓"),
+          React.createElement("h2",{style:{color:"#f1f5f9",fontSize:28,fontWeight:800,marginBottom:8}},"Exam Complete"),
+          React.createElement("div",{style:{fontSize:72,fontWeight:900,color:passed?"#10b981":"#f59e0b",lineHeight:1,margin:"16px 0"}},(pct)+"%"),
+          React.createElement("p",{style:{color:"#94a3b8",fontSize:18,marginBottom:4}},
+            score.c," correct out of ",score.t," question"+(score.t!==1?"s":"")),
+          React.createElement("p",{style:{color:"#475569",fontSize:14,marginBottom:8}},
+            examDuration>0?"Time: "+mins+"m "+String(secs).padStart(2,"0")+"s":""
+          ),
+          React.createElement("p",{style:{color:passed?"#10b981":"#f59e0b",fontWeight:700,fontSize:16,marginBottom:24}},
+            passed?"✓ Above 70% passing threshold":"✗ Below 70% — review weak areas"
+          ),
+          React.createElement("div",{style:{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}},
+            React.createElement("button",{
+              onClick:()=>{
+                // Show all questions with explanations
+                setRev({0:true});
+                setAppState("exam_review_show");
+              },
+              style:{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:15,cursor:"pointer"}
+            },"Review Answers & Explanations"),
+            React.createElement("button",{
+              onClick:()=>{setAppState("idle");setQs([]);setScore({t:0,c:0});generate();},
+              style:{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:15,cursor:"pointer"}
+            },"New Question")
+          )
+        )
+      )
+    );
   }
 
-  if(showTos)return React.createElement("div",{style:{background:BG,minHeight:"100vh",padding:"40px 5%"}},
-    React.createElement("div",{style:{maxWidth:800,margin:"0 auto"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}},
-        React.createElement("span",{style:{fontWeight:700,fontSize:18,color:"#f1f5f9"}},"MedBoard Pro"),
-        React.createElement("button",{onClick:function(){setShowTos(false);},style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer"}},"Back")
+  // exam_review_show — show question with full explanation
+  const showReview=appState==="exam_review_show";
+
+  // ─── RENDER: MAIN APP ─────────────────────────────────────────────────────
+  return React.createElement("div",{style:{minHeight:"100vh",background:BG}},
+
+    // ── Header ────────────────────────────────────────────────────────────────
+    React.createElement("div",{style:{background:"rgba(0,0,0,0.6)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 5%",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,cursor:"pointer"},onClick:()=>{setTab("mcq");setAppState("idle");setQs([]);}},
+        React.createElement("div",{style:{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:14}},"M"),
+        React.createElement("span",{style:{fontWeight:800,color:"#f1f5f9",fontSize:16}},
+          React.createElement("span",{style:{color:GOLD}},"Med"),
+          "Board",
+          React.createElement("span",{style:{color:GOLD,fontStyle:"italic",marginLeft:2}},"Pro")
+        )
       ),
-      React.createElement("h1",{style:{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}},"Terms of Service"),
-      React.createElement("p",{style:{color:"#64748b",fontSize:13,marginBottom:32}},"Last updated: April 1, 2026"),
-      TOS_SECTIONS.map(function(s){return React.createElement("div",{key:s.t,style:{marginBottom:24}},
-        React.createElement("h3",{style:{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}},s.t),
-        React.createElement("p",{style:{color:"#94a3b8",lineHeight:1.8,fontSize:14}},s.b)
-      );})
-    )
-  );
-
-  if(showPrivacy)return React.createElement("div",{style:{background:BG,minHeight:"100vh",padding:"40px 5%"}},
-    React.createElement("div",{style:{maxWidth:800,margin:"0 auto"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}},
-        React.createElement("span",{style:{fontWeight:700,fontSize:18,color:"#f1f5f9"}},"MedBoard Pro"),
-        React.createElement("button",{onClick:function(){setShowPrivacy(false);},style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer"}},"Back")
+      React.createElement("div",{style:{display:"flex",gap:4}},
+        [["mcq","Q","MCQ Bank"],["guides","G","Guides"],["progress","P","Progress"]].map(([t,icon,label])=>
+          React.createElement("button",{key:t,onClick:()=>setTab(t),style:{background:tab===t?"rgba(201,168,76,0.1)":"transparent",border:"1px solid "+(tab===t?GOLD:BDR),color:tab===t?GOLD:"#64748b",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontWeight:700,fontSize:12}},icon)
+        )
       ),
-      React.createElement("h1",{style:{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}},"Privacy Policy"),
-      React.createElement("p",{style:{color:"#64748b",fontSize:13,marginBottom:32}},"Last updated: April 1, 2026"),
-      PRIVACY_SECTIONS.map(function(s){return React.createElement("div",{key:s.t,style:{marginBottom:24}},
-        React.createElement("h3",{style:{fontSize:16,fontWeight:700,color:GOLD,marginBottom:8}},s.t),
-        React.createElement("p",{style:{color:"#94a3b8",lineHeight:1.8,fontSize:14}},s.b)
-      );})
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
+        appState==="exam_running"&&tLeft!==null&&React.createElement("span",{style:{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",background:"rgba(0,0,0,0.4)",padding:"4px 12px",borderRadius:6,border:"1px solid "+(tLeft<30?"#ef4444":tLeft<60?"#f59e0b":BDR)}},fmtT(tLeft)),
+        React.createElement("button",{onClick:logout,style:{background:"transparent",border:"1px solid "+BDR,color:"#64748b",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12}},
+          user.user_metadata?.full_name?.split(" ")[0]||user.email?.split("@")[0]||"Sign Out"
+        )
+      )
+    ),
+
+    // ── MCQ Tab ────────────────────────────────────────────────────────────────
+    tab==="mcq"&&React.createElement("div",{style:{padding:"20px 5%",maxWidth:960,margin:"0 auto"}},
+
+      // Stats bar
+      score.t>0&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:16,marginBottom:16,fontSize:13}},
+        React.createElement("span",{style:{color:"#475569"}},"Answered: ",React.createElement("strong",{style:{color:"#f1f5f9"}},score.t)),
+        React.createElement("span",{style:{color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}},Math.round(score.c/score.t*100),"% correct"),
+        appState==="exam_running"&&React.createElement("span",{style:{marginLeft:"auto",color:"#f59e0b",fontSize:12,fontWeight:600}},"EXAM MODE")
+      ),
+
+      // Sidebar toggle
+      React.createElement("button",{
+        onClick:()=>setSidebarOpen(!sidebarOpen),
+        style:{display:"flex",alignItems:"center",gap:8,background:CARD,border:"1px solid "+(sidebarOpen?GOLD:BDR),color:sidebarOpen?GOLD:"#94a3b8",padding:"8px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,width:"100%",justifyContent:"space-between",marginBottom:12}},
+        React.createElement("span",null,"⚙ ",grp," — ",topic," · ",lvl.l),
+        React.createElement("span",null,sidebarOpen?"▲ Hide":"▼ Options")
+      ),
+
+      // Sidebar options
+      sidebarOpen&&React.createElement("div",{style:{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,marginBottom:16,maxHeight:"60vh",overflowY:"auto"}},
+        // Level selector
+        React.createElement("p",{style:{fontSize:11,color:GOLD,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}},"Exam Level"),
+        React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}},
+          LEVELS.map(function(l){
+            return React.createElement("button",{key:l.v,onClick:()=>setLvl(l),
+              style:{padding:"5px 12px",borderRadius:6,border:"1px solid "+(lvl.v===l.v?GOLD:BDR),background:lvl.v===l.v?"rgba(201,168,76,0.1)":"transparent",color:lvl.v===l.v?GOLD:"#94a3b8",fontSize:12,fontWeight:700,cursor:"pointer"}},l.l);
+          })
+        ),
+        // Mode selector
+        React.createElement("p",{style:{fontSize:11,color:GOLD,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}},"Mode"),
+        React.createElement("div",{style:{display:"flex",gap:8,marginBottom:16}},
+          React.createElement("button",{onClick:()=>setExamMode(false),
+            style:{flex:1,padding:"8px",borderRadius:6,border:"1px solid "+(!examMode?GOLD:BDR),background:!examMode?"rgba(201,168,76,0.1)":"transparent",color:!examMode?GOLD:"#94a3b8",fontSize:12,fontWeight:700,cursor:"pointer"}},
+            "📚 Study"),
+          React.createElement("button",{onClick:()=>setExamMode(true),
+            style:{flex:1,padding:"8px",borderRadius:6,border:"1px solid "+(examMode?GOLD:BDR),background:examMode?"rgba(201,168,76,0.1)":"transparent",color:examMode?GOLD:"#94a3b8",fontSize:12,fontWeight:700,cursor:"pointer"}},
+            "⏱ Exam")
+        ),
+        // Topic groups
+        React.createElement("p",{style:{fontSize:11,color:GOLD,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}},"Topic"),
+        Object.entries(GROUPS).map(function([g,topics]){
+          return React.createElement("div",{key:g,style:{marginBottom:8}},
+            React.createElement("p",{style:{fontSize:11,color:"#334155",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:0.5}},g),
+            React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:4}},
+              topics.map(function(t){
+                return React.createElement("button",{key:t,onClick:()=>{setGrp(g);setTopic(t);},
+                  style:{padding:"4px 10px",borderRadius:5,border:"1px solid "+(topic===t?GOLD:BDR),background:topic===t?"rgba(201,168,76,0.1)":"transparent",color:topic===t?GOLD:"#64748b",fontSize:11,cursor:"pointer",fontWeight:topic===t?700:400}},t);
+              })
+            )
+          );
+        }),
+        // Lab panel
+        React.createElement(LabPanel,null)
+      ),
+
+      // Error
+      mcqErr&&React.createElement("div",{style:{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,padding:"14px 18px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}},
+        React.createElement("span",{style:{color:"#fca5a5",fontSize:14}},mcqErr),
+        React.createElement("button",{onClick:generate,style:{background:GOLD,color:"#000",border:"none",padding:"6px 14px",borderRadius:6,fontWeight:700,cursor:"pointer",fontSize:12}},"Try again")
+      ),
+
+      // Generate button
+      (!q||appState==="idle")&&!busy&&React.createElement("button",{
+        onClick:generate,
+        style:{width:"100%",padding:"16px",borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",marginBottom:16}},
+        examMode?"Start Exam Question ⏱":"Generate Question ▶"
+      ),
+
+      // Busy state
+      busy&&React.createElement("div",{style:{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,textAlign:"center",marginBottom:18}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:8}},
+          React.createElement("span",{style:{color:"#f1f5f9",fontSize:14,fontWeight:600}},"Preparing your question..."),
+          React.createElement("div",{style:{width:8,height:8,borderRadius:"50%",background:GOLD,animation:"pulse 1s infinite"}})
+        ),
+        React.createElement("p",{style:{color:"#334155",fontSize:11}}),"Applying NBME/ABIM standards · Verifying guideline accuracy"
+      ),
+
+      // Typewriter (study mode loading)
+      revealText&&!q&&React.createElement("div",{style:{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:24,marginBottom:16}},
+        React.createElement("p",{style:{color:"#e2e8f0",lineHeight:1.9,fontSize:15}}),revealText,"▊"
+      ),
+
+      // ── QUESTION CARD ───────────────────────────────────────────────────────
+      q&&React.createElement("div",{style:{background:CARD,border:"1px solid "+(studyAnswered||showReview?"#10b981":BDR),borderRadius:13,padding:24,animation:"fadeIn 0.3s ease"}},
+
+        // Question header
+        React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}},
+          React.createElement("span",{style:{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}},
+            appState==="exam_running"?"Exam":"Question 1"
+          ),
+          // Topic - hidden in exam mode until review
+          (studyAnswered||showReview)&&q.topic&&React.createElement("span",{style:{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}},q.topic),
+          // Correct/Incorrect - study mode only
+          studyAnswered&&React.createElement("span",{style:{marginLeft:"auto",fontSize:14,fontWeight:700,color:sel[0]===q.correct?"#10b981":"#ef4444"}},
+            sel[0]===q.correct?"✓ Correct":"✗ Incorrect"
+          ),
+          // Show review badge
+          showReview&&React.createElement("span",{style:{marginLeft:"auto",fontSize:14,fontWeight:700,color:sel[0]===q.correct?"#10b981":"#ef4444"}},
+            sel[0]===q.correct?"✓ Correct":"✗ Incorrect"
+          )
+        ),
+
+        // Stem
+        React.createElement("p",{style:{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}},q.stem),
+
+        // Answer choices
+        React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:10,marginBottom:18}},
+          Object.entries(q.choices).map(function([l,t]){
+            const answered=studyAnswered||examAnswered||showReview;
+            const bg=qColor(0,l);
+            return React.createElement("button",{key:l,
+              onClick:()=>{if(!answered)setSel(p=>({...p,[0]:l}));},
+              style:{textAlign:"left",padding:"13px 16px",borderRadius:9,
+                cursor:answered?"default":"pointer",
+                border:"1px solid "+(bg==="transparent"?BDR:bg),
+                background:bg==="transparent"?"rgba(255,255,255,0.02)":bg+"22",
+                color:(studyAnswered||showReview)&&l===q.correct?"#10b981":(studyAnswered||showReview)&&sel[0]===l?"#ef4444":"#cbd5e1",
+                fontWeight:sel[0]===l?700:400,fontSize:14}},
+              React.createElement("span",{style:{fontWeight:800,marginRight:10}},l,"."),t,
+              // Labels — study mode and review only
+              (studyAnswered||showReview)&&l===q.correct&&React.createElement("span",{style:{marginLeft:8,fontSize:12,color:"#10b981"}}," ✓ Correct answer"),
+              (studyAnswered||showReview)&&sel[0]===l&&l!==q.correct&&React.createElement("span",{style:{marginLeft:8,fontSize:12,color:"#ef4444"}}," ✗ Your answer")
+            );
+          })
+        ),
+
+        // Submit / Next buttons
+        React.createElement("div",{style:{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}},
+          // Study mode submit
+          appState==="studying"&&!studyAnswered&&React.createElement("button",{
+            onClick:()=>revealAnswer(0),disabled:!sel[0],
+            style:{background:sel[0]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[0]?GOLD:BDR),color:sel[0]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[0]?"pointer":"not-allowed",fontWeight:700,fontSize:14}},
+            "Submit Answer"
+          ),
+          // Exam mode submit
+          appState==="exam_running"&&!examAnswered&&React.createElement("button",{
+            onClick:()=>submitExamAnswer(0),disabled:!sel[0],
+            style:{background:sel[0]?"linear-gradient(135deg,#7c3aed,#6d28d9)":"#1e293b",border:"1px solid "+(sel[0]?"#8b5cf6":BDR),color:sel[0]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[0]?"pointer":"not-allowed",fontWeight:700,fontSize:14}},
+            "Submit & Continue ⏱"
+          ),
+          !sel[0]&&(appState==="studying"||appState==="exam_running")&&React.createElement("span",{style:{fontSize:13,color:"#334155"}},"Select an answer first"),
+          // Next question (study mode after reveal)
+          (studyAnswered||showReview)&&React.createElement("button",{
+            onClick:generate,disabled:busy,
+            style:{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"11px 28px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}},
+            "Next Question (N)"
+          )
+        ),
+
+        // Explanation — study mode and review
+        (studyAnswered||showReview)&&React.createElement("div",{style:{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginTop:16}},
+          React.createElement("p",{style:{margin:"0 0 12px",fontSize:12,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}},"Attending Explanation"),
+          q.explanation.split(". ").map(function(sentence,idx){
+            return React.createElement("p",{key:idx,style:{margin:"0 0 8px",color:"#e2e8f0",lineHeight:1.8,fontSize:14}},sentence);
+          }),
+          React.createElement("p",{style:{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}},
+            "Always verify with current society guidelines. Inaccuracies? Email ",
+            React.createElement("span",{style:{color:GOLD}},"antenehzenebe@gmail.com")
+          ),
+          q.imageUrl&&React.createElement("div",{style:{marginTop:14,paddingTop:12,borderTop:"1px solid "+BDR}},
+            React.createElement("p",{style:{fontSize:11,color:"#64748b",marginBottom:8}},"Reference Imaging"),
+            React.createElement("a",{href:q.imageUrl,target:"_blank",rel:"noopener noreferrer",
+              style:{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}},
+              "View on Radiopaedia ↗"
+            )
+          )
+        ),
+
+        // Keyboard hint
+        React.createElement("p",{style:{marginTop:10,fontSize:11,color:"#1e293b"}},"Keyboard: A-E to select · Enter to submit · N for next")
+      )
+    ),
+
+    // ── Guides Tab ─────────────────────────────────────────────────────────────
+    tab==="guides"&&React.createElement("div",{style:{padding:"30px 5%",maxWidth:960,margin:"0 auto"}},
+      React.createElement("h2",{style:{fontSize:22,fontWeight:800,color:"#f1f5f9",marginBottom:6}},"Clinical Guidelines"),
+      React.createElement("p",{style:{color:"#64748b",fontSize:14,marginBottom:24}},"Direct links to official society guidelines"),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}},
+        GUIDES.map(function(g){
+          return React.createElement("a",{key:g.id,href:g.u,target:"_blank",rel:"noopener noreferrer",
+            style:{background:CARD,border:"1px solid "+BDR,borderRadius:10,padding:"14px 16px",textDecoration:"none",display:"flex",alignItems:"center",gap:12,transition:"border-color 0.2s"},
+            onMouseEnter:e=>e.currentTarget.style.borderColor=GOLD,
+            onMouseLeave:e=>e.currentTarget.style.borderColor=BDR},
+            React.createElement("div",{style:{width:36,height:36,borderRadius:8,background:"rgba(0,40,104,0.3)",border:"1px solid #1e40af",display:"flex",alignItems:"center",justifyContent:"center",color:GOLD,fontWeight:800,fontSize:14,flexShrink:0}},g.i),
+            React.createElement("div",null,
+              React.createElement("p",{style:{color:"#f1f5f9",fontWeight:600,fontSize:13,marginBottom:2}},g.t),
+              React.createElement("p",{style:{color:"#475569",fontSize:11}},g.s)
+            )
+          );
+        })
+      )
+    ),
+
+    // ── Progress Tab ───────────────────────────────────────────────────────────
+    tab==="progress"&&React.createElement("div",{style:{padding:"30px 5%",maxWidth:960,margin:"0 auto"}},
+      React.createElement("h2",{style:{fontSize:22,fontWeight:800,color:"#f1f5f9",marginBottom:6}},"Your Progress"),
+      React.createElement("p",{style:{color:"#64748b",fontSize:14,marginBottom:24}},"Session statistics"),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16}},
+        [
+          {label:"Questions Answered",value:score.t,color:"#6366f1"},
+          {label:"Correct Answers",value:score.c,color:"#10b981"},
+          {label:"Accuracy",value:score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"},
+          {label:"Current Exam Level",value:lvl.l,color:GOLD},
+        ].map(function(stat){
+          return React.createElement("div",{key:stat.label,style:{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:"20px 16px",textAlign:"center"}},
+            React.createElement("div",{style:{fontSize:36,fontWeight:900,color:stat.color,marginBottom:8}},stat.value),
+            React.createElement("p",{style:{color:"#64748b",fontSize:13}},stat.label)
+          );
+        })
+      ),
+      React.createElement("div",{style:{marginTop:24,background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20}},
+        React.createElement("p",{style:{color:"#64748b",fontSize:13,textAlign:"center"}},"Full progress tracking with question history coming soon. Powered by Supabase.")
+      )
     )
-  );
-
-  if(authLoading)return React.createElement("div",{style:{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}},
-    React.createElement("div",{style:{textAlign:"center"}},
-      React.createElement("div",{style:{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 14px"}},"M"),
-      React.createElement("p",{style:{color:"#475569",fontSize:14}},"Loading MedBoard Pro...")
-    )
-  );
-
-  if(screen==="landing")return(
-    <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(10,10,15,0.93)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 5%"}}>
-        <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:64,gap:8,flexWrap:"wrap"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:GOLD}}>M</div>
-            <span style={{fontWeight:700,fontSize:18,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>{setScreen("auth");}}
-              style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>
-              Subscriber Sign In
-            </button>
-            <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-              style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"10px 22px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:14}}>
-              View Plans
-            </button>
-          </div>
-        </div>
-      </nav>
-      <section style={{textAlign:"center",padding:"100px 5% 80px"}}>
-        <h1 style={{fontSize:"clamp(30px,5vw,58px)",fontWeight:800,lineHeight:1.1,maxWidth:820,margin:"0 auto 20px",color:"#f1f5f9"}}>
-          Board Prep That Actually <span style={{color:GOLD}}>Understands Medicine</span>
-        </h1>
-        <p style={{fontSize:17,color:"#94a3b8",maxWidth:640,margin:"0 auto 12px",lineHeight:1.7}}>
-          USMLE Step 1, 2 and 3 · ABIM Internal Medicine · ABIM Endocrinology Subspecialty
-        </p>
-        <p style={{fontSize:15,color:"#64748b",maxWidth:640,margin:"0 auto 40px",lineHeight:1.7}}>
-          Built by <strong style={{color:"#e2e8f0"}}>Dr. Anteneh Zenebe, MD, FACE</strong> -- Assistant Clinical Professor and Associate Program Director, Howard University College of Medicine
-        </p>
-        <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:14}}>
-          <button onClick={()=>document.getElementById("pricing").scrollIntoView({behavior:"smooth"})}
-            style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:16}}>
-            Start 14-Day Free Trial
-          </button>
-          <button onClick={()=>setScreen("auth")}
-            style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"16px 36px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:16}}>
-            Subscriber Sign In
-          </button>
-        </div>
-        <p style={{color:"#475569",fontSize:13}}>Credit card required · No charge until Day 15 · Cancel anytime</p>
-      </section>
-      <section style={{padding:"80px 5%"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <div style={{textAlign:"center",marginBottom:56}}>
-            <p style={{fontSize:12,fontWeight:700,color:GOLD,letterSpacing:3,textTransform:"uppercase",marginBottom:12}}>Simple by design</p>
-            <h2 style={{fontSize:34,fontWeight:800,color:"#f1f5f9",margin:0}}>How MedBoard Pro Works</h2>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:0,position:"relative"}}>
-            {[
-              {
-                num:"01",
-                icon:"◎",
-                title:"Choose Your Exam",
-                desc:"Select from USMLE Step 1, Step 2 CK, Step 3, ABIM Internal Medicine, or ABIM Endocrinology and Metabolism subspecialty. Every question is weighted to the real exam blueprint.",
-                color:"#6366f1"
-              },
-              {
-                num:"02",
-                icon:"◈",
-                title:"Receive a Fresh Question",
-                desc:"A unique board-quality clinical vignette — written to NBME and ABIM item-writing standards — with a real patient, real labs, and real clinical decisions. Never the same question twice.",
-                color:GOLD
-              },
-              {
-                num:"03",
-                icon:"◉",
-                title:"Learn from Every Answer",
-                desc:"Instant feedback with the correct answer, guideline citations from ADA, ATA, ACC/AHA, Endocrine Society and 20+ societies, cognitive error analysis, and a board pearl from a fellowship program director.",
-                color:"#10b981"
-              }
-            ].map(function(step, i){
-              return React.createElement("div",{
-                key:step.num,
-                style:{
-                  padding:"40px 36px",
-                  borderTop:"1px solid "+BDR,
-                  borderBottom:"1px solid "+BDR,
-                  borderLeft:"1px solid "+BDR,
-                  borderRight: i===2 ? "1px solid "+BDR : "none",
-                  position:"relative",
-                  background:"transparent",
-                  transition:"background 0.3s"
-                },
-                onMouseEnter:function(e){e.currentTarget.style.background="rgba(255,255,255,0.02)";},
-                onMouseLeave:function(e){e.currentTarget.style.background="transparent";}
-              },
-                React.createElement("div",{style:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:28}},
-                  React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#334155",letterSpacing:2}},step.num),
-                  React.createElement("span",{style:{fontSize:28,color:step.color,opacity:0.6}},step.icon)
-                ),
-                React.createElement("h3",{style:{fontSize:18,fontWeight:800,color:"#f1f5f9",marginBottom:14,lineHeight:1.3}},step.title),
-                React.createElement("p",{style:{fontSize:14,color:"#64748b",lineHeight:1.8,margin:0}},step.desc),
-                React.createElement("div",{style:{position:"absolute",bottom:0,left:0,width:"100%",height:2,background:"linear-gradient(90deg,"+step.color+"44,transparent)"}}),
-                i < 2 && React.createElement("div",{style:{
-                  position:"absolute",
-                  right:-1,
-                  top:"50%",
-                  transform:"translateY(-50%)",
-                  width:1,
-                  height:"60%",
-                  background:"linear-gradient(180deg,transparent,"+BDR+",transparent)",
-                  zIndex:1
-                }})
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section id="features" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Everything you need to pass</h2>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:20}}>
-            {[
-              {icon:"T",title:"MCQ Bank",desc:"Blueprint-aligned questions across ABIM IM, ABIM Endocrinology, USMLE Step 1, 2 and 3. Fresh clinical vignettes on demand."},
-              {icon:"E",title:"Study and Exam Modes",desc:"Study mode gives instant feedback. Exam mode runs 90 seconds per question with a live countdown timer."},
-              {icon:"G",title:"Guideline-Current",desc:"Every explanation cites ADA, Endocrine Society, ACC/AHA, ESC, EASD, KDIGO and 20+ US and European societies."},
-              {icon:"R",title:"Official Guidelines",desc:"Direct one-click access to 12 major society guidelines including ADA, Endocrine Society, AACE, ACC/AHA and more."},
-              {icon:"L",title:"Lab and Calc Reference",desc:"Comprehensive lab reference values and 20 medical calculations built into the question sidebar."},
-
-            ].map(f=>(
-              <div key={f.title} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:26}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                <div style={{width:40,height:40,borderRadius:8,background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:GOLD,marginBottom:14,fontSize:16}}>{f.icon}</div>
-                <h3 style={{fontWeight:700,marginBottom:8,fontSize:16,color:"#f1f5f9"}}>{f.title}</h3>
-                <p style={{color:"#64748b",lineHeight:1.6,fontSize:14}}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section id="about" style={{padding:"80px 5%"}}>
-        <div style={{maxWidth:900,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>About the Founder</h2>
-          <div style={{background:CARD,border:"1px solid #6366f1",borderRadius:16,padding:32,display:"flex",gap:28,flexWrap:"wrap"}}>
-            <div style={{width:90,height:90,borderRadius:"50%",background:"linear-gradient(135deg,"+NAVY+",#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:800,color:"#fff",flexShrink:0}}>AZ</div>
-            <div style={{flex:1,minWidth:260}}>
-              <h3 style={{fontSize:22,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Anteneh Zenebe, MD, FACE</h3>
-              <p style={{color:"#8b5cf6",fontWeight:600,marginBottom:14,fontSize:14}}>Assistant Clinical Professor · Associate Program Director<br/>Endocrinology Fellowship · Howard University College of Medicine</p>
-              <p style={{color:"#94a3b8",lineHeight:1.8,fontSize:15}}>Board-certified endocrinologist and Fellow of the American College of Endocrinology. Dedicated to training physicians who serve underserved communities at Howard University.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section id="pricing" style={{padding:"80px 5%"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:20,color:"#f1f5f9"}}>Simple, transparent pricing</h2>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:40}}>
-            <div style={{display:"inline-flex",alignItems:"center",gap:12,background:"#1e293b",borderRadius:30,padding:"6px 16px"}}>
-              <span style={{fontSize:14,color:annual?"#475569":"#f1f5f9"}}>Monthly</span>
-              <div onClick={()=>setAnnual(!annual)} style={{width:44,height:24,borderRadius:12,background:annual?"#6366f1":"#334155",cursor:"pointer",position:"relative"}}>
-                <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:annual?23:3,transition:"left 0.3s"}}/>
-              </div>
-              <span style={{fontSize:14,color:annual?"#f1f5f9":"#475569"}}>Annual <span style={{color:"#10b981",fontWeight:700}}>-20%</span></span>
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
-            {PLANS.map(plan=>(
-              <div key={plan.key} style={{background:plan.badge==="MOST POPULAR"?"rgba(99,102,241,0.1)":"rgba(255,255,255,0.03)",border:"2px solid "+(plan.badge==="MOST POPULAR"?"#6366f1":BDR),borderRadius:20,padding:32,position:"relative",display:"flex",flexDirection:"column"}}>
-                {plan.badge&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:plan.badge==="MOST POPULAR"?"#6366f1":"#10b981",color:"#fff",fontSize:11,fontWeight:700,padding:"4px 14px",borderRadius:20}}>{plan.badge}</div>}
-                <div style={{color:plan.color,fontSize:13,fontWeight:600,marginBottom:8,textTransform:"uppercase"}}>{plan.name}</div>
-                <div style={{fontSize:44,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>${getPrice(plan).toLocaleString()}<span style={{fontSize:15,color:"#475569",fontWeight:400}}>/{plan.period}</span></div>
-                <ul style={{listStyle:"none",padding:0,margin:"20px 0",flex:1}}>
-                  {plan.features.map(f=>(
-                    <li key={f} style={{padding:"8px 0",fontSize:14,color:"#94a3b8",display:"flex",gap:10}}>
-                      <span style={{color:plan.color,flexShrink:0}}>v</span>{f}
-                    </li>
-                  ))}
-                </ul>
-                <button onClick={()=>window.location.href=PAYMENT_LINKS[plan.key]}
-                  style={{width:"100%",background:plan.badge==="MOST POPULAR"?"linear-gradient(135deg,#6366f1,#8b5cf6)":"transparent",border:plan.badge==="MOST POPULAR"?"none":"2px solid "+plan.color,color:plan.badge==="MOST POPULAR"?"#fff":plan.color,padding:14,borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                  Start 14-Day Free Trial
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section id="faq" style={{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}}>
-        <div style={{maxWidth:780,margin:"0 auto"}}>
-          <h2 style={{fontSize:34,fontWeight:800,textAlign:"center",marginBottom:48,color:"#f1f5f9"}}>Frequently Asked Questions</h2>
-          {FAQS.map((f,i)=>(
-            <div key={i} style={{borderBottom:"1px solid "+BDR}}>
-              <button onClick={()=>setOpenFaq(openFaq===i?null:i)}
-                style={{width:"100%",background:"none",border:"none",color:"#f1f5f9",textAlign:"left",padding:"20px 0",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:16,fontWeight:600,gap:16}}>
-                {f.q}<span style={{color:"#6366f1",fontSize:22,flexShrink:0}}>{openFaq===i?"-":"+"}</span>
-              </button>
-              {openFaq===i&&<p style={{color:"#94a3b8",lineHeight:1.8,paddingBottom:20,fontSize:15,margin:0}}>{f.a}</p>}
-            </div>
-          ))}
-        </div>
-      </section>
-      <footer style={{borderTop:"1px solid "+BDR,padding:"32px 5%",textAlign:"center",color:"#334155",fontSize:13}}>
-        <div style={{marginBottom:8,color:"#475569"}}>MedBoard Pro · Anteneh Zenebe, MD, FACE</div>
-        <div>{new Date().getFullYear()} MedBoard Pro · antenehzenebe@gmail.com · All rights reserved</div>
-        <div style={{marginTop:10,display:"flex",gap:20,justifyContent:"center"}}>
-          <span onClick={()=>setShowTos(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Terms of Service</span>
-          <span onClick={()=>setShowPrivacy(true)} style={{color:"#475569",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Privacy Policy</span>
-        </div>
-      </footer>
-    </div>
-  );
-
-  if(screen==="auth")return(
-    <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{width:"100%",maxWidth:420}}>
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{width:52,height:52,borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,color:GOLD,margin:"0 auto 12px"}}>M</div>
-          <h1 style={{fontSize:22,fontWeight:800,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></h1>
-          <p style={{color:"#475569",fontSize:13,marginTop:4}}>Board Prep Platform</p>
-        </div>
-        <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:20,padding:28}}>
-          {fromStripe&&(
-            <div style={{background:"rgba(16,185,129,0.1)",border:"1px solid #10b981",borderRadius:10,padding:"12px 16px",marginBottom:20,textAlign:"center"}}>
-              <p style={{color:"#10b981",fontWeight:700,fontSize:14,marginBottom:4}}>Payment confirmed! Welcome to MedBoard Pro.</p>
-              <p style={{color:"#64748b",fontSize:12}}>Create your account below to access your 14-day free trial.</p>
-            </div>
-          )}
-          {!fromStripe&&(
-            <div style={{background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#94a3b8",lineHeight:1.7}}>
-              <p style={{fontWeight:700,color:"#818cf8",marginBottom:6}}>New subscriber?</p>
-              <p>After completing payment, return here and sign in with Google or create an account with your email and password.</p>
-              <p style={{marginTop:6}}>Need help? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span></p>
-            </div>
-          )}
-          <h2 style={{fontSize:18,fontWeight:800,marginBottom:20,textAlign:"center",color:"#f1f5f9"}}>
-            {fromStripe?"Step 2 -- Create Your Account":"Sign In to Your Account"}
-          </h2>
-          <button onClick={googleLogin}
-            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:14,marginBottom:4,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-            <span style={{fontWeight:800,color:"#4285f4",fontSize:16}}>G</span> Continue with Google
-          </button>
-          {!fromStripe&&<p style={{fontSize:11,color:"#f59e0b",marginBottom:14,textAlign:"center"}}>Only if your Google email matches your payment email</p>}
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
-            <div style={{flex:1,height:1,background:BDR}}/><span style={{color:"#334155",fontSize:12}}>or</span><div style={{flex:1,height:1,background:BDR}}/>
-          </div>
-          {fromStripe&&(
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>FULL NAME</label>
-              <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Dr. John Smith"
-                style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-            </div>
-          )}
-          <div style={{marginBottom:14}}>
-            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>EMAIL</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="doctor@hospital.com"
-              style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-            {!fromStripe&&<p style={{fontSize:11,color:"#f59e0b",marginTop:5}}>Use the same email you used for your Stripe payment</p>}
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{fontSize:11,color:"#64748b",fontWeight:700,display:"block",marginBottom:5}}>PASSWORD</label>
-            <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Minimum 8 characters"
-              style={{width:"100%",background:"#1e293b",border:"1px solid "+BDR,color:"#f1f5f9",padding:"11px 13px",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          {authErr&&(
-            <div style={{background:authErr.startsWith("Check")?"rgba(16,185,129,0.1)":"rgba(239,68,68,0.1)",border:"1px solid "+(authErr.startsWith("Check")?"#10b981":"#ef4444"),borderRadius:8,padding:"10px 13px",color:authErr.startsWith("Check")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>
-              {authErr}
-            </div>
-          )}
-          <button onClick={fromStripe?signup:login} disabled={authBusy}
-            style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,marginBottom:12,opacity:authBusy?0.7:1}}>
-            {authBusy?"Please wait...":fromStripe?"Create Account and Start Learning":"Sign In and Start Learning"}
-          </button>
-          {!fromStripe&&(
-            <p style={{textAlign:"center",color:"#475569",fontSize:13,marginBottom:12}}>
-              New subscriber? <span onClick={()=>setScreen("landing")} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>View plans</span>
-            </p>
-          )}
-          {fromStripe&&(
-            <p style={{textAlign:"center",color:"#475569",fontSize:12,marginBottom:12}}>
-              Already have an account? <span onClick={()=>setFromStripe(false)} style={{color:GOLD,cursor:"pointer",fontWeight:600}}>Sign In instead</span>
-            </p>
-          )}
-          <p style={{textAlign:"center"}}>
-            <span onClick={()=>setScreen("landing")} style={{color:"#334155",fontSize:12,cursor:"pointer"}}>Back to home</span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  return(
-    <div style={{background:BG,minHeight:"100vh"}}>
-      <nav style={{background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 2%",position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",height:56,gap:4}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div onClick={()=>setTab("home")} style={{width:30,height:30,borderRadius:7,background:"linear-gradient(135deg,"+NAVY+",#1a3a7a)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:GOLD,cursor:"pointer"}}>M</div>
-            <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>MedBoard <span style={{color:GOLD}}>Pro</span></span>
-          </div>
-          <div style={{display:"flex",gap:2}}>
-            <NB id="home" label="Home" icon="H"/>
-            <NB id="mcq" label="MCQ Bank" icon="Q"/>
-            <NB id="guides" label="Guides" icon="G"/>
-            <NB id="progress" label="Progress" icon="P"/>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:12,fontWeight:600,color:"#f1f5f9"}}>{uname}</div>
-              <div style={{fontSize:10,color:"#475569"}}>{user&&user.email}</div>
-            </div>
-            <button onClick={()=>window.open(PORTAL_URL,"_blank")}
-              style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600}}>
-              Manage Plan
-            </button>
-            <button onClick={logout} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11}}>Sign Out</button>
-          </div>
-        </div>
-      </nav>
-      <div style={{padding:"18px 2%"}}>
-
-        {tab==="home"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Welcome back, {uname}!</h2>
-            <p style={{color:"#475569",fontSize:13,marginBottom:20}}>Board Prep Dashboard</p>
-            <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid "+GOLD,borderRadius:12,padding:18,marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Account</div><div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>Active</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Sessions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.s}</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Questions</div><div style={{fontSize:16,fontWeight:800,color:"#f1f5f9"}}>{score.t}</div></div>
-              <div><div style={{fontSize:11,color:"#64748b",marginBottom:2}}>Accuracy</div><div style={{fontSize:16,fontWeight:800,color:score.t>0?(score.c/score.t>0.7?"#10b981":"#f59e0b"):"#475569"}}>{score.t>0?Math.round(score.c/score.t*100)+"%":"--"}</div></div>
-              <button onClick={()=>window.open(PORTAL_URL,"_blank")}
-                style={{marginLeft:"auto",background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"8px 16px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                Manage Subscription
-              </button>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
-              {[{icon:"Q",title:"MCQ Bank",desc:"Blueprint-aligned questions",id:"mcq",color:"#6366f1"},{icon:"G",title:"Guidelines",desc:"Official society resources",id:"guides",color:"#10b981"},{icon:"P",title:"My Progress",desc:"Track performance",id:"progress",color:"#f59e0b"}].map(a=>(
-                <div key={a.id} onClick={()=>{setTab(a.id);}}
-                  style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:16,cursor:"pointer"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=a.color}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                  <div style={{fontWeight:700,fontSize:13,color:a.color,marginBottom:2}}>{a.title}</div>
-                  <div style={{fontSize:11,color:"#475569"}}>{a.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="mcq"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>MCQ Bank</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Blueprint-aligned questions · Study or timed exam mode</p>
-            <div style={{display:"flex",gap:16,alignItems:"flex-start",flexDirection:"column"}}>
-              <button onClick={()=>setSidebarOpen(!sidebarOpen)}
-                style={{display:"flex",alignItems:"center",gap:8,background:CARD,border:"1px solid "+(sidebarOpen?GOLD:BDR),color:sidebarOpen?GOLD:"#94a3b8",padding:"8px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,width:"100%",justifyContent:"space-between"}}>
-                <span>⚙ {grp} — {topic} · {lvl.l}</span>
-                <span>{sidebarOpen?"▲ Hide":"▼ Options"}</span>
-              </button>
-              {sidebarOpen&&<div style={{width:"100%",background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,maxHeight:"60vh",overflowY:"auto"}}>
-                <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:12,letterSpacing:1}}>BOARD LEVEL</p>
-                {LEVELS.map(x=>(
-                  <button key={x.l} onClick={()=>{setLvl(x);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:7,border:"1px solid "+(lvl.l===x.l?GOLD:BDR),background:lvl.l===x.l?"rgba(201,168,76,0.1)":"transparent",color:lvl.l===x.l?GOLD:"#e2e8f0",fontSize:13,fontWeight:lvl.l===x.l?700:500,cursor:"pointer",marginBottom:5}}>
-                    {x.l}
-                  </button>
-                ))}
-                <div style={{height:1,background:BDR,margin:"14px 0"}}/>
-                <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:10,letterSpacing:1}}>SPECIALTY</p>
-                {Object.keys(GROUPS).map(g=>(
-                  <button key={g} onClick={()=>{setGrp(g);setTopic(GROUPS[g][0]);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                    style={{width:"100%",textAlign:"left",padding:"7px 12px",borderRadius:7,border:"1px solid "+(grp===g?GOLD:BDR),background:grp===g?"rgba(201,168,76,0.08)":"transparent",color:grp===g?GOLD:"#e2e8f0",fontSize:12,fontWeight:grp===g?700:500,cursor:"pointer",marginBottom:4}}>
-                    {g}
-                  </button>
-                ))}
-                {grp&&GROUPS[grp].length>1&&(
-                  <React.Fragment>
-                    <div style={{height:1,background:BDR,margin:"10px 0"}}/>
-                    <p style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8,letterSpacing:1}}>TOPIC</p>
-                    {GROUPS[grp].map(t=>(
-                      <button key={t} onClick={()=>{setTopic(t);if(qs.length>0){stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);}}}
-                        style={{width:"100%",textAlign:"left",padding:"6px 12px",borderRadius:6,border:"none",background:topic===t?"rgba(201,168,76,0.08)":"transparent",color:topic===t?GOLD:"#e2e8f0",fontSize:12,fontWeight:topic===t?700:500,cursor:"pointer",marginBottom:2}}>
-                        {t}
-                      </button>
-                    ))}
-                  </React.Fragment>
-                )}
-                <LabPanel/>
-              </div>}
-              <div style={{width:"100%"}}>
-                {revealText&&!busy&&qs.length===0&&(
-                  <div style={{background:CARD,border:"1px solid "+GOLD,borderRadius:13,padding:24,marginBottom:18}}>
-                    <p style={{fontSize:11,color:GOLD,fontWeight:700,margin:"0 0 10px",letterSpacing:1}}>GENERATING QUESTION</p>
-                    <p style={{color:"#e2e8f0",fontSize:15,lineHeight:1.9,margin:0}}>{revealText}<span style={{display:"inline-block",width:2,height:14,background:GOLD,marginLeft:3,animation:"pulse 0.7s infinite",verticalAlign:"middle"}}/></p>
-                  </div>
-                )}
-                {qs.length===0&&!busy&&!revealText&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:18,marginBottom:18}}>
-                    <div style={{display:"flex",gap:10,marginBottom:16}}>
-                      <button onClick={()=>setExamMode(false)}
-                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(!examMode?"#10b981":BDR),background:!examMode?"rgba(16,185,129,0.08)":"transparent",color:!examMode?"#10b981":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                        Study Mode
-                      </button>
-                      <button onClick={()=>setExamMode(true)}
-                        style={{flex:1,padding:"12px",borderRadius:10,border:"2px solid "+(examMode?"#ef4444":BDR),background:examMode?"rgba(239,68,68,0.08)":"transparent",color:examMode?"#ef4444":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
-                        Exam Mode
-                      </button>
-                    </div>
-                    <div style={{background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:9,padding:"10px 14px",marginBottom:14}}>
-                      <p style={{fontSize:12,color:GOLD,fontWeight:600,margin:0}}>Selected: <span style={{color:"#f1f5f9"}}>{grp} -- {topic}</span></p>
-                      <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Level: {lvl.l}</p>
-                    </div>
-                    <button onClick={generate} disabled={busy}
-                      style={{width:"100%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"14px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:15}}>
-                      {examMode?"Start Exam Mode":"Start Practicing"}
-                    </button>
-                  </div>
-                )}
-                {busy&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:32,textAlign:"center",marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:8}}>
-                      <p style={{color:"#f1f5f9",fontSize:14,fontWeight:600,margin:0}}>Preparing your question...</p>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:GOLD,animation:"pulse 1s infinite"}}/>
-                    </div>
-                    <p style={{color:"#334155",fontSize:11,margin:0}}>Applying NBME/ABIM standards · Verifying guideline accuracy</p>
-                  </div>
-                )}
-                {mcqErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",borderRadius:9,padding:13,color:"#ef4444",marginBottom:14,fontSize:14}}>{mcqErr}<button onClick={()=>generate()} style={{marginLeft:12,background:"transparent",border:"1px solid #ef4444",color:"#ef4444",padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>Try again</button></div>}
-                {score.t>0&&qs.length>0&&(
-                  <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,color:"#64748b"}}>Answered: {score.t}</span>
-                    {score.t>0&&<span style={{fontSize:13,color:score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>}
-                    {examMode&&tActive&&<span style={{fontSize:16,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",marginLeft:"auto"}}>{tLeft!==null?fmtT(tLeft):"--:--"}</span>}
-                    <button onClick={()=>{stopT();setQs([]);setSel({});setRev({});setQNum(0);setTLeft(null);setScore({t:0,c:0,s:0});}}
-                      style={{background:"rgba(239,68,68,0.1)",border:"1px solid #ef4444",color:"#ef4444",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700,marginLeft:"auto"}}>
-                      End Session
-                    </button>
-                  </div>
-                )}
-                {examDone&&examMode&&(
-                <div style={{background:CARD,border:"2px solid "+GOLD,borderRadius:16,padding:40,textAlign:"center",marginBottom:24}}>
-                  <div style={{fontSize:48,marginBottom:12}}>🎓</div>
-                  <h2 style={{color:GOLD,fontSize:26,fontWeight:800,marginBottom:8}}>Exam Complete</h2>
-                  <div style={{fontSize:60,fontWeight:900,color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b",margin:"12px 0"}}>{score.t>0?Math.round(score.c/score.t*100):0}%</div>
-                  <p style={{color:"#94a3b8",fontSize:16,marginBottom:4}}>{score.c} correct out of {score.t} questions</p>
-                  <p style={{color:"#475569",fontSize:13,marginBottom:24}}>{score.t>0&&score.c/score.t>=0.7?"Well done — above passing threshold":"Keep practicing — review weak areas"}</p>
-                  <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-                    <button onClick={()=>{setExamDone(false);setExamMode(false);}}
-                      style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>
-                      Review Answers
-                    </button>
-                    <button onClick={()=>{setExamDone(false);setQs([]);setSel({});setRev({});setScore({t:0,c:0,s:0});generate();}}
-                      style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>
-                      New Exam
-                    </button>
-                  </div>
-                </div>
-              )}
-              {qs.length>0&&qs[0]&&!busy&&(()=>{
-                  try{
-                    var q=qs[0];var i=0;
-                    var answered=!!rev[i];
-                    var correct=answered&&sel[i]===q.correct;
-                    return(
-                      <div style={{background:CARD,border:"1px solid "+(rev[i]&&rev[i]!=="exam"?(sel[i]===q.correct?"#10b981":"#ef4444"):BDR),borderRadius:13,padding:24}}>
-                        <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                          <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>Question {qNum+1}</span>
-                          {answered&&!examMode&&q.topic&&<span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{q.topic}</span>}
-                          {answered&&!examMode&&<span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:correct?"#10b981":"#ef4444"}}>{correct?"Correct":"Incorrect"}</span>}
-                        </div>
-                        <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{q.stem}</p>
-                        {q.showImageButton&&q.imageUrl&&!answered&&(
-                          <a href={q.imageUrl} target="_blank" rel="noopener noreferrer"
-                            style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,marginBottom:16,textDecoration:"none"}}>
-                            View Imaging Study on Radiopaedia
-                          </a>
-                        )}
-                        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-                          {Object.entries(q.choices).map(([l,t])=>(
-                            <button key={l} onClick={()=>{if(!answered)setSel(p=>({...p,[i]:l}));}}
-                              style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:answered?"default":"pointer",
-                                border:"1px solid "+(qColor(i,l)==="transparent"?BDR:qColor(i,l)),
-                                background:qColor(i,l)==="transparent"?"rgba(255,255,255,0.02)":qColor(i,l)+"22",
-                                color:answered&&!examMode&&l===q.correct?"#10b981":answered&&!examMode&&sel[i]===l?"#ef4444":"#cbd5e1",
-                                fontWeight:sel[i]===l?700:400,fontSize:14}}>
-                              <span style={{fontWeight:800,marginRight:10}}>{l}.</span>{t}
-                              {answered&&!examMode&&l===q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#10b981"}}> Correct answer</span>}
-                              {answered&&!examMode&&sel[i]===l&&l!==q.correct&&<span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}> Your answer</span>}
-                            </button>
-                          ))}
-                        </div>
-                        {answered&&!examMode&&(
-                          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginBottom:16}}>
-                            <p style={{margin:"0 0 12px",fontSize:12,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}}>Attending Explanation</p>
-                            {q.explanation.split(/(?<=\.)\s+(?=[A-Z(])/).map(function(sentence,idx){return(
-                              React.createElement("p",{key:idx,style:{margin:"0 0 8px",color:"#e2e8f0",lineHeight:1.8,fontSize:14}},sentence)
-                            );})}
-                            <p style={{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}}>
-                              Always verify with current society guidelines. Inaccuracies? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span>
-                            </p>
-                            {q.imageUrl&&(
-                              <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid "+BDR}}>
-                                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Further Reading -- Reference Imaging</p>
-                                <a href={q.imageUrl} target="_blank" rel="noopener noreferrer"
-                                  style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>
-                                  View Reference Imaging on Radiopaedia
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                          {!answered?(
-                            <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                              <button onClick={()=>reveal(i)} disabled={!sel[i]}
-                                style={{background:sel[i]?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel[i]?GOLD:BDR),color:sel[i]?"#fff":"#475569",padding:"11px 32px",borderRadius:8,cursor:sel[i]?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
-                                Submit Answer
-                              </button>
-                              {!sel[i]&&<span style={{fontSize:13,color:"#334155"}}>Select an answer first</span>}<span style={{fontSize:11,color:"#334155",marginLeft:8}}>Enter to submit</span>
-                            </div>
-                          ):(
-                            <button onClick={nextQuestion} disabled={busy}
-                              style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 32px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
-                              {busy?"Generating...":"Next Question (N)"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }catch(e){return React.createElement("div",{style:{color:"#ef4444",padding:20}},"Error displaying question. Click End Session and try again.");}
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab==="guides"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Official Guidelines</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Direct links to official society guidelines</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
-              {GUIDES.map(g=>(
-                <div key={g.id} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,display:"flex",flexDirection:"column",gap:10}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=BDR}>
-                  <div style={{width:36,height:36,borderRadius:8,background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:GOLD,fontSize:14}}>{g.i}</div>
-                  <div style={{fontWeight:700,fontSize:14,lineHeight:1.4,color:"#f1f5f9"}}>{g.t}</div>
-                  <span style={{background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",color:GOLD,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,alignSelf:"flex-start"}}>{g.s}</span>
-                  <a href={g.u} target="_blank" rel="noopener noreferrer"
-                    style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"9px",borderRadius:7,fontWeight:600,fontSize:12,textAlign:"center",display:"block",marginTop:"auto"}}>
-                    Open Official Guidelines
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="progress"&&(
-          <div>
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#f1f5f9"}}>Your Progress</h2>
-            <p style={{color:"#475569",marginBottom:18,fontSize:13}}>Track your board prep performance</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:22}}>
-              {[{l:"Sessions",v:score.s,c:"#6366f1"},{l:"Questions",v:score.t,c:"#3b82f6"},{l:"Correct",v:score.c,c:"#10b981"},{l:"Accuracy",v:score.t>0?Math.round(score.c/score.t*100)+"%":"--",c:GOLD}].map(s=>(
-                <div key={s.l} style={{background:CARD,border:"1px solid "+s.c+"44",borderRadius:12,padding:18,textAlign:"center"}}>
-                  <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
-                  <div style={{fontSize:11,color:"#475569",marginTop:3}}>{s.l}</div>
-                </div>
-              ))}
-            </div>
-            {score.t===0?(
-              <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:36,textAlign:"center"}}>
-                <h3 style={{fontWeight:700,marginBottom:8,color:"#f1f5f9"}}>No questions answered yet</h3>
-                <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Start the MCQ Bank to begin tracking your progress!</p>
-                <button onClick={()=>setTab("mcq")} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"11px 24px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Go to MCQ Bank</button>
-              </div>
-            ):(
-              <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:22}}>
-                <h3 style={{fontWeight:700,marginBottom:14,fontSize:15,color:"#f1f5f9"}}>Performance Summary</h3>
-                <div style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <span style={{fontSize:13,color:"#94a3b8"}}>Overall accuracy</span>
-                    <span style={{fontSize:13,fontWeight:700,color:GOLD}}>{Math.round(score.c/score.t*100)}%</span>
-                  </div>
-                  <div style={{height:10,background:"#1e293b",borderRadius:5,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:Math.round(score.c/score.t*100)+"%",background:"linear-gradient(90deg,"+NAVY+","+GOLD+")",borderRadius:5}}/>
-                  </div>
-                </div>
-                <p style={{color:"#475569",fontSize:13,lineHeight:1.6}}>
-                  {score.c/score.t>=0.8?"Excellent! You are well prepared for boards.":score.c/score.t>=0.6?"Good progress! Keep practicing your weak areas.":"Keep going! Consistent practice leads to board success."}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-      </div>
-      <div style={{textAlign:"center",padding:"16px",color:"#1e293b",fontSize:11,borderTop:"1px solid "+BDR}}>
-        MedBoard Pro · Anteneh Zenebe, MD, FACE · antenehzenebe@gmail.com
-        <div style={{marginTop:8,display:"flex",gap:16,justifyContent:"center"}}>
-          <span onClick={()=>setShowTos(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
-          <span onClick={()=>setShowPrivacy(true)} style={{color:"#334155",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
-        </div>
-      </div>
-    </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
+// ─── LANDING PAGE ─────────────────────────────────────────────────────────────
+function LandingPage({authMode,setAuthMode,email,setEmail,pw,setPw,nm,setNm,authErr,authMsg,handleAuth,googleLogin}){
+  const [showAuth,setShowAuth]=React.useState(false);
+  return React.createElement("div",{style:{minHeight:"100vh",background:BG}},
+
+    // Nav
+    React.createElement("nav",{style:{padding:"0 5%",height:64,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",zIndex:100}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10}},
+        React.createElement("div",{style:{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:14}},"M"),
+        React.createElement("span",{style:{fontWeight:800,fontSize:18,color:"#f1f5f9"}},
+          React.createElement("span",{style:{color:GOLD}},"Med"),"Board",React.createElement("span",{style:{color:GOLD,fontStyle:"italic",marginLeft:2}},"Pro")
+        )
+      ),
+      React.createElement("button",{onClick:()=>setShowAuth(true),
+        style:{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"8px 20px",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}},
+        "Subscriber Sign In"
+      )
+    ),
+
+    // Hero
+    React.createElement("section",{style:{padding:"80px 5%",textAlign:"center",maxWidth:900,margin:"0 auto"}},
+      React.createElement("div",{style:{display:"inline-block",background:"rgba(0,40,104,0.3)",border:"1px solid rgba(0,40,104,0.6)",borderRadius:20,padding:"6px 16px",marginBottom:20}},
+        React.createElement("span",{style:{color:GOLD,fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:2}},"Fellowship Program Director · Howard University")
+      ),
+      React.createElement("h1",{style:{fontSize:"clamp(28px,5vw,52px)",fontWeight:900,lineHeight:1.2,marginBottom:20}},
+        "Board Prep Built by a ",
+        React.createElement("span",{style:{color:GOLD}},"Fellowship Program Director"),
+        " — Not a Test Prep Company"
+      ),
+      React.createElement("p",{style:{fontSize:18,color:"#94a3b8",marginBottom:32,lineHeight:1.7,maxWidth:700,margin:"0 auto 32px"}},
+        "AI-generated clinical vignettes written to NBME and ABIM standards. Every explanation cites ADA, ATA, ACC/AHA, Endocrine Society, and 20+ specialty society guidelines."
+      ),
+      React.createElement("div",{style:{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}},
+        React.createElement("button",{onClick:()=>setShowAuth(true),
+          style:{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,color:"#fff",padding:"14px 32px",borderRadius:10,fontWeight:800,fontSize:16,cursor:"pointer"}},
+          "Start 14-Day Free Trial"
+        ),
+        React.createElement("button",{onClick:()=>document.getElementById("how-it-works").scrollIntoView({behavior:"smooth"}),
+          style:{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"14px 32px",borderRadius:10,fontWeight:700,fontSize:16,cursor:"pointer"}},
+          "How It Works"
+        )
+      )
+    ),
+
+    // How It Works
+    React.createElement("section",{id:"how-it-works",style:{padding:"80px 5%"}},
+      React.createElement("div",{style:{maxWidth:1100,margin:"0 auto"}},
+        React.createElement("div",{style:{textAlign:"center",marginBottom:56}},
+          React.createElement("p",{style:{fontSize:12,fontWeight:700,color:GOLD,letterSpacing:3,textTransform:"uppercase",marginBottom:12}},"Simple by design"),
+          React.createElement("h2",{style:{fontSize:34,fontWeight:800,color:"#f1f5f9",margin:0}},"How MedBoard Pro Works")
+        ),
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:0}},
+          [
+            {num:"01",icon:"◎",title:"Choose Your Exam",desc:"Select from USMLE Step 1, Step 2 CK, Step 3, ABIM Internal Medicine, or ABIM Endocrinology. Every question is weighted to the real exam blueprint.",color:"#6366f1"},
+            {num:"02",icon:"◈",title:"Receive a Fresh Question",desc:"A unique board-quality clinical vignette written to NBME and ABIM item-writing standards — with a real patient, real labs, real clinical decisions. Never the same question twice.",color:GOLD},
+            {num:"03",icon:"◉",title:"Learn from Every Answer",desc:"Instant feedback with guideline citations from ADA, ATA, ACC/AHA, Endocrine Society and 20+ societies, cognitive error analysis, and a board pearl from a fellowship program director.",color:"#10b981"},
+          ].map(function(step,i){
+            return React.createElement("div",{key:step.num,
+              style:{padding:"40px 36px",border:"1px solid "+BDR,borderRight:i<2?"none":"1px solid "+BDR,position:"relative",transition:"background 0.3s"},
+              onMouseEnter:e=>e.currentTarget.style.background="rgba(255,255,255,0.02)",
+              onMouseLeave:e=>e.currentTarget.style.background="transparent"},
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:28}},
+                React.createElement("span",{style:{fontSize:11,fontWeight:700,color:"#334155",letterSpacing:2}},step.num),
+                React.createElement("span",{style:{fontSize:28,color:step.color,opacity:0.6}},step.icon)
+              ),
+              React.createElement("h3",{style:{fontSize:18,fontWeight:800,color:"#f1f5f9",marginBottom:14,lineHeight:1.3}},step.title),
+              React.createElement("p",{style:{fontSize:14,color:"#64748b",lineHeight:1.8,margin:0}},step.desc),
+              React.createElement("div",{style:{position:"absolute",bottom:0,left:0,width:"100%",height:2,background:"linear-gradient(90deg,"+step.color+"44,transparent)"}})
+            );
+          })
+        )
+      )
+    ),
+
+    // Pricing
+    React.createElement("section",{style:{padding:"80px 5%",background:"rgba(255,255,255,0.02)"}},
+      React.createElement("div",{style:{maxWidth:1100,margin:"0 auto"}},
+        React.createElement("div",{style:{textAlign:"center",marginBottom:48}},
+          React.createElement("h2",{style:{fontSize:32,fontWeight:800,color:"#f1f5f9",marginBottom:12}},"Simple, Transparent Pricing"),
+          React.createElement("p",{style:{color:"#64748b",fontSize:16}},"14-day free trial · No charge until Day 15 · Cancel anytime")
+        ),
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:20}},
+          PLANS.map(function(plan){
+            return React.createElement("div",{key:plan.key,
+              style:{background:CARD,border:"1px solid "+(plan.badge?"MOST POPULAR"===plan.badge?GOLD:plan.color:BDR),borderRadius:16,padding:28,position:"relative"}},
+              plan.badge&&React.createElement("div",{style:{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:plan.color,color:"#fff",fontSize:11,fontWeight:700,padding:"3px 14px",borderRadius:20,whiteSpace:"nowrap"}},plan.badge),
+              React.createElement("h3",{style:{color:"#f1f5f9",fontSize:18,fontWeight:800,marginBottom:8}},plan.name),
+              React.createElement("div",{style:{color:GOLD,marginBottom:16}},
+                React.createElement("span",{style:{fontSize:36,fontWeight:900}},"$",plan.price),
+                React.createElement("span",{style:{color:"#64748b",fontSize:14}},"/",plan.period)
+              ),
+              React.createElement("ul",{style:{listStyle:"none",marginBottom:24}},
+                plan.features.map(function(f){
+                  return React.createElement("li",{key:f,style:{color:"#94a3b8",fontSize:14,padding:"4px 0",display:"flex",alignItems:"center",gap:8}},
+                    React.createElement("span",{style:{color:"#10b981",fontSize:12}},"✓"),f
+                  );
+                })
+              ),
+              React.createElement("button",{onClick:()=>window.open(PAYMENT_LINKS[plan.key],"_blank"),
+                style:{width:"100%",padding:"12px",borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+plan.color,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}},
+                "Start Free Trial"
+              )
+            );
+          })
+        )
+      )
+    ),
+
+    // Auth modal
+    showAuth&&React.createElement("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20},
+      onClick:e=>{if(e.target===e.currentTarget)setShowAuth(false);}},
+      React.createElement("div",{style:{background:"#0f172a",border:"1px solid "+BDR,borderRadius:16,padding:32,width:"100%",maxWidth:420}},
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}},
+          React.createElement("h3",{style:{color:"#f1f5f9",fontWeight:800,fontSize:18}},
+            authMode==="signup"?"Create Account":authMode==="reset"?"Reset Password":"Welcome Back"
+          ),
+          React.createElement("button",{onClick:()=>setShowAuth(false),style:{background:"transparent",border:"none",color:"#64748b",fontSize:20,cursor:"pointer"}},"×")
+        ),
+        React.createElement("button",{onClick:googleLogin,
+          style:{width:"100%",padding:"11px",borderRadius:8,background:"#fff",border:"1px solid #d1d5db",color:"#374151",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:8}},
+          "Continue with Google"
+        ),
+        React.createElement("div",{style:{textAlign:"center",color:"#334155",fontSize:12,marginBottom:16}},"or"),
+        React.createElement("form",{onSubmit:handleAuth},
+          authMode==="signup"&&React.createElement("input",{value:nm,onChange:e=>setNm(e.target.value),placeholder:"Full name",required:true,
+            style:{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,borderRadius:8,padding:"10px 14px",color:"#f1f5f9",fontSize:14,marginBottom:10,outline:"none"}}),
+          React.createElement("input",{type:"email",value:email,onChange:e=>setEmail(e.target.value),placeholder:"Email address",required:true,
+            style:{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,borderRadius:8,padding:"10px 14px",color:"#f1f5f9",fontSize:14,marginBottom:10,outline:"none"}}),
+          authMode!=="reset"&&React.createElement("input",{type:"password",value:pw,onChange:e=>setPw(e.target.value),placeholder:"Password",required:true,
+            style:{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,borderRadius:8,padding:"10px 14px",color:"#f1f5f9",fontSize:14,marginBottom:10,outline:"none"}}),
+          authErr&&React.createElement("p",{style:{color:"#f87171",fontSize:13,marginBottom:10}},authErr),
+          authMsg&&React.createElement("p",{style:{color:"#34d399",fontSize:13,marginBottom:10}},authMsg),
+          React.createElement("button",{type:"submit",
+            style:{width:"100%",padding:"11px",borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:12}},
+            authMode==="signup"?"Create Account":authMode==="reset"?"Send Reset Email":"Sign In"
+          )
+        ),
+        React.createElement("div",{style:{display:"flex",justifyContent:"center",gap:16,fontSize:13}},
+          authMode!=="login"&&React.createElement("button",{onClick:()=>setAuthMode("login"),style:{background:"none",border:"none",color:GOLD,cursor:"pointer"}},"Sign In"),
+          authMode!=="signup"&&React.createElement("button",{onClick:()=>setAuthMode("signup"),style:{background:"none",border:"none",color:GOLD,cursor:"pointer"}},"Create Account"),
+          authMode!=="reset"&&React.createElement("button",{onClick:()=>setAuthMode("reset"),style:{background:"none",border:"none",color:"#64748b",cursor:"pointer"}},"Forgot Password?")
+        )
+      )
+    )
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
 </script>
-</body>
+<body><div id="root"></div></body>
 </html>
