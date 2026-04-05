@@ -410,6 +410,45 @@ function App(){
     var ok=sel[i]===qs[i].correct;
     setRev(function(p){var n=Object.assign({},p);n[i]=true;return n;});
     setScore(function(s){return{t:s.t+1,c:s.c+(ok?1:0),s:s.s};});
+    // Save user response to Supabase asynchronously — never blocks UI
+    saveUserResponse(qs[i],sel[i],ok);
+  }
+
+  function saveUserResponse(question,selectedChoice,isCorrect){
+    var SUPABASE_URL="https://vhzeeskhvkujihuvddcc.supabase.co";
+    var SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+    // Get current user session from supabase client
+    supabase.auth.getSession().then(function(result){
+      var session=result&&result.data&&result.data.session;
+      if(!session||!session.user)return; // Not logged in — skip
+      var userId=session.user.id;
+      // First find the mcq_id from the saved question stem
+      fetch(SUPABASE_URL+"/rest/v1/mcqs?stem=eq."+encodeURIComponent(question.stem)+"&select=id&limit=1",{
+        headers:{
+          "apikey":SUPABASE_KEY,
+          "Authorization":"Bearer "+session.access_token
+        }
+      }).then(function(r){return r.json();}).then(function(mcqs){
+        var mcqId=mcqs&&mcqs[0]&&mcqs[0].id;
+        if(!mcqId)return;
+        // Save the user response
+        fetch(SUPABASE_URL+"/rest/v1/user_responses",{
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json",
+            "apikey":SUPABASE_KEY,
+            "Authorization":"Bearer "+session.access_token,
+            "Prefer":"return=minimal"
+          },
+          body:JSON.stringify({
+            user_id:userId,
+            mcq_id:mcqId,
+            selected_choice:selectedChoice,
+            is_correct:isCorrect
+          })
+        }).catch(function(){});
+      }).catch(function(){});
+    }).catch(function(){});
   }
 
   function qColor(i,l){
