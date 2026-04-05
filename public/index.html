@@ -209,76 +209,6 @@ function LabPanel(){
   );
 }
 function App(){
-  const [screen,setScreen]=React.useState("landing");
-  const [user,setUser]=React.useState(null);
-  const [authLoading,setAuthLoading]=React.useState(true);
-  const [email,setEmail]=React.useState("");
-  const [pw,setPw]=React.useState("");
-  const [nm,setNm]=React.useState("");
-  const [authErr,setAuthErr]=React.useState("");
-  const [authBusy,setAuthBusy]=React.useState(false);
-  const [fromStripe,setFromStripe]=React.useState(false);
-  const [tab,setTab]=React.useState("mcq");
-  const [annual,setAnnual]=React.useState(false);
-  const [openFaq,setOpenFaq]=React.useState(null);
-  const [showTos,setShowTos]=React.useState(false);
-  const [showPrivacy,setShowPrivacy]=React.useState(false);
-  const [grp,setGrp]=React.useState("Random");
-  const [topic,setTopic]=React.useState("Random -- All Specialties");
-  const [lvl,setLvl]=React.useState(LEVELS[3]);
-  const [examMode,setExamMode]=React.useState(false);
-  const [examDone,setExamDone]=React.useState(false);
-  const [examAnswered,setExamAnswered]=React.useState({});
-  const [tLeft,setTLeft]=React.useState(null);
-  const [tActive,setTActive]=React.useState(false);
-  const [qs,setQs]=React.useState([]);
-  const [busy,setBusy]=React.useState(false);
-  const [mcqErr,setMcqErr]=React.useState("");
-  const [sel,setSel]=React.useState({});
-  const [rev,setRev]=React.useState({});
-  const [score,setScore]=React.useState({t:0,c:0,s:0});
-  const [qNum,setQNum]=React.useState(0);
-  const [sidebarOpen,setSidebarOpen]=React.useState(false);
-
-  const tRef=React.useRef(null);
-
-  // Keyboard shortcut: N = next question, Enter = submit answer
-  React.useEffect(function(){
-    function handleKey(e){
-      if(e.key==="n"||e.key==="N"){
-        var answered=rev&&rev[0];
-        if(answered&&!busy)nextQuestion();
-      }
-      if(e.key==="Enter"){
-        var answered=rev&&rev[0];
-        var selected=sel&&sel[0];
-        if(!answered&&selected)reveal(0);
-      }
-    }
-    window.addEventListener("keydown",handleKey);
-    return function(){window.removeEventListener("keydown",handleKey);};
-  },[rev,sel,busy,qs]);
-
-  React.useEffect(function(){
-    var params=new URLSearchParams(window.location.search);
-    if(params.get("subscribed")==="true"){setFromStripe(true);setScreen("auth");window.history.replaceState({},"","/");}
-    sb.auth.getSession().then(function(res){
-      if(res.data.session&&res.data.session.user){setUser(res.data.session.user);setScreen("app");}
-      setAuthLoading(false);
-    }).catch(function(){setAuthLoading(false);});
-    var sub=sb.auth.onAuthStateChange(function(_,session){
-      if(session&&session.user){setUser(session.user);setScreen("app");}
-      else setUser(null);
-    });
-    return function(){sub.data.subscription.unsubscribe();};
-  },[]);
-
-
-// ─── EXAM MODE STATE MACHINE ──────────────────────────────────────────────────
-// STATES: idle | generating | studying | exam_running | exam_review
-// This ensures clean separation between study and exam flows
-
-function App(){
   // Auth
   const [user,setUser]=React.useState(null);
   const [authLoading,setAuthLoading]=React.useState(true);
@@ -726,12 +656,12 @@ function App(){
       ),
 
       // Typewriter (study mode loading)
-      revealText&&!q&&React.createElement("div",{style:{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:24,marginBottom:16}},
+      revealText&&!q&&q.stem&&q.choices&&React.createElement("div",{style:{background:CARD,border:"1px solid "+BDR,borderRadius:14,padding:24,marginBottom:16}},
         React.createElement("p",{style:{color:"#e2e8f0",lineHeight:1.9,fontSize:15}}),revealText,"▊"
       ),
 
       // ── QUESTION CARD ───────────────────────────────────────────────────────
-      q&&React.createElement("div",{style:{background:CARD,border:"1px solid "+(studyAnswered||showReview?"#10b981":BDR),borderRadius:13,padding:24,animation:"fadeIn 0.3s ease"}},
+      q&&q.stem&&q.choices&&React.createElement("div",{style:{background:CARD,border:"1px solid "+(studyAnswered||showReview?"#10b981":BDR),borderRadius:13,padding:24,animation:"fadeIn 0.3s ease"}},
 
         // Question header
         React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}},
@@ -755,7 +685,7 @@ function App(){
 
         // Answer choices
         React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:10,marginBottom:18}},
-          Object.entries(q.choices).map(function([l,t]){
+          Object.entries(q.choices||{}).map(function([l,t]){
             const answered=studyAnswered||examAnswered||showReview;
             const bg=qColor(0,l);
             return React.createElement("button",{key:l,
@@ -800,7 +730,7 @@ function App(){
         // Explanation — study mode and review
         (studyAnswered||showReview)&&React.createElement("div",{style:{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginTop:16}},
           React.createElement("p",{style:{margin:"0 0 12px",fontSize:12,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}},"Attending Explanation"),
-          q.explanation.split(". ").map(function(sentence,idx){
+          (q.explanation||"").split(". ").map(function(sentence,idx){
             return React.createElement("p",{key:idx,style:{margin:"0 0 8px",color:"#e2e8f0",lineHeight:1.8,fontSize:14}},sentence);
           }),
           React.createElement("p",{style:{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}},
@@ -849,7 +779,7 @@ function App(){
         [
           {label:"Questions Answered",value:score.t,color:"#6366f1"},
           {label:"Correct Answers",value:score.c,color:"#10b981"},
-          {label:"Accuracy",value:score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"},
+          {label:"Accuracy",value:score&&score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"},
           {label:"Current Exam Level",value:lvl.l,color:GOLD},
         ].map(function(stat){
           return React.createElement("div",{key:stat.label,style:{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:"20px 16px",textAlign:"center"}},
@@ -863,7 +793,6 @@ function App(){
       )
     )
   );
-}
 } // end App function
 
 // ─── LANDING PAGE ─────────────────────────────────────────────────────────────
@@ -1013,8 +942,19 @@ function LandingPage({authMode,setAuthMode,email,setEmail,pw,setPw,nm,setNm,auth
   );
 }
 
-const root=ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App));
+document.addEventListener("DOMContentLoaded", function() {
+  const rootEl = document.getElementById("root");
+  if (rootEl) {
+    const root = ReactDOM.createRoot(rootEl);
+    root.render(
+      React.createElement(
+        React.StrictMode,
+        null,
+        React.createElement(App)
+      )
+    );
+  }
+});
 </script>
 <body><div id="root"></div></body>
 </html>
