@@ -1,5 +1,6 @@
 [build]
-  publish = "public"
+  # Changed from "public" to "." so Netlify looks in your main folder!
+  publish = "." 
   functions = "netlify/functions"
 
 [functions]
@@ -9,7 +10,5 @@
 [functions."generate-mcq"]
   timeout = 60
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.anthropic.com https://generativelanguage.googleapis.com https://vhzeeskhvkujihuvddcc.supabase.co https://billing.stripe.com https://buy.stripe.com; img-src 'self' data: https:; font-src 'self' https:; frame-src 'self' https://billing.stripe.com;"
+# We are temporarily turning off the CSP headers. 
+# Once the app is visible and working, we can turn them back on carefully!
