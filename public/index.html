@@ -295,9 +295,8 @@ function LandingPage(props) {
         </div>
         <div style={{display:"flex",gap:24,color:"#94a3b8",fontSize:14,fontWeight:600,display:window.innerWidth>768?"flex":"none"}}>
           <a href="#how" style={{color:"inherit",textDecoration:"none"}}>Features</a>
-          <a href="#" style={{color:"inherit",textDecoration:"none"}}>About</a>
+          <a href="#about" style={{color:"inherit",textDecoration:"none"}}>About</a>
           <a href="#pricing" style={{color:"inherit",textDecoration:"none"}}>Pricing</a>
-          <a href="#" style={{color:"inherit",textDecoration:"none"}}>FAQ</a>
         </div>
         <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid #3b82f6",color:"#fff",padding:"10px 24px",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14,boxShadow:"0 4px 14px rgba(0,40,104,0.4)"}}>
           Sign In / Start Trial
@@ -362,6 +361,27 @@ function LandingPage(props) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* About the Founder */}
+      <section id="about" style={{padding:"100px 5%",background:"#0f172a"}}>
+        <div style={{maxWidth:900,margin:"0 auto"}}>
+          <h2 style={{fontSize:36,fontWeight:800,color:"#f1f5f9",marginBottom:40,textAlign:"center"}}>About the Founder</h2>
+          <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:24,padding:"48px",boxShadow:"0 12px 32px rgba(0,0,0,0.4)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:24,marginBottom:32,flexWrap:"wrap"}}>
+              <div style={{width:80,height:80,borderRadius:"50%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",color:GOLD,fontSize:28,fontWeight:900}}>AZ</div>
+              <div>
+                <h3 style={{fontSize:24,fontWeight:800,color:"#f1f5f9",marginBottom:6}}>Dr. Anteneh Zenebe, MD, FACE</h3>
+                <p style={{color:GOLD,fontSize:15,fontWeight:700}}>Fellowship Associate Program Director · Howard University</p>
+              </div>
+            </div>
+            <div style={{color:"#cbd5e1",fontSize:16,lineHeight:1.8}}>
+              <p style={{marginBottom:16}}>Hi, I am Dr. Anteneh Zenebe. I am an academic endocrinologist, Assistant Professor of Medicine, and the Associate Program Director for the Endocrinology, Diabetes, and Metabolism Fellowship at Howard University College of Medicine. After earning my MD from Addis Ababa University and completing my ABIM board certifications, I developed a strong clinical and research focus heavily centered on the gut microbiome, insulin resistance, and metabolic disorders.</p>
+              <p style={{marginBottom:16}}>I built MedBoard Pro because I saw a critical need for a board prep tool that truly understands medicine the way an attending physician does. I wanted to create a platform that moves beyond buzzwords, focusing on up-to-date society guidelines and real-world clinical decision-making.</p>
+              <p>Outside of the hospital, I live in the DC metro area with my wife and our three children. I have a deep love for theology and philosophy, and in my free time, you can usually find me playing table tennis or watching football (soccer).</p>
+            </div>
           </div>
         </div>
       </section>
