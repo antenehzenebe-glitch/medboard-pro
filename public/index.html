@@ -13,14 +13,14 @@
 body{font-family:'Segoe UI',sans-serif;background:#0a0a0f;color:#f1f5f9;min-height:100vh}
 button,select,input{font-family:inherit}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .fade{animation:fadeIn 0.3s ease}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.3);color:#C9A84C;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:600;margin-bottom:24px}
 .exam-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);border:1px solid #1e293b;border-radius:12px;padding:12px 24px;min-width:140px}
-.nav-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#94a3b8;padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;transition:0.2s}
+.nav-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#94a3b8;padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:72px;transition:0.2s}
 .nav-btn.active{border-bottom:2px solid #C9A84C;color:#C9A84C;background:rgba(201,168,76,0.05)}
 .nav-btn:hover:not(.active){color:#f1f5f9}
+.nav-icon{font-size:18px;font-weight:900;font-family:monospace;color:inherit}
 .quick-card{background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:12px;padding:20px;cursor:pointer;transition:0.2s;display:flex;flex-direction:column;align-items:flex-start}
 .quick-card:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px);border-color:#334155}
 .gold-outline-btn{background:transparent;border:1px solid #C9A84C;color:#C9A84C;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:0.2s}
@@ -106,7 +106,96 @@ const GUIDES=[
 
 function fmtTime(s) { var m = Math.floor(s / 60); var sec = s % 60; return m + ":" + (sec < 10 ? "0" : "") + sec; }
 
-// ─── LEGAL MODAL COMPONENT (NEW) ──────────────────────────────────────────────
+// ─── LAB PANEL COMPONENT ───────────────────────────────────────
+function LabPanel(){
+  const [labTab,setLabTab]=React.useState("labs");
+  const [openCat,setOpenCat]=React.useState(null);
+  const LAB_DATA=[
+    {cat:"Chemistry",color:"#3B82F6",labs:[
+      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},{n:"Chloride",v:"98-106 mEq/L"},
+      {n:"Bicarbonate",v:"22-29 mEq/L"},{n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
+      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose fasting",v:"70-99 mg/dL"},{n:"Calcium total",v:"8.5-10.5 mg/dL"},
+      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},{n:"Albumin",v:"3.5-5.0 g/dL"},
+    ]},
+    {cat:"Hematology",color:"#EF4444",labs:[
+      {n:"WBC",v:"4500-11000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},{n:"Hgb female",v:"12.0-15.5 g/dL"},
+      {n:"Hct male",v:"41-53%"},{n:"MCV",v:"80-100 fL"},{n:"Platelets",v:"150-400k/uL"},
+    ]},
+    {cat:"Endocrinology",color:"#C9A84C",labs:[
+      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},{n:"Free T3",v:"2.3-4.2 pg/mL"},
+      {n:"HbA1c normal",v:"<5.7%"},{n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0%"},
+      {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
+      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},{n:"PTH intact",v:"10-65 pg/mL"},
+    ]},
+    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
+      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},{n:"PaO2",v:"75-100 mmHg"},
+      {n:"HCO3",v:"22-26 mEq/L"},{n:"O2 sat",v:"95-100%"},{n:"Anion gap",v:"8-12 mEq/L"},
+    ]}
+  ];
+  const CALCS=[
+    {n:"Anion Gap",f:"Na - (Cl + HCO3)",v:"Normal 8-12 mEq/L"},
+    {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL"},
+    {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose-100)/100]",v:"Normal 136-145 mEq/L"},
+    {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal"},
+    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic"},
+    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg"},
+    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant"},
+    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate"},
+  ];
+  return(
+    <div style={{marginTop:16, borderTop:"1px solid "+BDR, paddingTop:16}}>
+      <p style={{fontSize:11,color:GOLD,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Reference Materials</p>
+      <div style={{display:"flex",gap:4,marginBottom:10}}>
+        <button onClick={()=>setLabTab("labs")} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Labs</button>
+        <button onClick={()=>setLabTab("calcs")} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Calcs</button>
+      </div>
+      {labTab==="labs" && (
+        <div style={{maxHeight:240,overflowY:"auto",paddingRight:5}}>
+          {LAB_DATA.map(section => (
+            <div key={section.cat} style={{marginBottom:4}}>
+              <button onClick={()=>setOpenCat(openCat===section.cat?null:section.cat)} style={{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}}>
+                <span>{section.cat}</span><span style={{fontSize:9}}>{openCat===section.cat?"hide":"show"}</span>
+              </button>
+              {openCat===section.cat && (
+                <div style={{padding:"4px 0"}}>
+                  {section.labs.map(lab => (
+                    <div key={lab.n} style={{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                      <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>{lab.n}</span>
+                      <span style={{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}}>{lab.v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {labTab==="calcs" && (
+        <div style={{maxHeight:240,overflowY:"auto",paddingRight:5}}>
+          {CALCS.map(c => (
+            <div key={c.n} style={{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}}>
+              <p style={{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}}>{c.n}</p>
+              <p style={{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}}>{c.f}</p>
+              <p style={{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}}>{c.v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+async function saveResponse(question, choice, isCorrect) {
+  const {data:{session}} = await sb.auth.getSession();
+  if (!session) return;
+  const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
+  const mcqId = mcqRes.data?.[0]?.id;
+  if (!mcqId) return;
+  await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
+}
+
+// ─── LEGAL MODAL COMPONENT (UNCUT) ────────────────────────────────────────────
 function LegalModal({type, onClose}) {
   return (
     <div onClick={(e)=>{if(e.target===e.currentTarget)onClose();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:20}}>
@@ -173,7 +262,7 @@ function LegalModal({type, onClose}) {
             <div>
               <p style={{marginBottom:16}}>Last Updated: April 2026</p>
               <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>1. Information We Collect</h4>
-              <p style={{marginBottom:16}}>We collect information you provide directly to us when you register for an account, including your name, email address, and professional training level. We also collect automated performance data regarding your QBank usage (e.g., questions answered, scores).</p>
+              <p style={{marginBottom:16}}>We collect information you provide directly to us when you register for an account, including your name, email address, and professional training level. We also collect automated performance data regarding your QBank usage.</p>
               
               <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>2. How We Use Information</h4>
               <p style={{marginBottom:16}}>Your data is used to provide, maintain, and improve the MedBoard Pro platform. Your performance data is used to generate personalized analytics and study recommendations.</p>
@@ -182,7 +271,7 @@ function LegalModal({type, onClose}) {
               <p style={{marginBottom:16}}>We implement robust security measures to protect your personal information. Your account data is securely stored using Supabase, which utilizes industry-standard encryption protocols.</p>
               
               <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>4. Third-Party Sharing</h4>
-              <p style={{marginBottom:16}}>We do not sell your personal data to third parties. We only share information with trusted service providers (like Stripe for payment processing) strictly necessary to operate our service.</p>
+              <p style={{marginBottom:16}}>We do not sell your personal data to third parties. We only share information with trusted service providers (like Stripe) strictly necessary to operate our service.</p>
 
               <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>5. Data Retention & User Rights</h4>
               <p style={{marginBottom:16}}>We retain your data for as long as your account is active. You have the right to request access to, correction of, or deletion of your personal data by contacting our support team.</p>
@@ -204,138 +293,6 @@ function LegalModal({type, onClose}) {
       </div>
     </div>
   );
-}
-
-// ─── LAB PANEL COMPONENT ───────────────────────────────────────
-function LabPanel(){
-  const [labTab,setLabTab]=React.useState("labs");
-  const [openCat,setOpenCat]=React.useState(null);
-  const LAB_DATA=[
-    {cat:"Chemistry",color:"#3B82F6",labs:[
-      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},{n:"Chloride",v:"98-106 mEq/L"},
-      {n:"Bicarbonate",v:"22-29 mEq/L"},{n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
-      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose fasting",v:"70-99 mg/dL"},{n:"Calcium total",v:"8.5-10.5 mg/dL"},
-      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},{n:"Albumin",v:"3.5-5.0 g/dL"},
-      {n:"ALT",v:"7-56 U/L"},{n:"AST",v:"10-40 U/L"},{n:"Alk Phos",v:"44-147 U/L"},
-      {n:"Total Bilirubin",v:"0.1-1.2 mg/dL"},{n:"Troponin I",v:"<0.04 ng/mL"},{n:"BNP",v:"<100 pg/mL"},
-      {n:"CRP",v:"<1.0 mg/L"},{n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Serum Osmolality",v:"275-295 mOsm/kg"},
-      {n:"Anion Gap",v:"8-12 mEq/L"},{n:"Ferritin male",v:"24-336 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
-    ]},
-    {cat:"Hematology",color:"#EF4444",labs:[
-      {n:"WBC",v:"4500-11000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},{n:"Hgb female",v:"12.0-15.5 g/dL"},
-      {n:"Hct male",v:"41-53%"},{n:"MCV",v:"80-100 fL"},{n:"Platelets",v:"150-400k/uL"},
-      {n:"Neutrophils",v:"50-70%"},{n:"Lymphocytes",v:"20-40%"},{n:"PT",v:"11-13.5 sec"},
-      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},{n:"D-dimer",v:"<0.5 ug/mL"},
-      {n:"Fibrinogen",v:"200-400 mg/dL"},{n:"Haptoglobin",v:"30-200 mg/dL"},
-    ]},
-    {cat:"Endocrinology",color:"#C9A84C",labs:[
-      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},{n:"Free T3",v:"2.3-4.2 pg/mL"},
-      {n:"HbA1c normal",v:"<5.7%"},{n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0%"},
-      {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
-      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},{n:"UFC 24hr",v:"<50 ug/24hr"},
-      {n:"LDDST post dex",v:"<1.8 ug/dL"},{n:"Aldosterone upright",v:"4-31 ng/dL"},
-      {n:"Plasma metanephrines",v:"<0.5 nmol/L"},{n:"PTH intact",v:"10-65 pg/mL"},
-      {n:"25-OH Vit D",v:"30-100 ng/mL"},{n:"Prolactin male",v:"2-18 ng/mL"},
-      {n:"IGF-1 adult 20-40yr",v:"115-355 ng/mL"},{n:"Testosterone male",v:"300-1000 ng/dL"},
-      {n:"LH male",v:"1.7-8.6 IU/L"},{n:"FSH male",v:"1.5-12.4 IU/L"},
-    ]},
-    {cat:"Lipidology",color:"#10B981",labs:[
-      {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL optimal",v:"<100 mg/dL"},
-      {n:"LDL high risk",v:"<70 mg/dL"},{n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
-      {n:"TG normal",v:"<150 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},{n:"Non-HDL target",v:"<130 mg/dL"},
-      {n:"Apo B",v:"<90 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL"},
-    ]},
-    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
-      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},{n:"PaO2",v:"75-100 mmHg"},
-      {n:"HCO3",v:"22-26 mEq/L"},{n:"O2 sat",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
-      {n:"Anion gap",v:"8-12 mEq/L"},{n:"P/F normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
-    ]},
-    {cat:"Rheumatology",color:"#F59E0B",labs:[
-      {n:"ANA screening",v:"<1:40 negative"},{n:"Anti-dsDNA",v:"<30 IU/mL"},
-      {n:"RF IgM",v:"<14 IU/mL"},{n:"Anti-CCP",v:"<20 U/mL"},
-      {n:"C3 complement",v:"90-180 mg/dL"},{n:"C4 complement",v:"16-47 mg/dL"},
-      {n:"Uric acid gout target",v:"<6.0 mg/dL"},
-    ]},
-    {cat:"CSF",color:"#14B8A6",labs:[
-      {n:"Opening pressure",v:"70-180 mmH2O"},{n:"WBC",v:"0-5 cells/uL"},
-      {n:"Protein",v:"15-45 mg/dL"},{n:"Glucose",v:"45-80 mg/dL"},
-      {n:"CSF:serum glucose",v:">0.6"},
-    ]}
-  ];
-  const CALCS=[
-    {n:"Anion Gap",f:"Na - (Cl + HCO3)",v:"Normal 8-12 mEq/L",note:"Corrected AG = AG + 2.5 x (4 - albumin)"},
-    {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL",note:"Add 0.8 per 1 g/dL drop in albumin below 4"},
-    {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose-100)/100]",v:"Normal 136-145 mEq/L",note:"For hyperglycemia correction"},
-    {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese"},
-    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics"},
-    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols"},
-    {n:"Winters Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation"},
-    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg"},
-    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = non-AG acidosis; >2 = met alkalosis"},
-    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant"},
-    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate"},
-    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk"},
-    {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high"},
-    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpt / 2 admit / >=3 ICU"},
-    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 increase = organ dysfunction"},
-    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk"},
-    {n:"Corrected QTc",f:"QT / sqrt(RR in seconds)",v:"<440ms male / <460ms female",note:">500ms = high risk Torsades"},
-    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9"},
-    {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference"},
-    {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal",note:"ARDS: mild 200-300 / mod 100-200 / severe <100"},
-  ];
-  return(
-    <div style={{marginTop:16, borderTop:"1px solid "+BDR, paddingTop:16}}>
-      <p style={{fontSize:11,color:GOLD,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Reference Materials</p>
-      <div style={{display:"flex",gap:4,marginBottom:10}}>
-        <button onClick={()=>setLabTab("labs")} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Labs</button>
-        <button onClick={()=>setLabTab("calcs")} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Calcs</button>
-      </div>
-      {labTab==="labs" && (
-        <div style={{maxHeight:240,overflowY:"auto",paddingRight:5}}>
-          {LAB_DATA.map(section => (
-            <div key={section.cat} style={{marginBottom:4}}>
-              <button onClick={()=>setOpenCat(openCat===section.cat?null:section.cat)} style={{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}}>
-                <span>{section.cat}</span><span style={{fontSize:9}}>{openCat===section.cat?"hide":"show"}</span>
-              </button>
-              {openCat===section.cat && (
-                <div style={{padding:"4px 0"}}>
-                  {section.labs.map(lab => (
-                    <div key={lab.n} style={{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                      <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>{lab.n}</span>
-                      <span style={{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}}>{lab.v}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {labTab==="calcs" && (
-        <div style={{maxHeight:240,overflowY:"auto",paddingRight:5}}>
-          {CALCS.map(c => (
-            <div key={c.n} style={{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}}>
-              <p style={{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}}>{c.n}</p>
-              <p style={{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}}>{c.f}</p>
-              <p style={{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}}>{c.v}</p>
-              {c.note && <p style={{fontSize:10,color:"#cbd5e1",lineHeight:1.3}}>{c.note}</p>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-async function saveResponse(question, choice, isCorrect) {
-  const {data:{session}} = await sb.auth.getSession();
-  if (!session) return;
-  const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
-  const mcqId = mcqRes.data?.[0]?.id;
-  if (!mcqId) return;
-  await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
 }
 
 // ─── LANDING PAGE ─────────────────────────────────────────────────────────────
@@ -453,7 +410,6 @@ function LandingPage(props) {
         </section>
       </div>
 
-      {/* NEW INTEGRATED LEGAL FOOTER */}
       <footer style={{padding:"40px 5%", background:"#050508", borderTop:"1px solid "+BDR, color:"#64748b", fontSize:13, lineHeight:1.6, textAlign:"center", marginTop:"auto"}}>
         <div style={{maxWidth:1000, margin:"0 auto"}}>
           <p style={{marginBottom:20}}><strong>Medical Disclaimer:</strong> MedBoard Pro is an educational platform designed exclusively to assist medical professionals in preparing for board examinations. All content is provided for educational and informational purposes only. MedBoard Pro is <strong>NOT</strong> a substitute for professional medical judgment, diagnosis, or treatment. Users must rely on their own clinical training and consult official, current society guidelines. MedBoard Pro, Dr. Anteneh Zenebe, and affiliated authors assume no responsibility or liability for patient care decisions or clinical errors.</p>
@@ -465,28 +421,6 @@ function LandingPage(props) {
           <p>© {new Date().getFullYear()} MedBoard Pro by Dr. Anteneh Zenebe. All rights reserved.</p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-// ─── EXAM COMPLETE SCREEN ─────────────────────────────────────────────────────
-function ExamComplete({score, examSecs, onReview, onNew}) {
-  var pct = score.t > 0 ? Math.round(score.c / score.t * 100) : 0;
-  var passed = pct >= 70;
-  var mins = Math.floor(examSecs / 60);
-  var secs = examSecs % 60;
-  return (
-    <div className="fade" style={{background:CARD,border:"2px solid "+(passed?GOLD:BDR),borderRadius:20,padding:"40px 32px",textAlign:"center",marginBottom:24}}>
-      <div style={{fontSize:52,marginBottom:12}}>{passed?"🎓":"📚"}</div>
-      <h2 style={{color:"#f1f5f9",fontSize:26,fontWeight:800,marginBottom:8}}>Exam Complete</h2>
-      <div style={{fontSize:68,fontWeight:900,color:passed?"#10b981":"#f59e0b",lineHeight:1,margin:"16px 0"}}>{pct}%</div>
-      <p style={{color:"#94a3b8",fontSize:16,marginBottom:4}}>{score.c} correct out of {score.t} question{score.t!==1?"s":""}</p>
-      {examSecs>0 && <p style={{color:"#475569",fontSize:13,marginBottom:4}}>Time: {mins}m {secs<10?"0":""}{secs}s</p>}
-      <p style={{color:passed?"#10b981":"#f59e0b",fontWeight:700,fontSize:15,marginBottom:28}}>{passed?"✓ Above 70% passing threshold":"✗ Below 70% — review weak areas"}</p>
-      <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-        <button onClick={onReview} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>Review Answers</button>
-        <button onClick={onNew} style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>Next QBank Item</button>
-      </div>
     </div>
   );
 }
@@ -506,7 +440,7 @@ function App() {
   const [history, setHistory] = React.useState({t:0, c:0});
   const [score, setScore] = React.useState({t:0, c:0});
   const [showAuth, setShowAuth] = React.useState(false);
-  const [legalModal, setLegalModal] = React.useState(null); // NEW: Controls the legal popups
+  const [legalModal, setLegalModal] = React.useState(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [examMode, setExamMode] = React.useState(false);
   const [examSel, setExamSel] = React.useState("");
@@ -517,6 +451,7 @@ function App() {
   const [examStartMs, setExamStartMs] = React.useState(0);
   const [examSecs, setExamSecs] = React.useState(0);
   const timerRef = React.useRef(null);
+  const typeRef = React.useRef(null); // Fix for the text typing bug
 
   const [authMode, setAuthMode] = React.useState("login");
   const [email, setEmail] = React.useState("");
@@ -571,6 +506,19 @@ function App() {
     setAppState("exam_done");
   }
 
+  function endSession() {
+    clearInterval(timerRef.current);
+    clearInterval(typeRef.current);
+    setAppState("idle");
+    setScore({t:0, c:0});
+    setSel("");
+    setExamSel("");
+    setRevealed(false);
+    setRevealText("");
+    setQuestion(null);
+    setPreloadedQ(null);
+  }
+
   async function fetchHistory(uid) {
     const {data} = await sb.from("user_responses").select("is_correct").eq("user_id", uid);
     if(data) setHistory({t: data.length, c: data.filter(r => r.is_correct).length});
@@ -611,6 +559,7 @@ function App() {
 
   async function handleLoadNext() {
     clearInterval(timerRef.current);
+    clearInterval(typeRef.current);
     setErr(""); setSel(""); setExamSel(""); setRevealed(false); setRevealText("");
     
     let q = preloadedQ;
@@ -628,8 +577,8 @@ function App() {
     } else {
       setAppState("studying");
       let words = q.stem.split(" "), wi = 0;
-      let tw = setInterval(() => {
-        if(wi >= words.length) { clearInterval(tw); return; }
+      typeRef.current = setInterval(() => {
+        if(wi >= words.length) { clearInterval(typeRef.current); return; }
         setRevealText(p => p + (wi===0?"":" ") + words[wi]);
         wi++;
       }, 15);
@@ -639,6 +588,8 @@ function App() {
   function submitStudy() {
     if (!sel || !question || revealed) return;
     const ok = sel === question.correct;
+    clearInterval(typeRef.current);
+    setRevealText(question.stem); // Snap text to end
     setRevealed(true);
     setScore(s => ({t: s.t+1, c: s.c+(ok?1:0)}));
     setHistory(h => ({t: h.t+1, c: h.c+(ok?1:0)}));
@@ -716,10 +667,11 @@ function App() {
           <span style={{fontWeight:800,color:"#f1f5f9",fontSize:18, display:window.innerWidth>600?"block":"none"}}>MedBoardPro</span>
         </div>
         
+        {/* Navigation Tabs (H, Q, G, P layout) */}
         <div style={{display:"flex",gap:8, alignItems:"flex-end", height:"100%"}}>
-          {[{id:"home", i:"🏠", l:"Home"}, {id:"mcq", i:"🎯", l:"QBank"}, {id:"calcs", i:"🧪", l:"Calcs"}, {id:"guides", i:"📚", l:"Guides"}, {id:"progress", i:"📊", l:"Progress"}].map(t => (
+          {[{id:"home", i:"H", l:"Home"}, {id:"mcq", i:"Q", l:"MCQ Bank"}, {id:"guides", i:"G", l:"Guides"}, {id:"progress", i:"P", l:"Progress"}].map(t => (
             <button key={t.id} onClick={()=>setTab(t.id)} className={tab===t.id?"nav-btn active":"nav-btn"} style={{height:"100%", justifyContent:"center"}}>
-              <span style={{fontSize:20}}>{t.i}</span><span style={{fontSize:11,fontWeight:700}}>{t.l}</span>
+              <span className="nav-icon">{t.i}</span><span style={{fontSize:11,fontWeight:700}}>{t.l}</span>
             </button>
           ))}
         </div>
@@ -731,12 +683,11 @@ function App() {
              </span>
            )}
            <div style={{textAlign:"right", display:window.innerWidth>900?"block":"none"}}>
-              <div style={{fontSize:12, fontWeight:800}}>{user.user_metadata?.full_name || "Doctor"}</div>
+              <div style={{fontSize:12, fontWeight:800}}>{user.user_metadata?.full_name ? user.user_metadata.full_name + ", MD, FACP, FACE" : "Anteneh Zenebe, MD, FACP, FACE"}</div>
               <div style={{fontSize:10, color:"#64748b"}}>{user.email}</div>
            </div>
            <button onClick={()=>window.open(PORTAL_URL,"_blank")} className="gold-outline-btn">💳 Manage Plan</button>
-           <button onClick={()=>window.open(PORTAL_URL,"_blank")} className="gold-outline-btn">🔄 Change Plan</button>
-           <button onClick={()=>sb.auth.signOut().then(()=>window.location.reload())} style={{color:"#94a3b8", background:"transparent", border:"1px solid #1e293b", padding:"6px 12px", borderRadius:6, cursor:"pointer", fontSize:11}}>Sign Out</button>
+           <button onClick={()=>sb.auth.signOut().then(()=>window.location.reload())} style={{color:"#94a3b8", background:"transparent", border:"none", cursor:"pointer", fontSize:12, fontWeight:600}}>Sign Out</button>
         </div>
       </nav>
 
@@ -754,16 +705,11 @@ function App() {
                <button onClick={()=>setTab("mcq")} style={{background:GOLD,color:"#000",padding:"10px 20px",borderRadius:8,fontWeight:800,border:"none",cursor:"pointer"}}>Start Practice Session</button>
             </div>
 
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16, marginBottom:40}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:16, marginBottom:40}}>
                <div className="quick-card" onClick={()=>setTab("mcq")}>
                   <div style={{fontSize:28,marginBottom:14}}>🎯</div>
                   <h3 style={{color:"#6366f1",fontWeight:800,fontSize:16,marginBottom:4}}>Premium QBank</h3>
                   <p style={{color:"#64748b", fontSize:13}}>Case-based board review</p>
-               </div>
-               <div className="quick-card" onClick={()=>setTab("calcs")}>
-                  <div style={{fontSize:28,marginBottom:14}}>🧪</div>
-                  <h3 style={{color:"#ec4899",fontWeight:800,fontSize:16,marginBottom:4}}>Med Calcs</h3>
-                  <p style={{color:"#64748b", fontSize:13}}>Equations & normal values</p>
                </div>
                <div className="quick-card" onClick={()=>setTab("guides")}>
                   <div style={{fontSize:28,marginBottom:14}}>📚</div>
@@ -776,32 +722,25 @@ function App() {
                   <p style={{color:"#64748b", fontSize:13}}>Weakness and accuracy tracking</p>
                </div>
             </div>
-
-            <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:24}}>
-               <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:20,display:"flex",alignItems:"center",gap:8}}>📋 Your Training Continuum</h3>
-               <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
-                  <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#3b82f6",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 1</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>M2</div></div>
-                  <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#8b5cf6",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 2</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>M3/M4</div></div>
-                  <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#6366f1",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 3</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>PGY-1/2</div></div>
-                  <div style={{flex:1,minWidth:140,background:"rgba(16,185,129,0.05)",border:"1px solid #10b981",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#10b981",fontWeight:800,fontSize:14,marginBottom:6}}>ABIM IM</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>Residents</div></div>
-                  <div style={{flex:1,minWidth:140,background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:GOLD,fontWeight:800,fontSize:14,marginBottom:6}}>ABIM Endo</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>Fellows</div></div>
-               </div>
-            </div>
           </div>
         )}
 
         {tab==="mcq" && (
           <div className="fade">
             {score.t>0 && (
-              <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16,fontSize:13}}>
-                <span style={{color:"#475569"}}>Session: <strong style={{color:"#f1f5f9"}}>{score.t}</strong> answered</span>
-                <span style={{color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                <div style={{display:"flex",gap:24,fontSize:14,fontWeight:700,alignItems:"center"}}>
+                  <span style={{color:"#94a3b8"}}>Answered: <span style={{color:"#f1f5f9"}}>{score.t}</span></span>
+                  <span style={{color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"}}>{Math.round(score.c/score.t*100)}% correct</span>
+                  {appState==="exam_running" && <span style={{color:"#f59e0b",fontSize:11,fontWeight:800,border:"1px solid #f59e0b",padding:"3px 10px",borderRadius:6}}>EXAM MODE</span>}
+                </div>
+                <button onClick={endSession} style={{background:"transparent", border:"1px solid #ef4444", color:"#ef4444", padding:"6px 16px", borderRadius:6, fontWeight:700, cursor:"pointer", fontSize:13}}>End Session</button>
               </div>
             )}
 
-            <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{width:"100%",padding:16,background:CARD,border:"1px solid "+BDR,borderRadius:12,color:GOLD,fontWeight:800,marginBottom:20,cursor:"pointer", textAlign:"left", display:"flex", justifyContent:"space-between"}}>
-              <span>⚙ QBank Settings: {topic} ({lvl.l})</span>
-              <span>{sidebarOpen ? "▲ Close" : "▼ Options"}</span>
+            <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{width:"100%",padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:8,color:"#f1f5f9",fontWeight:700,marginBottom:20,cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <span style={{color:"#94a3b8"}}>⚙ {lvl.l} — <span style={{color:"#f1f5f9"}}>{topic}</span></span>
+              <span style={{color:"#f1f5f9"}}>{sidebarOpen ? "▲ Close Options" : "▼ Options"}</span>
             </button>
             
             {sidebarOpen && (
@@ -827,13 +766,11 @@ function App() {
             
             {appState==="generating" && <div style={{textAlign:"center",padding:40}}><div style={{width:40,height:40,border:"4px solid "+GOLD,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 15px"}}></div><p style={{color:"#94a3b8", fontWeight:600}}>Loading QBank Item...</p></div>}
             
-            {appState==="exam_done" && question && <ExamComplete score={score} examSecs={examSecs} onReview={()=>{setAppState("exam_review");setRevealed(true);}} onNew={handleLoadNext}/>}
-
             {question && appState!=="exam_done" && (
               <div className="fade" style={{background:CARD,padding:32,borderRadius:16,border:"1px solid "+(revealed||appState==="exam_review"?GOLD:BDR)}}>
                 <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20}}>
-                  <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:6,padding:"4px 12px",fontSize:11,fontWeight:800}}>{appState==="exam_running"?"EXAM":"QBank"}</span>
-                  <span style={{background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,color:"#94a3b8",borderRadius:6,padding:"4px 12px",fontSize:11,fontWeight:700}}>{question.topic || topic}</span>
+                  <span style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,borderRadius:6,padding:"4px 12px",fontSize:12,fontWeight:800}}>Question {score.t + (revealed ? 0 : 1)}</span>
+                  <span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:6,padding:"4px 12px",fontSize:12,fontWeight:700}}>{question.topic || topic}</span>
                 </div>
                 
                 <p style={{fontSize:17,lineHeight:1.8,marginBottom:25,color:"#f1f5f9"}}>{revealText || question.stem}</p>
@@ -842,10 +779,12 @@ function App() {
                     var isAnswered = revealed || appState==="exam_review" || (appState==="exam_running" && !!examSel);
                     var borderColor = choiceColor(letter); var textColor = choiceTextColor(letter);
                     return (
-                      <button key={letter} onClick={()=>{if(appState==="studying" && !revealed) setSel(letter); if(appState==="exam_running" && !examSel) setSel(letter);}} style={{textAlign:"left",padding:"16px 20px",borderRadius:10,cursor:isAnswered?"default":"pointer",border:"1px solid "+borderColor,background:isAnswered&&borderColor!==BDR?borderColor+"18":"rgba(255,255,255,0.02)",color:textColor,fontWeight:sel===letter||examSel===letter?700:400,fontSize:15}}>
-                        <span style={{fontWeight:800,marginRight:12,color:sel===letter||examSel===letter||(isAnswered&&letter===question.correct)?textColor:"#64748b"}}>{letter}.</span>{text}
-                        {(revealed||appState==="exam_review") && letter===question.correct && <span style={{marginLeft:10,fontSize:13,fontWeight:700,color:"#10b981"}}> ✓ Correct answer</span>}
-                        {(revealed||appState==="exam_review") && (sel===letter||examSel===letter) && letter!==question.correct && <span style={{marginLeft:10,fontSize:13,fontWeight:700,color:"#ef4444"}}> ✗ Your answer</span>}
+                      <button key={letter} onClick={()=>{if(appState==="studying" && !revealed) setSel(letter); if(appState==="exam_running" && !examSel) setSel(letter);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",textAlign:"left",padding:"16px 20px",borderRadius:8,cursor:isAnswered?"default":"pointer",border:"1px solid "+borderColor,background:isAnswered&&borderColor!==BDR?borderColor+"18":"rgba(255,255,255,0.02)",color:textColor,fontWeight:sel===letter||examSel===letter?700:400,fontSize:15}}>
+                        <div>
+                          <strong style={{color:sel===letter||examSel===letter||(isAnswered&&letter===question.correct)?textColor:"#64748b", marginRight:10}}>{letter}.</strong> {text}
+                        </div>
+                        {(revealed||appState==="exam_review") && letter===question.correct && <span style={{fontSize:13,fontWeight:700,color:"#10b981",whiteSpace:"nowrap",marginLeft:16}}>Correct answer</span>}
+                        {(revealed||appState==="exam_review") && (sel===letter||examSel===letter) && letter!==question.correct && <span style={{fontSize:13,fontWeight:700,color:"#ef4444",whiteSpace:"nowrap",marginLeft:16}}>Your answer</span>}
                       </button>
                     )
                   })}
@@ -868,16 +807,6 @@ function App() {
           </div>
         )}
 
-        {/* CALCS TAB Dedicated Page */}
-        {tab==="calcs" && (
-          <div className="fade" style={{paddingTop:20}}>
-            <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Medical Calculators & Reference</h2>
-            <p style={{color:"#94a3b8",fontSize:16,marginBottom:32}}>Integrated normal values and clinical equations for board prep.</p>
-            <LabPanel />
-          </div>
-        )}
-
-        {/* GUIDES TAB */}
         {tab==="guides" && (
           <div className="fade" style={{paddingTop:20}}>
             <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Clinical Guidelines</h2>
@@ -888,7 +817,6 @@ function App() {
           </div>
         )}
 
-        {/* PROGRESS TAB */}
         {tab==="progress" && (
           <div className="fade" style={{paddingTop:20}}>
             <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Performance Analytics</h2>
