@@ -65,7 +65,6 @@ const GROUPS={
   "Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
 };
 
-// ADDED CONST HERE TO FIX THE FATAL CRASH
 const GUIDES=[
   {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"D",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
   {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"E",u:"https://www.endocrine.org/clinical-practice-guidelines"},
@@ -122,4 +121,878 @@ function LabPanel(){
       {n:"CRP",v:"<1.0 mg/L"},{n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Serum Osmolality",v:"275-295 mOsm/kg"},
       {n:"Anion Gap",v:"8-12 mEq/L"},{n:"Ferritin male",v:"24-336 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
     ]},
-    {cat:"Hematology
+    {cat:"Hematology",color:"#EF4444",labs:[
+      {n:"WBC",v:"4500-11000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},{n:"Hgb female",v:"12.0-15.5 g/dL"},
+      {n:"Hct male",v:"41-53%"},{n:"MCV",v:"80-100 fL"},{n:"Platelets",v:"150-400k/uL"},
+      {n:"Neutrophils",v:"50-70%"},{n:"Lymphocytes",v:"20-40%"},{n:"PT",v:"11-13.5 sec"},
+      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},{n:"D-dimer",v:"<0.5 ug/mL"},
+      {n:"Fibrinogen",v:"200-400 mg/dL"},{n:"Haptoglobin",v:"30-200 mg/dL"},
+    ]},
+    {cat:"Endocrinology",color:"#C9A84C",labs:[
+      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},{n:"Free T3",v:"2.3-4.2 pg/mL"},
+      {n:"HbA1c normal",v:"<5.7%"},{n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0%"},
+      {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
+      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},{n:"UFC 24hr",v:"<50 ug/24hr"},
+      {n:"LDDST post dex",v:"<1.8 ug/dL"},{n:"Aldosterone upright",v:"4-31 ng/dL"},
+      {n:"Plasma metanephrines",v:"<0.5 nmol/L"},{n:"PTH intact",v:"10-65 pg/mL"},
+      {n:"25-OH Vit D",v:"30-100 ng/mL"},{n:"Prolactin male",v:"2-18 ng/mL"},
+      {n:"IGF-1 adult 20-40yr",v:"115-355 ng/mL"},{n:"Testosterone male",v:"300-1000 ng/dL"},
+      {n:"LH male",v:"1.7-8.6 IU/L"},{n:"FSH male",v:"1.5-12.4 IU/L"},
+    ]},
+    {cat:"Lipidology",color:"#10B981",labs:[
+      {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL optimal",v:"<100 mg/dL"},
+      {n:"LDL high risk",v:"<70 mg/dL"},{n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
+      {n:"TG normal",v:"<150 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},{n:"Non-HDL target",v:"<130 mg/dL"},
+      {n:"Apo B",v:"<90 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL"},
+    ]},
+    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
+      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},{n:"PaO2",v:"75-100 mmHg"},
+      {n:"HCO3",v:"22-26 mEq/L"},{n:"O2 sat",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
+      {n:"Anion gap",v:"8-12 mEq/L"},{n:"P/F normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
+    ]},
+    {cat:"Rheumatology",color:"#F59E0B",labs:[
+      {n:"ANA screening",v:"<1:40 negative"},{n:"Anti-dsDNA",v:"<30 IU/mL"},
+      {n:"RF IgM",v:"<14 IU/mL"},{n:"Anti-CCP",v:"<20 U/mL"},
+      {n:"C3 complement",v:"90-180 mg/dL"},{n:"C4 complement",v:"16-47 mg/dL"},
+      {n:"Uric acid gout target",v:"<6.0 mg/dL"},
+    ]},
+    {cat:"CSF",color:"#14B8A6",labs:[
+      {n:"Opening pressure",v:"70-180 mmH2O"},{n:"WBC",v:"0-5 cells/uL"},
+      {n:"Protein",v:"15-45 mg/dL"},{n:"Glucose",v:"45-80 mg/dL"},
+      {n:"CSF:serum glucose",v:">0.6"},
+    ]},
+  ];
+  const CALCS=[
+    {n:"Anion Gap",f:"Na - (Cl + HCO3)",v:"Normal 8-12 mEq/L",note:"Corrected AG = AG + 2.5 x (4 - albumin)"},
+    {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL",note:"Add 0.8 per 1 g/dL drop in albumin below 4"},
+    {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose-100)/100]",v:"Normal 136-145 mEq/L",note:"For hyperglycemia correction"},
+    {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese"},
+    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics"},
+    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols"},
+    {n:"Winters Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation"},
+    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg"},
+    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = non-AG acidosis; >2 = met alkalosis"},
+    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant"},
+    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate"},
+    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk"},
+    {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high"},
+    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpt / 2 admit / >=3 ICU"},
+    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 increase = organ dysfunction"},
+    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk"},
+    {n:"Corrected QTc",f:"QT / sqrt(RR in seconds)",v:"<440ms male / <460ms female",note:">500ms = high risk Torsades"},
+    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9"},
+    {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference"},
+    {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal",note:"ARDS: mild 200-300 / mod 100-200 / severe <100"},
+  ];
+  return(
+    <div style={{marginTop:12}}>
+      <div style={{height:1,background:BDR,marginBottom:12}}></div>
+      <div style={{display:"flex",gap:4,marginBottom:10}}>
+        <button onClick={function(){setLabTab("labs");}} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Labs</button>
+        <button onClick={function(){setLabTab("calcs");}} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Calcs</button>
+      </div>
+      {labTab==="labs" && (
+        <div>
+          {LAB_DATA.map(function(section){
+            return (
+              <div key={section.cat} style={{marginBottom:4}}>
+                <button onClick={function(){setOpenCat(openCat===section.cat?null:section.cat);}} style={{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}}>
+                  <span>{section.cat}</span><span style={{fontSize:9}}>{openCat===section.cat?"hide":"show"}</span>
+                </button>
+                {openCat===section.cat && (
+                  <div style={{padding:"4px 0",maxHeight:240,overflowY:"auto"}}>
+                    {section.labs.map(function(lab){
+                      return (
+                        <div key={lab.n} style={{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                          <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>{lab.n}</span>
+                          <span style={{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}}>{lab.v}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {labTab==="calcs" && (
+        <div style={{maxHeight:440,overflowY:"auto"}}>
+          {CALCS.map(function(c){
+            return (
+              <div key={c.n} style={{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}}>
+                <p style={{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}}>{c.n}</p>
+                <p style={{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}}>{c.f}</p>
+                <p style={{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}}>{c.v}</p>
+                {c.note && <p style={{fontSize:10,color:"#cbd5e1",lineHeight:1.3}}>{c.note}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SUPABASE HELPERS ─────────────────────────────────────────────────────────
+async function saveMcq(question, level) {
+  try {
+    await sb.from("mcqs").insert({
+      exam_level: level || "",
+      topic: question.topic || "",
+      stem: question.stem || "",
+      choices: question.choices || {},
+      correct_answer: question.correct || "",
+      explanation: question.explanation || ""
+    });
+  } catch(e) {}
+}
+
+async function saveResponse(question, choice, isCorrect) {
+  try {
+    var res = await sb.auth.getSession();
+    var session = res.data && res.data.session;
+    if (!session || !session.user) return;
+    var userId = session.user.id;
+    var mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
+    var mcqId = mcqRes.data && mcqRes.data[0] && mcqRes.data[0].id;
+    if (!mcqId) return;
+    await sb.from("user_responses").insert({
+      user_id: userId,
+      mcq_id: mcqId,
+      selected_choice: choice,
+      is_correct: isCorrect
+    });
+  } catch(e) {}
+}
+
+// ─── LANDING PAGE ─────────────────────────────────────────────────────────────
+function LandingPage(props) {
+  var showAuth = props.showAuth;
+  var setShowAuth = props.setShowAuth;
+  var authMode = props.authMode;
+  var setAuthMode = props.setAuthMode;
+  var email = props.email;
+  var setEmail = props.setEmail;
+  var pw = props.pw;
+  var setPw = props.setPw;
+  var nm = props.nm;
+  var setNm = props.setNm;
+  var authErr = props.authErr;
+  var authMsg = props.authMsg;
+  var handleAuth = props.handleAuth;
+  var googleLogin = props.googleLogin;
+
+  return (
+    <div style={{minHeight:"100vh",background:BG}}>
+      {/* Nav */}
+      <nav style={{padding:"0 5%",height:64,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.97)",backdropFilter:"blur(12px)",zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:34,height:34,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:15}}>M</div>
+          <span style={{fontWeight:800,fontSize:18,color:"#f1f5f9"}}><span style={{color:GOLD}}>Med</span>Board<span style={{color:GOLD,fontStyle:"italic",marginLeft:2}}>Pro</span></span>
+        </div>
+        <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"8px 20px",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>
+          Subscriber Sign In
+        </button>
+      </nav>
+
+      {/* Hero */}
+      <section style={{padding:"80px 5%",textAlign:"center",maxWidth:900,margin:"0 auto"}}>
+        <div style={{display:"inline-block",background:"rgba(0,40,104,0.3)",border:"1px solid rgba(0,40,104,0.6)",borderRadius:20,padding:"6px 18px",marginBottom:20}}>
+          <span style={{color:GOLD,fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:2}}>Fellowship Program Director · Howard University</span>
+        </div>
+        <h1 style={{fontSize:"clamp(26px,5vw,52px)",fontWeight:900,lineHeight:1.2,marginBottom:20,color:"#f1f5f9"}}>
+          Board Prep Built by a <span style={{color:GOLD}}>Fellowship Program Director</span> — Not a Test Prep Company
+        </h1>
+        <p style={{fontSize:17,color:"#94a3b8",marginBottom:36,lineHeight:1.75,maxWidth:680,margin:"0 auto 36px"}}>
+          AI-generated clinical vignettes written to NBME and ABIM standards. Every explanation cites ADA, ATA, ACC/AHA, Endocrine Society, and 20+ specialty society guidelines.
+        </p>
+        <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap"}}>
+          <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,color:"#fff",padding:"14px 36px",borderRadius:10,fontWeight:800,fontSize:16,cursor:"pointer"}}>
+            Start 14-Day Free Trial
+          </button>
+          <button onClick={()=>{var el=document.getElementById("how");if(el)el.scrollIntoView({behavior:"smooth"});}} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"14px 32px",borderRadius:10,fontWeight:700,fontSize:15,cursor:"pointer"}}>
+            How It Works
+          </button>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section id="how" style={{padding:"80px 5%"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:56}}>
+            <p style={{fontSize:11,fontWeight:700,color:GOLD,letterSpacing:3,textTransform:"uppercase",marginBottom:12}}>Simple by design</p>
+            <h2 style={{fontSize:32,fontWeight:800,color:"#f1f5f9"}}>How MedBoard Pro Works</h2>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))"}}>
+            {[
+              {num:"01",icon:"◎",title:"Choose Your Exam",desc:"Select from USMLE Step 1, 2, 3, ABIM Internal Medicine, or ABIM Endocrinology. Every question is weighted to the real exam blueprint.",color:"#6366f1"},
+              {num:"02",icon:"◈",title:"Receive a Fresh Question",desc:"A unique board-quality clinical vignette written to NBME and ABIM item-writing standards — with a real patient, real labs, real clinical decisions.",color:GOLD},
+              {num:"03",icon:"◉",title:"Learn from Every Answer",desc:"Instant feedback with guideline citations from ADA, ATA, ACC/AHA, Endocrine Society and 20+ societies, plus a board pearl from a fellowship program director.",color:"#10b981"}
+            ].map(function(step, i) {
+              return (
+                <div key={step.num} style={{padding:"40px 36px",border:"1px solid "+BDR,borderRight:i<2?"none":"1px solid "+BDR,position:"relative"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24}}>
+                    <span style={{fontSize:11,fontWeight:700,color:"#334155",letterSpacing:2}}>{step.num}</span>
+                    <span style={{fontSize:28,color:step.color,opacity:0.7}}>{step.icon}</span>
+                  </div>
+                  <h3 style={{fontSize:18,fontWeight:800,color:"#f1f5f9",marginBottom:12,lineHeight:1.3}}>{step.title}</h3>
+                  <p style={{fontSize:14,color:"#64748b",lineHeight:1.8}}>{step.desc}</p>
+                  <div style={{position:"absolute",bottom:0,left:0,width:"100%",height:2,background:"linear-gradient(90deg,"+step.color+"55,transparent)"}}></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section style={{padding:"80px 5%",background:"rgba(255,255,255,0.015)"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:48}}>
+            <h2 style={{fontSize:32,fontWeight:800,color:"#f1f5f9",marginBottom:12}}>Simple, Transparent Pricing</h2>
+            <p style={{color:"#64748b",fontSize:15}}>14-day free trial · No charge until Day 15 · Cancel anytime</p>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:20}}>
+            {PLANS.map(function(plan) {
+              return (
+                <div key={plan.key} style={{background:CARD,border:"1px solid "+(plan.badge==="MOST POPULAR"?GOLD:BDR),borderRadius:16,padding:28,position:"relative"}}>
+                  {plan.badge && <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:plan.color,color:"#fff",fontSize:11,fontWeight:700,padding:"3px 14px",borderRadius:20,whiteSpace:"nowrap"}}>{plan.badge}</div>}
+                  <h3 style={{color:"#f1f5f9",fontSize:18,fontWeight:800,marginBottom:8}}>{plan.name}</h3>
+                  <div style={{color:GOLD,marginBottom:16}}>
+                    <span style={{fontSize:36,fontWeight:900}}>${plan.price}</span>
+                    <span style={{color:"#64748b",fontSize:14}}>/{plan.period}</span>
+                  </div>
+                  <ul style={{listStyle:"none",marginBottom:24}}>
+                    {plan.features.map(function(f) {
+                      return <li key={f} style={{color:"#94a3b8",fontSize:14,padding:"4px 0",display:"flex",alignItems:"center",gap:8}}><span style={{color:"#10b981",fontSize:12}}>✓</span>{f}</li>;
+                    })}
+                  </ul>
+                  <button onClick={()=>window.open(PAYMENT_LINKS[plan.key],"_blank")} style={{width:"100%",padding:"12px",borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+plan.color,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>
+                    Start Free Trial
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Auth Modal */}
+      {showAuth && (
+        <div onClick={function(e){if(e.target===e.currentTarget)setShowAuth(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}>
+          <div style={{background:"#0f172a",border:"1px solid "+BDR,borderRadius:16,padding:32,width:"100%",maxWidth:420}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+              <h3 style={{color:"#f1f5f9",fontWeight:800,fontSize:18}}>
+                {authMode==="signup"?"Create Account":authMode==="reset"?"Reset Password":"Welcome Back"}
+              </h3>
+              <button onClick={()=>setShowAuth(false)} style={{background:"transparent",border:"none",color:"#64748b",fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
+            </div>
+            <button onClick={googleLogin} style={{width:"100%",padding:"11px",borderRadius:8,background:"#fff",border:"1px solid #d1d5db",color:"#374151",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+              <span style={{fontSize:16}}>G</span> Continue with Google
+            </button>
+            <div style={{textAlign:"center",color:"#334155",fontSize:12,marginBottom:16}}>— or —</div>
+            <form onSubmit={handleAuth}>
+              {authMode==="signup" && <input value={nm} onChange={function(e){setNm(e.target.value);}} placeholder="Full name" required style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,borderRadius:8,padding:"10px 14px",color:"#f1f5f9",fontSize:14,marginBottom:10,outline:"none",display:"block"}}/>}
+              <input type="email" value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="Email address" required style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,borderRadius:8,padding:"10px 14px",color:"#f1f5f9",fontSize:14,marginBottom:10,outline:"none",display:"block"}}/>
+              {authMode!=="reset" && <input type="password" value={pw} onChange={function(e){setPw(e.target.value);}} placeholder="Password" required style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,borderRadius:8,padding:"10px 14px",color:"#f1f5f9",fontSize:14,marginBottom:10,outline:"none",display:"block"}}/>}
+              {authErr && <p style={{color:"#f87171",fontSize:13,marginBottom:10}}>{authErr}</p>}
+              {authMsg && <p style={{color:"#34d399",fontSize:13,marginBottom:10}}>{authMsg}</p>}
+              <button type="submit" style={{width:"100%",padding:"11px",borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:12}}>
+                {authMode==="signup"?"Create Account":authMode==="reset"?"Send Reset Email":"Sign In"}
+              </button>
+            </form>
+            <div style={{display:"flex",justifyContent:"center",gap:16,fontSize:13}}>
+              {authMode!=="login" && <button onClick={()=>setAuthMode("login")} style={{background:"none",border:"none",color:GOLD,cursor:"pointer"}}>Sign In</button>}
+              {authMode!=="signup" && <button onClick={()=>setAuthMode("signup")} style={{background:"none",border:"none",color:GOLD,cursor:"pointer"}}>Create Account</button>}
+              {authMode!=="reset" && <button onClick={()=>setAuthMode("reset")} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer"}}>Forgot Password?</button>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EXAM COMPLETE SCREEN ─────────────────────────────────────────────────────
+function ExamComplete(props) {
+  var score = props.score;
+  var examSecs = props.examSecs;
+  var onReview = props.onReview;
+  var onNew = props.onNew;
+  var pct = score.t > 0 ? Math.round(score.c / score.t * 100) : 0;
+  var passed = pct >= 70;
+  var mins = Math.floor(examSecs / 60);
+  var secs = examSecs % 60;
+  return (
+    <div className="fade" style={{background:CARD,border:"2px solid "+(passed?GOLD:BDR),borderRadius:20,padding:"40px 32px",textAlign:"center",marginBottom:24}}>
+      <div style={{fontSize:52,marginBottom:12}}>{passed?"🎓":"📚"}</div>
+      <h2 style={{color:"#f1f5f9",fontSize:26,fontWeight:800,marginBottom:8}}>Exam Complete</h2>
+      <div style={{fontSize:68,fontWeight:900,color:passed?"#10b981":"#f59e0b",lineHeight:1,margin:"16px 0"}}>{pct}%</div>
+      <p style={{color:"#94a3b8",fontSize:16,marginBottom:4}}>{score.c} correct out of {score.t} question{score.t!==1?"s":""}</p>
+      {examSecs>0 && <p style={{color:"#475569",fontSize:13,marginBottom:4}}>Time: {mins}m {secs<10?"0":""}{secs}s</p>}
+      <p style={{color:passed?"#10b981":"#f59e0b",fontWeight:700,fontSize:15,marginBottom:28}}>{passed?"✓ Above 70% passing threshold":"✗ Below 70% — review weak areas"}</p>
+      <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+        <button onClick={onReview} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>Review Answers</button>
+        <button onClick={onNew} style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>New Question</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// State machine: idle | generating | studying | exam_running | exam_done | exam_review
+function App() {
+  // Auth
+  var [user, setUser] = React.useState(null);
+  var [authLoading, setAuthLoading] = React.useState(true);
+  var [showAuth, setShowAuth] = React.useState(false);
+  var [authMode, setAuthMode] = React.useState("login");
+  var [email, setEmail] = React.useState("");
+  var [pw, setPw] = React.useState("");
+  var [nm, setNm] = React.useState("");
+  var [authErr, setAuthErr] = React.useState("");
+  var [authMsg, setAuthMsg] = React.useState("");
+
+  // Navigation
+  var [tab, setTab] = React.useState("mcq");
+  var [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+  // Settings
+  var [grp, setGrp] = React.useState("Random");
+  var [topic, setTopic] = React.useState("Random -- All Specialties");
+  var [lvl, setLvl] = React.useState(LEVELS[3]);
+  var [examMode, setExamMode] = React.useState(false);
+
+  // App state machine
+  var [appState, setAppState] = React.useState("idle");
+  // idle | generating | studying | exam_running | exam_done | exam_review
+
+  // Question data
+  var [question, setQuestion] = React.useState(null);
+  var [sel, setSel] = React.useState("");
+  var [revealed, setRevealed] = React.useState(false);
+  var [revealText, setRevealText] = React.useState("");
+
+  // Exam tracking
+  var [examSel, setExamSel] = React.useState("");
+  var [examCorrect, setExamCorrect] = React.useState(false);
+
+  // Score
+  var [score, setScore] = React.useState({t:0, c:0});
+
+  // Timer
+  var [tLeft, setTLeft] = React.useState(null);
+  var [examStartMs, setExamStartMs] = React.useState(0);
+  var [examSecs, setExamSecs] = React.useState(0);
+  var timerRef = React.useRef(null);
+
+  // Error
+  var [err, setErr] = React.useState("");
+  var [busy, setBusy] = React.useState(false);
+
+  // Auth init
+  React.useEffect(function() {
+    sb.auth.getSession().then(function(res) {
+      var s = res.data && res.data.session;
+      setUser(s ? s.user : null);
+      setAuthLoading(false);
+    });
+    var sub = sb.auth.onAuthStateChange(function(event, session) {
+      setUser(session ? session.user : null);
+    });
+    return function() {
+      sub.data && sub.data.subscription && sub.data.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Warmup ping after question loads
+  React.useEffect(function() {
+    if (question) {
+      var t = setTimeout(function() {
+        fetch("/.netlify/functions/generate-mcq", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({topic:topic, level:lvl.v, warmup:true})
+        }).catch(function(){});
+      }, 3000);
+      return function() { clearTimeout(t); };
+    }
+  }, [question]);
+
+  // Keyboard shortcuts
+  React.useEffect(function() {
+    function onKey(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      var map = {a:"A",b:"B",c:"C",d:"D",e:"E"};
+      var letter = map[e.key.toLowerCase()];
+      if (letter) {
+        if (appState === "studying" && !revealed) setSel(letter);
+        if (appState === "exam_running" && !examSel) setExamSel(letter);
+      }
+      if (e.key === "Enter") {
+        if (appState === "studying" && !revealed && sel) submitStudy();
+        if (appState === "exam_running" && !examSel && sel) submitExam();
+      }
+      if ((e.key === "n" || e.key === "N") && (appState === "studying" || appState === "idle")) generate();
+    }
+    window.addEventListener("keydown", onKey);
+    return function() { window.removeEventListener("keydown", onKey); };
+  }, [appState, revealed, sel, examSel, question]);
+
+  // ─── TIMER ──────────────────────────────────────────────────────────────────
+  function startTimer() {
+    clearInterval(timerRef.current);
+    setExamStartMs(Date.now());
+    setTLeft(SECS);
+    timerRef.current = setInterval(function() {
+      setTLeft(function(t) {
+        if (t <= 1) {
+          clearInterval(timerRef.current);
+          endExam();
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  }
+
+  function stopTimer() {
+    clearInterval(timerRef.current);
+    setExamSecs(Math.floor((Date.now() - examStartMs) / 1000));
+  }
+
+  function endExam() {
+    stopTimer();
+    setAppState("exam_done");
+  }
+
+  // ─── AUTH ────────────────────────────────────────────────────────────────────
+  function googleLogin() {
+    sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:"https://medboardpro.org"}});
+  }
+
+  function logout() {
+    sb.auth.signOut();
+    setAppState("idle");
+    setQuestion(null);
+  }
+
+  async function handleAuth(e) {
+    e.preventDefault();
+    setAuthErr("");
+    setAuthMsg("");
+    try {
+      if (authMode === "signup") {
+        var r1 = await sb.auth.signUp({email, password:pw, options:{data:{full_name:nm}}});
+        if (r1.error) throw r1.error;
+        setAuthMsg("Check your email to confirm your account.");
+      } else if (authMode === "reset") {
+        var r2 = await sb.auth.resetPasswordForEmail(email);
+        if (r2.error) throw r2.error;
+        setAuthMsg("Password reset email sent.");
+      } else {
+        var r3 = await sb.auth.signInWithPassword({email, password:pw});
+        if (r3.error) throw r3.error;
+        setShowAuth(false);
+      }
+    } catch(ex) {
+      setAuthErr(ex.message);
+    }
+  }
+
+  // ─── GENERATE ────────────────────────────────────────────────────────────────
+  async function generate() {
+    clearInterval(timerRef.current);
+    setAppState("generating");
+    setQuestion(null);
+    setSel("");
+    setExamSel("");
+    setRevealed(false);
+    setRevealText("");
+    setErr("");
+    setBusy(true);
+
+    var attempts = 3;
+    var lastErr = "";
+
+    for (var i = 0; i < attempts; i++) {
+      try {
+        if (i > 0) await new Promise(function(r){setTimeout(r,2000);});
+        var res = await fetch("/.netlify/functions/generate-mcq", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({topic:topic, level:lvl.v, count:1})
+        });
+        if (!res.ok) {
+          var ej = await res.json().catch(function(){return{error:"Error "+res.status};});
+          throw new Error(ej.error || "Error " + res.status);
+        }
+        var data = await res.json();
+        if (!Array.isArray(data) || !data[0]) throw new Error("Invalid response");
+        var q = data[0];
+        if (!q.stem || !q.choices || !q.correct || !q.explanation) throw new Error("Incomplete question data");
+
+        setBusy(false);
+        saveMcq(q, lvl.v).catch(function(){});
+
+        if (examMode) {
+          // Exam mode: show question immediately, start timer right away
+          setQuestion(q);
+          setAppState("exam_running");
+          startTimer();
+        } else {
+          // Study mode: typewriter reveal
+          setAppState("studying");
+          var words = q.stem.split(" ");
+          var wi = 0;
+          var tw = setInterval(function() {
+            if (wi >= words.length) {
+              clearInterval(tw);
+              setQuestion(q);
+              setRevealText("");
+              return;
+            }
+            setRevealText(function(prev) {return prev + (wi===0?"":" ") + words[wi];});
+            wi++;
+          }, 15);
+        }
+        return;
+      } catch(ex) {
+        lastErr = ex.message;
+        if (i < attempts - 1) setErr("Reconnecting...");
+      }
+    }
+    setBusy(false);
+    setAppState("idle");
+    setErr("Failed to generate: " + lastErr);
+  }
+
+  // ─── STUDY MODE SUBMIT ────────────────────────────────────────────────────────
+  function submitStudy() {
+    if (!sel || !question || revealed) return;
+    var ok = sel === question.correct;
+    setRevealed(true);
+    setScore(function(s){return{t:s.t+1, c:s.c+(ok?1:0)};});
+    saveResponse(question, sel, ok).catch(function(){});
+  }
+
+  // ─── EXAM MODE SUBMIT ─────────────────────────────────────────────────────────
+  function submitExam() {
+    if (!sel || !question || examSel) return;
+    var ok = sel === question.correct;
+    setExamSel(sel);
+    setExamCorrect(ok);
+    setScore(function(s){return{t:s.t+1, c:s.c+(ok?1:0)};});
+    saveResponse(question, sel, ok).catch(function(){});
+    setTimeout(endExam, 400);
+  }
+
+  // ─── CHOICE COLOR ─────────────────────────────────────────────────────────────
+  function choiceColor(letter) {
+    if (!question) return BDR;
+    var isReview = appState === "exam_review" || revealed;
+    if (isReview) {
+      if (letter === question.correct) return "#10b981";
+      if (letter === (examSel || sel) && letter !== question.correct) return "#ef4444";
+      return BDR;
+    }
+    if (letter === sel) return GOLD;
+    return BDR;
+  }
+
+  function choiceTextColor(letter) {
+    if (!question) return "#cbd5e1";
+    var isReview = appState === "exam_review" || revealed;
+    if (isReview) {
+      if (letter === question.correct) return "#10b981";
+      if (letter === (examSel || sel) && letter !== question.correct) return "#ef4444";
+      return "#94a3b8";
+    }
+    return "#cbd5e1";
+  }
+
+  // ─── RENDER ───────────────────────────────────────────────────────────────────
+  if (authLoading) {
+    return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:GOLD,fontSize:18,fontWeight:700}}>Loading MedBoard Pro...</div>;
+  }
+
+  if (!user) {
+    return <LandingPage showAuth={showAuth} setShowAuth={setShowAuth} authMode={authMode} setAuthMode={setAuthMode} email={email} setEmail={setEmail} pw={pw} setPw={setPw} nm={nm} setNm={setNm} authErr={authErr} authMsg={authMsg} handleAuth={handleAuth} googleLogin={googleLogin}/>;
+  }
+
+  // ADDED SAFETY NET HERE
+  var userName = (user.user_metadata && user.user_metadata.full_name && user.user_metadata.full_name.split(" ")[0]) || (user.email && user.email.split("@")[0]) || "User";
+
+  return (
+    <div style={{minHeight:"100vh",background:BG}}>
+
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div style={{background:"rgba(0,0,0,0.7)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 5%",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={function(){setTab("mcq");setAppState("idle");setQuestion(null);}}>
+          <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:14}}>M</div>
+          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:16}}><span style={{color:GOLD}}>Med</span>Board<span style={{color:GOLD,fontStyle:"italic",marginLeft:2}}>Pro</span></span>
+        </div>
+        <div style={{display:"flex",gap:4}}>
+          {[["mcq","MCQ Bank"],["guides","Guides"],["progress","Progress"]].map(function(item){
+            return <button key={item[0]} onClick={function(){setTab(item[0]);}} style={{background:tab===item[0]?"rgba(201,168,76,0.1)":"transparent",border:"1px solid "+(tab===item[0]?GOLD:BDR),color:tab===item[0]?GOLD:"#64748b",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontWeight:700,fontSize:12}}>{item[1]}</button>;
+          })}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {appState==="exam_running" && tLeft!==null && (
+            <span style={{fontSize:15,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",background:"rgba(0,0,0,0.5)",padding:"4px 12px",borderRadius:6,border:"1px solid "+(tLeft<30?"#ef4444":BDR)}}>
+              {fmtTime(tLeft)}
+            </span>
+          )}
+          <button onClick={logout} style={{background:"transparent",border:"1px solid "+BDR,color:"#64748b",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12}}>{userName}</button>
+        </div>
+      </div>
+
+      {/* ── MCQ TAB ────────────────────────────────────────────────────────── */}
+      {tab==="mcq" && (
+        <div style={{padding:"20px 5%",maxWidth:960,margin:"0 auto"}}>
+
+          {/* Score bar */}
+          {score.t>0 && (
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14,fontSize:13}}>
+              <span style={{color:"#475569"}}>Answered: <strong style={{color:"#f1f5f9"}}>{score.t}</strong></span>
+              <span style={{color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>
+              {appState==="exam_running" && <span style={{marginLeft:"auto",color:"#f59e0b",fontSize:11,fontWeight:700,border:"1px solid #f59e0b",padding:"2px 8px",borderRadius:4}}>EXAM MODE</span>}
+            </div>
+          )}
+
+          {/* Settings toggle */}
+          <button onClick={function(){setSidebarOpen(!sidebarOpen);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:CARD,border:"1px solid "+(sidebarOpen?GOLD:BDR),color:sidebarOpen?GOLD:"#94a3b8",padding:"9px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,marginBottom:10}}>
+            <span>⚙ {grp} — {topic} · {lvl.l}</span>
+            <span>{sidebarOpen?"▲ Hide":"▼ Options"}</span>
+          </button>
+
+          {/* Settings panel */}
+          {sidebarOpen && (
+            <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:18,marginBottom:14,maxHeight:"55vh",overflowY:"auto"}}>
+              {/* Level */}
+              <p style={{fontSize:11,color:GOLD,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Exam Level</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+                {LEVELS.map(function(l){
+                  return <button key={l.v} onClick={function(){setLvl(l);}} style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+(lvl.v===l.v?GOLD:BDR),background:lvl.v===l.v?"rgba(201,168,76,0.1)":"transparent",color:lvl.v===l.v?GOLD:"#94a3b8",fontSize:12,fontWeight:700,cursor:"pointer"}}>{l.l}</button>;
+                })}
+              </div>
+              {/* Mode */}
+              <p style={{fontSize:11,color:GOLD,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Mode</p>
+              <div style={{display:"flex",gap:8,marginBottom:16}}>
+                <button onClick={function(){setExamMode(false);}} style={{flex:1,padding:"8px",borderRadius:6,border:"1px solid "+(!examMode?GOLD:BDR),background:!examMode?"rgba(201,168,76,0.1)":"transparent",color:!examMode?GOLD:"#94a3b8",fontSize:13,fontWeight:700,cursor:"pointer"}}>📚 Study</button>
+                <button onClick={function(){setExamMode(true);}} style={{flex:1,padding:"8px",borderRadius:6,border:"1px solid "+(examMode?GOLD:BDR),background:examMode?"rgba(201,168,76,0.1)":"transparent",color:examMode?GOLD:"#94a3b8",fontSize:13,fontWeight:700,cursor:"pointer"}}>⏱ Exam</button>
+              </div>
+              {/* Topics */}
+              <p style={{fontSize:11,color:GOLD,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Topic</p>
+              {Object.entries(GROUPS).map(function([g, topics]){
+                return (
+                  <div key={g} style={{marginBottom:10}}>
+                    <p style={{fontSize:10,color:"#334155",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:0.5}}>{g}</p>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {topics.map(function(t){
+                        return <button key={t} onClick={function(){setGrp(g);setTopic(t);}} style={{padding:"4px 10px",borderRadius:5,border:"1px solid "+(topic===t?GOLD:BDR),background:topic===t?"rgba(201,168,76,0.1)":"transparent",color:topic===t?GOLD:"#64748b",fontSize:11,cursor:"pointer",fontWeight:topic===t?700:400}}>{t}</button>;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Lab Panel */}
+              <LabPanel/>
+            </div>
+          )}
+
+          {/* Error */}
+          {err && (
+            <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"#fca5a5",fontSize:14}}>{err}</span>
+              <button onClick={generate} style={{background:GOLD,color:"#000",border:"none",padding:"5px 12px",borderRadius:6,fontWeight:700,cursor:"pointer",fontSize:12}}>Try again</button>
+            </div>
+          )}
+
+          {/* Generate button */}
+          {(appState==="idle" || appState==="studying" || appState==="exam_review") && !busy && (
+            <button onClick={generate} style={{width:"100%",padding:"15px",borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:14}}>
+              {examMode?"Start Exam Question ⏱":"Generate Question ▶"}
+            </button>
+          )}
+
+          {/* Busy */}
+          {busy && (
+            <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:28,textAlign:"center",marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+                <span style={{color:"#f1f5f9",fontSize:14,fontWeight:600}}>Preparing your question...</span>
+                <div style={{width:8,height:8,borderRadius:"50%",background:GOLD,animation:"pulse 1s infinite"}}></div>
+              </div>
+              <p style={{color:"#334155",fontSize:11,marginTop:6}}>Applying NBME/ABIM standards · Verifying guideline accuracy</p>
+            </div>
+          )}
+
+          {/* Typewriter */}
+          {revealText && !question && (
+            <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:22,marginBottom:14}}>
+              <p style={{color:"#e2e8f0",lineHeight:1.9,fontSize:15}}>{revealText}<span style={{animation:"pulse 0.8s infinite",display:"inline-block"}}>▊</span></p>
+            </div>
+          )}
+
+          {/* Exam Done */}
+          {appState==="exam_done" && question && (
+            <ExamComplete score={score} examSecs={examSecs} onReview={function(){setAppState("exam_review");setRevealed(true);}} onNew={generate}/>
+          )}
+
+          {/* Question Card */}
+          {question && appState!=="exam_done" && (
+            <div className="fade" style={{background:CARD,border:"1px solid "+(revealed||appState==="exam_review"?GOLD:BDR),borderRadius:14,padding:24}}>
+
+              {/* Header */}
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:5,padding:"3px 12px",fontSize:12,fontWeight:700}}>
+                  {appState==="exam_running"?"EXAM":"Question"}
+                </span>
+                {(revealed||appState==="exam_review") && question.topic && (
+                  <span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"2px 10px",fontSize:11}}>{question.topic}</span>
+                )}
+                {revealed && (
+                  <span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:sel===question.correct?"#10b981":"#ef4444"}}>
+                    {sel===question.correct?"✓ Correct":"✗ Incorrect"}
+                  </span>
+                )}
+                {appState==="exam_review" && examSel && (
+                  <span style={{marginLeft:"auto",fontSize:14,fontWeight:700,color:examCorrect?"#10b981":"#ef4444"}}>
+                    {examCorrect?"✓ Correct":"✗ Incorrect"}
+                  </span>
+                )}
+              </div>
+
+              {/* Stem */}
+              <p style={{margin:"0 0 22px",lineHeight:1.9,fontSize:15,color:"#e2e8f0"}}>{question.stem}</p>
+
+              {/* Choices */}
+              <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+                {Object.entries(question.choices).map(function([letter, text]){
+                  var isAnswered = revealed || appState==="exam_review" || (appState==="exam_running" && !!examSel);
+                  var borderColor = choiceColor(letter);
+                  var textColor = choiceTextColor(letter);
+                  return (
+                    <button key={letter}
+                      onClick={function(){
+                        if (appState==="studying" && !revealed) setSel(letter);
+                        if (appState==="exam_running" && !examSel) setExamSel(letter);
+                        if (appState==="exam_running" && !examSel) setSel(letter);
+                      }}
+                      style={{textAlign:"left",padding:"13px 16px",borderRadius:9,cursor:isAnswered?"default":"pointer",border:"1px solid "+borderColor,background:isAnswered&&borderColor!==BDR?borderColor+"18":"rgba(255,255,255,0.02)",color:textColor,fontWeight:sel===letter||examSel===letter?700:400,fontSize:14}}>
+                      <span style={{fontWeight:800,marginRight:10}}>{letter}.</span>{text}
+                      {(revealed||appState==="exam_review") && letter===question.correct && <span style={{marginLeft:8,fontSize:12,color:"#10b981"}}> ✓ Correct answer</span>}
+                      {(revealed||appState==="exam_review") && (sel===letter||examSel===letter) && letter!==question.correct && <span style={{marginLeft:8,fontSize:12,color:"#ef4444"}}> ✗ Your answer</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                {/* Study submit */}
+                {appState==="studying" && !revealed && (
+                  <button onClick={submitStudy} disabled={!sel} style={{background:sel?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel?GOLD:BDR),color:sel?"#fff":"#475569",padding:"11px 28px",borderRadius:8,cursor:sel?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
+                    Submit Answer
+                  </button>
+                )}
+                {/* Exam submit */}
+                {appState==="exam_running" && !examSel && (
+                  <button onClick={submitExam} disabled={!sel} style={{background:sel?"linear-gradient(135deg,#7c3aed,#6d28d9)":"#1e293b",border:"1px solid "+(sel?"#8b5cf6":BDR),color:sel?"#fff":"#475569",padding:"11px 28px",borderRadius:8,cursor:sel?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
+                    Submit & Continue ⏱
+                  </button>
+                )}
+                {(!sel && !examSel) && (appState==="studying"||appState==="exam_running") && (
+                  <span style={{fontSize:13,color:"#334155"}}>Select an answer first · Keys: A B C D E</span>
+                )}
+                {/* Next question */}
+                {(revealed || appState==="exam_review") && (
+                  <button onClick={generate} style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"11px 24px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>
+                    Next Question (N)
+                  </button>
+                )}
+              </div>
+
+              {/* Explanation */}
+              {(revealed || appState==="exam_review") && (
+                <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:9,padding:16,marginTop:18}}>
+                  <p style={{margin:"0 0 12px",fontSize:12,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}}>Attending Explanation</p>
+                  {question.explanation.split(". ").filter(function(s){return s.trim().length>0;}).map(function(sentence, idx){
+                    return <p key={idx} style={{margin:"0 0 10px",color:"#e2e8f0",lineHeight:1.85,fontSize:14}}>{sentence}{sentence.endsWith(".")?"":(idx < question.explanation.split(". ").length-1?".":"")}</p>;
+                  })}
+                  <p style={{margin:"10px 0 0",fontSize:11,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:8}}>
+                    Always verify with current society guidelines. Inaccuracies? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span>
+                  </p>
+                  {question.imageUrl && (
+                    <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+BDR}}>
+                      <a href={question.imageUrl} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(99,102,241,0.12)",border:"1px solid #6366f1",color:"#818cf8",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>View on Radiopaedia ↗</a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── GUIDES TAB ─────────────────────────────────────────────────────── */}
+      {tab==="guides" && (
+        <div style={{padding:"30px 5%",maxWidth:960,margin:"0 auto"}}>
+          <h2 style={{fontSize:22,fontWeight:800,color:"#f1f5f9",marginBottom:6}}>Clinical Guidelines</h2>
+          <p style={{color:"#64748b",fontSize:14,marginBottom:24}}>Direct links to official society guidelines</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+            {GUIDES.map(function(g){
+              return (
+                <a key={g.id} href={g.u} target="_blank" rel="noopener noreferrer"
+                  style={{background:CARD,border:"1px solid "+BDR,borderRadius:10,padding:"14px 16px",textDecoration:"none",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:8,background:"rgba(0,40,104,0.3)",border:"1px solid #1e40af",display:"flex",alignItems:"center",justifyContent:"center",color:GOLD,fontWeight:800,fontSize:14,flexShrink:0}}>{g.i}</div>
+                  <div>
+                    <p style={{color:"#f1f5f9",fontWeight:600,fontSize:13,marginBottom:2}}>{g.t}</p>
+                    <p style={{color:"#475569",fontSize:11}}>{g.s}</p>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── PROGRESS TAB ───────────────────────────────────────────────────── */}
+      {tab==="progress" && (
+        <div style={{padding:"30px 5%",maxWidth:960,margin:"0 auto"}}>
+          <h2 style={{fontSize:22,fontWeight:800,color:"#f1f5f9",marginBottom:6}}>Your Progress</h2>
+          <p style={{color:"#64748b",fontSize:14,marginBottom:24}}>Session statistics</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:24}}>
+            {[
+              {label:"Questions Answered",value:score.t,color:"#6366f1"},
+              {label:"Correct Answers",value:score.c,color:"#10b981"},
+              {label:"Accuracy",value:score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"},
+              {label:"Exam Level",value:lvl.l,color:GOLD}
+            ].map(function(stat){
+              return (
+                <div key={stat.label} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:"20px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:34,fontWeight:900,color:stat.color,marginBottom:8}}>{stat.value}</div>
+                  <p style={{color:"#64748b",fontSize:13}}>{stat.label}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,textAlign:"center"}}>
+            <p style={{color:"#64748b",fontSize:13}}>Full question history and weakness analysis powered by Supabase — coming soon.</p>
+            <button onClick={function(){window.open(PORTAL_URL,"_blank");}} style={{marginTop:12,background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"8px 20px",borderRadius:8,fontWeight:700,fontSize:13,cursor:"pointer"}}>Manage Subscription</button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ─── MOUNT ────────────────────────────────────────────────────────────────────
+var rootEl = document.getElementById("root");
+var root = ReactDOM.createRoot(rootEl);
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
