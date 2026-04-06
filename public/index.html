@@ -25,6 +25,8 @@ button,select,input{font-family:inherit}
 .quick-card:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px);border-color:#334155}
 .gold-outline-btn{background:transparent;border:1px solid #C9A84C;color:#C9A84C;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:0.2s}
 .gold-outline-btn:hover{background:rgba(201,168,76,0.1)}
+.footer-link{background:transparent;border:none;color:#C9A84C;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;font-family:inherit;}
+.footer-link:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -46,7 +48,6 @@ const PLANS=[
   {key:"institution",name:"Institution",price:2999,period:"year",color:"#10B981",badge:"BEST VALUE", features:["Up to 20 learner seats","Full access all content","ADA, ES, AACE, ACC/AHA, ESC","Personal onboarding","~$250/mo flat"]},
 ];
 
-// Explicitly labeled Board Exams
 const LEVELS = [
   {v:"USMLE Step 1", l:"USMLE Step 1"}, 
   {v:"USMLE Step 2 CK", l:"USMLE Step 2 CK"},
@@ -104,6 +105,106 @@ const GUIDES=[
 ];
 
 function fmtTime(s) { var m = Math.floor(s / 60); var sec = s % 60; return m + ":" + (sec < 10 ? "0" : "") + sec; }
+
+// ─── LEGAL MODAL COMPONENT (NEW) ──────────────────────────────────────────────
+function LegalModal({type, onClose}) {
+  return (
+    <div onClick={(e)=>{if(e.target===e.currentTarget)onClose();}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:20}}>
+      <div className="fade" style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:16,padding:"32px 40px",width:"100%",maxWidth:800,maxHeight:"85vh",overflowY:"auto",boxShadow:"0 24px 48px rgba(0,0,0,0.5)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,borderBottom:"1px solid #1e293b",paddingBottom:16}}>
+          <h2 style={{color:GOLD,fontSize:24,fontWeight:800}}>
+            {type === 'terms' ? "Terms of Service" : type === 'privacy' ? "Privacy Policy" : "Contact Support"}
+          </h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"#94a3b8",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+        
+        <div style={{color:"#cbd5e1",fontSize:14,lineHeight:1.8}}>
+          {type === 'terms' && (
+            <div>
+              <p style={{marginBottom:16}}>Last Updated: April 2026</p>
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>1. Acceptance of Terms</h4>
+              <p style={{marginBottom:16}}>By accessing and using MedBoard Pro, you accept and agree to be bound by the terms and provision of this agreement.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>2. Medical Disclaimer & No Medical Advice</h4>
+              <p style={{marginBottom:16}}>MedBoard Pro is an educational platform designed exclusively to assist medical students, residents, and fellows in preparing for medical board examinations. All content, including but not limited to QBank questions, clinical vignettes, explanations, and medical calculators, is provided for educational and informational purposes only. MedBoard Pro is NOT a substitute for professional medical judgment, diagnosis, or treatment. Users must rely on their own clinical training and consult official, current society guidelines before making any clinical decisions. MedBoard Pro and Dr. Anteneh Zenebe assume no responsibility or liability for any patient care decisions made.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>3. Ownership & Proprietary Rights</h4>
+              <p style={{marginBottom:16}}>All content, features, and functionality of MedBoard Pro—including the underlying software, medical question banks, clinical vignettes, explanations, text, graphics, and user interface—are the exclusive property of MedBoard Pro and are protected by United States and international copyright, trademark, and other intellectual property laws. Accessing the Qbank does not grant you any ownership rights.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>4. Grant of Limited License</h4>
+              <p style={{marginBottom:16}}>Subject to your compliance with these Terms, MedBoard Pro grants you a limited, revocable, non-exclusive, non-transferable license to access and use the Qbank strictly for your personal, non-commercial, educational use.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>5. Prohibited Conduct</h4>
+              <p style={{marginBottom:8}}>You strictly agree not to:</p>
+              <ul style={{marginLeft:20,marginBottom:16}}>
+                <li><strong>Copy or Distribute:</strong> Reproduce, sell, or exploit any portion of the Qbank without express written permission.</li>
+                <li><strong>Account Sharing:</strong> Share or distribute your login credentials to any other individual.</li>
+                <li><strong>Data Scraping:</strong> Use automated scripts or web scrapers to extract data from the platform.</li>
+                <li><strong>Reverse Engineering:</strong> Attempt to derive the source code of the software.</li>
+              </ul>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>6. Limitation of Liability</h4>
+              <p style={{marginBottom:16}}>In no event shall MedBoard Pro or its founder be liable for any indirect, punitive, incidental, or consequential damages. This explicitly includes: (a) failure to pass medical board examinations; (b) clinical or prescribing errors made by the user in clinical practice; and (c) damages for loss of profits or data.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>7. Feedback & Submissions</h4>
+              <p style={{marginBottom:16}}>Any feedback, ideas, or suggestions submitted by users automatically become the property of MedBoard Pro without any obligation of compensation.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>8. User-Generated Content</h4>
+              <p style={{marginBottom:16}}>Users retain ownership of their personal study notes, but grant MedBoard Pro a license to host and store that content to operate the service.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>9. DMCA & Copyright Infringement</h4>
+              <p style={{marginBottom:16}}>If you believe your copyrighted work has been improperly uploaded to our platform, please contact our support email with a formal DMCA takedown notice.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>10. Subscription and Billing</h4>
+              <p style={{marginBottom:16}}>Subscriptions are billed recursively based on the chosen plan. The 14-day free trial requires a valid credit card, and users will be automatically billed on the 15th day unless canceled prior.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>11. Account Security</h4>
+              <p style={{marginBottom:16}}>You are responsible for maintaining the confidentiality of your account credentials. MedBoard Pro monitors for concurrent logins and suspicious activity.</p>
+
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>12. Indemnification</h4>
+              <p style={{marginBottom:16}}>You agree to indemnify and hold harmless MedBoard Pro and its affiliates from any claims, damages, or expenses arising from your use of the platform or violation of these terms.</p>
+
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>13. Governing Law</h4>
+              <p style={{marginBottom:16}}>These Terms shall be governed and construed in accordance with the laws of the State of Maryland, United States, without regard to its conflict of law provisions.</p>
+            </div>
+          )}
+
+          {type === 'privacy' && (
+            <div>
+              <p style={{marginBottom:16}}>Last Updated: April 2026</p>
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>1. Information We Collect</h4>
+              <p style={{marginBottom:16}}>We collect information you provide directly to us when you register for an account, including your name, email address, and professional training level. We also collect automated performance data regarding your QBank usage (e.g., questions answered, scores).</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>2. How We Use Information</h4>
+              <p style={{marginBottom:16}}>Your data is used to provide, maintain, and improve the MedBoard Pro platform. Your performance data is used to generate personalized analytics and study recommendations.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>3. Data Security</h4>
+              <p style={{marginBottom:16}}>We implement robust security measures to protect your personal information. Your account data is securely stored using Supabase, which utilizes industry-standard encryption protocols.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>4. Third-Party Sharing</h4>
+              <p style={{marginBottom:16}}>We do not sell your personal data to third parties. We only share information with trusted service providers (like Stripe for payment processing) strictly necessary to operate our service.</p>
+
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>5. Data Retention & User Rights</h4>
+              <p style={{marginBottom:16}}>We retain your data for as long as your account is active. You have the right to request access to, correction of, or deletion of your personal data by contacting our support team.</p>
+            </div>
+          )}
+
+          {type === 'contact' && (
+            <div style={{textAlign:"center", padding:"40px 0"}}>
+              <div style={{fontSize:48, marginBottom:20}}>📬</div>
+              <h3 style={{color:"#f1f5f9", fontSize:20, marginBottom:16}}>We are here to help.</h3>
+              <p style={{marginBottom:32}}>For technical support, billing inquiries, or clinical content feedback, please email the Academic Director directly.</p>
+              <div style={{background:"rgba(201,168,76,0.1)", border:"1px solid "+GOLD, borderRadius:12, padding:"20px", display:"inline-block"}}>
+                <p style={{color:GOLD, fontSize:18, fontWeight:800, margin:0}}>antenehzenebe@gmail.com</p>
+              </div>
+              <p style={{marginTop:32, fontSize:13, color:"#64748b"}}>Average response time: 24-48 hours.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── LAB PANEL COMPONENT ───────────────────────────────────────
 function LabPanel(){
@@ -239,7 +340,7 @@ async function saveResponse(question, choice, isCorrect) {
 
 // ─── LANDING PAGE ─────────────────────────────────────────────────────────────
 function LandingPage(props) {
-  var {showAuth, setShowAuth, authMode, setAuthMode, email, setEmail, pw, setPw, nm, setNm, authErr, authMsg, handleAuth, googleLogin} = props;
+  var {showAuth, setShowAuth, authMode, setAuthMode, email, setEmail, pw, setPw, nm, setNm, authErr, handleAuth, googleLogin, setLegalModal} = props;
 
   return (
     <div style={{minHeight:"100vh",background:BG, display:"flex", flexDirection:"column"}}>
@@ -352,13 +453,14 @@ function LandingPage(props) {
         </section>
       </div>
 
+      {/* NEW INTEGRATED LEGAL FOOTER */}
       <footer style={{padding:"40px 5%", background:"#050508", borderTop:"1px solid "+BDR, color:"#64748b", fontSize:13, lineHeight:1.6, textAlign:"center", marginTop:"auto"}}>
         <div style={{maxWidth:1000, margin:"0 auto"}}>
           <p style={{marginBottom:20}}><strong>Medical Disclaimer:</strong> MedBoard Pro is an educational platform designed exclusively to assist medical professionals in preparing for board examinations. All content is provided for educational and informational purposes only. MedBoard Pro is <strong>NOT</strong> a substitute for professional medical judgment, diagnosis, or treatment. Users must rely on their own clinical training and consult official, current society guidelines. MedBoard Pro, Dr. Anteneh Zenebe, and affiliated authors assume no responsibility or liability for patient care decisions or clinical errors.</p>
           <div style={{display:"flex", justifyContent:"center", gap:24, marginBottom:16, flexWrap:"wrap"}}>
-            <a href="#" style={{color:GOLD, textDecoration:"none", fontWeight:600}}>Terms of Service</a>
-            <a href="#" style={{color:GOLD, textDecoration:"none", fontWeight:600}}>Privacy Policy</a>
-            <a href="mailto:antenehzenebe@gmail.com" style={{color:GOLD, textDecoration:"none", fontWeight:600}}>Contact Support</a>
+            <button onClick={()=>setLegalModal('terms')} className="footer-link">Terms of Service</button>
+            <button onClick={()=>setLegalModal('privacy')} className="footer-link">Privacy Policy</button>
+            <button onClick={()=>setLegalModal('contact')} className="footer-link">Contact Support</button>
           </div>
           <p>© {new Date().getFullYear()} MedBoard Pro by Dr. Anteneh Zenebe. All rights reserved.</p>
         </div>
@@ -404,6 +506,7 @@ function App() {
   const [history, setHistory] = React.useState({t:0, c:0});
   const [score, setScore] = React.useState({t:0, c:0});
   const [showAuth, setShowAuth] = React.useState(false);
+  const [legalModal, setLegalModal] = React.useState(null); // NEW: Controls the legal popups
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [examMode, setExamMode] = React.useState(false);
   const [examSel, setExamSel] = React.useState("");
@@ -578,7 +681,8 @@ function App() {
 
   if (!user) return (
     <>
-      <LandingPage setShowAuth={setShowAuth} />
+      <LandingPage setShowAuth={setShowAuth} setLegalModal={setLegalModal} />
+      {legalModal && <LegalModal type={legalModal} onClose={()=>setLegalModal(null)} />}
       {showAuth && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}} onClick={(e)=>e.target===e.currentTarget && setShowAuth(false)}>
            <div style={{background:"#0f172a", padding:40, borderRadius:20, border:"1px solid "+BDR, width:"100%", maxWidth:400}}>
@@ -605,7 +709,7 @@ function App() {
   );
 
   return (
-    <div style={{minHeight:"100vh",background:BG}}>
+    <div style={{minHeight:"100vh",background:BG, display:"flex", flexDirection:"column"}}>
       <nav style={{padding:"0 5%",height:80,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setTab("home")}>
           <div style={{width:34,height:34,borderRadius:8,background:NAVY,border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD}}>M</div>
@@ -636,7 +740,7 @@ function App() {
         </div>
       </nav>
 
-      <div style={{padding:"40px 5%",maxWidth:1000,margin:"0 auto"}}>
+      <div style={{flex: 1, padding:"40px 5%",maxWidth:1000,margin:"0 auto", width:"100%"}}>
         {tab==="home" && (
           <div className="fade">
             <h2 style={{fontSize:28,fontWeight:800,marginBottom:8}}>Welcome back, {user.user_metadata?.full_name?.split(" ")[0] || "Doctor"}! 👋</h2>
@@ -764,6 +868,7 @@ function App() {
           </div>
         )}
 
+        {/* CALCS TAB Dedicated Page */}
         {tab==="calcs" && (
           <div className="fade" style={{paddingTop:20}}>
             <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Medical Calculators & Reference</h2>
@@ -772,6 +877,7 @@ function App() {
           </div>
         )}
 
+        {/* GUIDES TAB */}
         {tab==="guides" && (
           <div className="fade" style={{paddingTop:20}}>
             <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Clinical Guidelines</h2>
@@ -782,6 +888,7 @@ function App() {
           </div>
         )}
 
+        {/* PROGRESS TAB */}
         {tab==="progress" && (
           <div className="fade" style={{paddingTop:20}}>
             <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Performance Analytics</h2>
@@ -794,6 +901,20 @@ function App() {
           </div>
         )}
       </div>
+
+      {legalModal && <LegalModal type={legalModal} onClose={()=>setLegalModal(null)} />}
+
+      <footer style={{padding:"40px 5%", background:"#050508", borderTop:"1px solid "+BDR, color:"#64748b", fontSize:13, lineHeight:1.6, textAlign:"center", marginTop:"auto"}}>
+        <div style={{maxWidth:1000, margin:"0 auto"}}>
+          <p style={{marginBottom:20}}><strong>Medical Disclaimer:</strong> MedBoard Pro is an educational platform designed exclusively to assist medical professionals in preparing for board examinations. All content is provided for educational and informational purposes only. MedBoard Pro is <strong>NOT</strong> a substitute for professional medical judgment, diagnosis, or treatment. Users must rely on their own clinical training and consult official, current society guidelines. MedBoard Pro, Dr. Anteneh Zenebe, and affiliated authors assume no responsibility or liability for patient care decisions or clinical errors.</p>
+          <div style={{display:"flex", justifyContent:"center", gap:24, marginBottom:16, flexWrap:"wrap"}}>
+            <button onClick={()=>setLegalModal('terms')} className="footer-link">Terms of Service</button>
+            <button onClick={()=>setLegalModal('privacy')} className="footer-link">Privacy Policy</button>
+            <button onClick={()=>setLegalModal('contact')} className="footer-link">Contact Support</button>
+          </div>
+          <p>© {new Date().getFullYear()} MedBoard Pro by Dr. Anteneh Zenebe. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
