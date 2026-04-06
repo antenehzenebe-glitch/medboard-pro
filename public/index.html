@@ -24,6 +24,7 @@ button,select,input{font-family:inherit}
 .quick-card{background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:12px;padding:20px;cursor:pointer;transition:0.2s}
 .quick-card:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px);border-color:#334155}
 .gold-outline-btn{background:transparent;border:1px solid #C9A84C;color:#C9A84C;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:0.2s}
+.gold-outline-btn:hover{background:rgba(201,168,76,0.1)}
 </style>
 </head>
 <body>
@@ -36,88 +37,273 @@ const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const sb = createClient(SB_URL, SB_KEY);
 const NAVY="#002868", GOLD="#C9A84C", BG="#0a0a0f", CARD="rgba(255,255,255,0.04)", BDR="#1e293b";
 const PORTAL_URL = "https://billing.stripe.com/p/login/fZufZ9fDJ4NVbNM5iS2sM00";
+const PAYMENT_LINKS = {
+  student: "https://buy.stripe.com/8x24gr9flcgn9FE4eO2sM03",
+  resident: "https://buy.stripe.com/8x228j0IPfszcRQ8v42sM04",
+  institution: "https://buy.stripe.com/cNidR19flbcjbNM5iS2sM05"
+};
+const SECS = 90;
 
-const LEVELS = [
-  {v:"USMLE Step 1", l:"Step 1"}, {v:"USMLE Step 2 CK", l:"Step 2"},
-  {v:"USMLE Step 3", l:"Step 3"}, {v:"ABIM Internal Medicine", l:"ABIM IM"},
-  {v:"ABIM Endocrinology", l:"ABIM Endo"}
-];
-
-const GUIDES=[
-  {id:1,t:"ADA Standards of Care",s:"Endocrinology",i:"D",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
-  {id:2,t:"Endocrine Society Guidelines",s:"Endocrinology",i:"E",u:"https://www.endocrine.org/clinical-practice-guidelines"},
-  {id:3,t:"AACE Clinical Guidance",s:"Endocrinology",i:"A",u:"https://pro.aace.com/clinical-guidance"},
-  {id:4,t:"ACC/AHA Cardiovascular",s:"Cardiology",i:"C",u:"https://www.acc.org/guidelines"},
-  {id:5,t:"KDIGO Kidney Disease",s:"Nephrology",i:"K",u:"https://kdigo.org/guidelines"},
-  {id:6,t:"USPSTF Recommendations",s:"Preventive",i:"U",u:"https://www.uspreventiveservicestaskforce.org/uspstf/"},
-  {id:13,t:"ATA Thyroid Guidelines",s:"Endocrinology",i:"T",u:"https://www.thyroid.org/professionals/ata-professional-guidelines"},
-  {id:15,t:"NEJM Image Challenge",s:"Visual Dx",i:"N",u:"https://www.nejm.org/image-challenge"},
-  {id:16,t:"ECG Wave-Maven",s:"Cardiology",i:"E",u:"http://ecg.bidmc.harvard.edu"},
-  {id:20,t:"GOLD COPD Guidelines",s:"Pulmonology",i:"O",u:"https://goldcopd.org/"},
-  {id:21,t:"GINA Asthma Guidelines",s:"Pulmonology",i:"G",u:"https://ginasthma.org/"},
-  {id:22,t:"Surviving Sepsis",s:"Critical Care",i:"S",u:"https://www.sccm.org/SurvivingSepsisCampaign/Guidelines"}
+const PLANS=[
+  {key:"student",name:"Medical Student",price:29,period:"month",color:"#3B82F6",badge:null,
+    features:["USMLE Step 1, 2 & 3","Premium QBank Access","Official society guidelines","Study & exam modes","Integrated Lab & Calcs"]},
+  {key:"resident",name:"Resident / Fellow",price:59,period:"month",color:"#8B5CF6",badge:"MOST POPULAR",
+    features:["Everything in Student","ABIM Internal Medicine","ABIM Endocrinology subspecialty","Timed exam mode","Progress tracking"]},
+  {key:"institution",name:"Institution",price:2999,period:"year",color:"#10B981",badge:"BEST VALUE",
+    features:["Up to 20 learner seats","Full access all content","ADA, ES, AACE, ACC/AHA, ESC","Personal onboarding","~$250/mo flat"]},
 ];
 
 const GROUPS={
-  "Diabetes":["Type 2 Management","Type 1 Insulin","DKA and HHS","CGM and AID Systems"],
-  "Thyroid":["Hypothyroidism","Hyperthyroidism","Thyroid Nodule","Thyroid Cancer"],
-  "Adrenal":["Adrenal Insufficiency","Cushings Syndrome","Primary Aldosteronism"],
-  "Bone & Calcium":["Hypercalcemia","Osteoporosis","Vitamin D Deficiency"]
+  "Random":["Random -- All Specialties","Random -- Endocrinology Only","Random -- ABIM IM Blueprint","Random -- USMLE High-Yield"],
+  "Diabetes":["Type 2 Diagnosis and Management","Type 1 Insulin Therapy","DKA and HHS","Hypoglycemia","Microvascular Complications","Macrovascular Complications","Gestational Diabetes","LADA and MODY","CGM and AID Systems","GLP-1 Receptor Agonists","SGLT2 Inhibitors","Inpatient Glycemic Management"],
+  "Thyroid":["Hypothyroidism and Hashimotos","Hyperthyroidism and Graves","Thyroid Storm","Thyroid Nodule Evaluation","Thyroid Cancer","Thyroid in Pregnancy","Subacute Thyroiditis"],
+  "Adrenal":["Adrenal Insufficiency","Cushings Syndrome","Primary Aldosteronism","Pheochromocytoma","Adrenal Crisis","Congenital Adrenal Hyperplasia"],
+  "Pituitary":["Hypopituitarism","Prolactinoma","Acromegaly","Diabetes Insipidus","Pituitary Apoplexy","Cushings Disease"],
+  "Bone and Calcium":["Hypercalcemia","Hyperparathyroidism","Osteoporosis","Vitamin D Deficiency","Pagets Disease","Hypoparathyroidism"],
+  "Reproductive Endo":["PCOS","Male Hypogonadism","Menopause and HRT","Precocious Puberty","Turner and Klinefelter"],
+  "NETs and MEN":["Carcinoid Tumors","Insulinoma","Gastrinoma","MEN1","MEN2A and MEN2B"],
+  "Cardiology":["ACS STEMI NSTEMI","Heart Failure","Atrial Fibrillation","Hypertension","Valvular Disease","Lipid Disorders","Pulmonary Embolism"],
+  "Pulmonology":["Asthma and COPD","Pneumonia","Interstitial Lung Disease","ARDS","Sleep Apnea","Pulmonary Function Tests"],
+  "Nephrology":["Acute Kidney Injury","CKD","Glomerulonephritis","Electrolyte Disorders","Acid-Base Disorders","Nephrotic Syndrome"],
+  "GI and Hepatology":["IBD Crohns and UC","Cirrhosis","Hepatitis B and C","GI Bleeding","Acute Pancreatitis","NAFLD NASH"],
+  "Neurology":["Ischemic Stroke","Seizures and Epilepsy","Multiple Sclerosis","Meningitis","Parkinsons Disease","Headache"],
+  "Infectious Disease":["Sepsis and Septic Shock","HIV","Tuberculosis","Infective Endocarditis","Antibiotic Stewardship","COVID-19"],
+  "Hematology":["Anemia","Sickle Cell Disease","Thrombocytopenia","DVT and Anticoagulation","Leukemia and Lymphoma","Multiple Myeloma"],
+  "Rheumatology":["Rheumatoid Arthritis","SLE","Gout and Pseudogout","Giant Cell Arteritis","Vasculitis","Ankylosing Spondylitis"],
+  "Pharmacology":["Antibiotic Classes","Cardiovascular Drugs","Diabetes Medications","Anticoagulants","Immunosuppressants","Drug Interactions"],
+  "Ethics":["Informed Consent","Advance Directives","End-of-Life Care","Medical Errors","Health Disparities","High-Value Care"],
 };
 
-// ─── LAB PANEL COMPONENT ──────────────────────────────────────────────────────
+const GUIDES=[
+  {id:1,t:"ADA Standards of Medical Care in Diabetes",s:"Endocrinology",i:"D",u:"https://diabetesjournals.org/care/issue/48/Supplement_1"},
+  {id:2,t:"Endocrine Society Clinical Practice Guidelines",s:"Endocrinology",i:"E",u:"https://www.endocrine.org/clinical-practice-guidelines"},
+  {id:3,t:"AACE Clinical Guidance",s:"Endocrinology",i:"A",u:"https://pro.aace.com/clinical-guidance"},
+  {id:4,t:"ACC/AHA Cardiovascular Guidelines",s:"Cardiology",i:"C",u:"https://www.acc.org/guidelines"},
+  {id:5,t:"KDIGO Kidney Disease Guidelines",s:"Nephrology",i:"K",u:"https://kdigo.org/guidelines"},
+  {id:6,t:"USPSTF Preventive Recommendations",s:"Preventive",i:"U",u:"https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics"},
+  {id:7,t:"ESC Cardiovascular Guidelines",s:"Cardiology",i:"S",u:"https://www.escardio.org/Guidelines"},
+  {id:8,t:"EASD Diabetes Guidelines",s:"Endocrinology",i:"X",u:"https://www.easd.org/guidelines/statements-and-guidelines.html"},
+  {id:9,t:"IDSA Infectious Disease Guidelines",s:"ID",i:"I",u:"https://www.idsociety.org/practice-guideline/alphabetical-guidelines"},
+  {id:10,t:"NCCN Oncology Guidelines",s:"Oncology",i:"N",u:"https://www.nccn.org/guidelines/guidelines-detail"},
+  {id:11,t:"ACR Rheumatology Guidelines",s:"Rheumatology",i:"R",u:"https://www.rheumatology.org/Practice-Quality/Clinical-Support/Clinical-Practice-Guidelines"},
+  {id:12,t:"ATS/ERS Respiratory Guidelines",s:"Pulmonology",i:"P",u:"https://www.thoracic.org/statements"},
+  {id:13,t:"American Thyroid Association Guidelines",s:"Endocrinology",i:"T",u:"https://www.thyroid.org/professionals/ata-professional-guidelines"},
+  {id:14,t:"National Osteoporosis Foundation Guidelines",s:"Bone",i:"B",u:"https://www.bonehealthandosteoporosis.org/clinicians/guidelines"},
+  {id:15,t:"NEJM Image Challenge",s:"Visual Dx",i:"N",u:"https://www.nejm.org/image-challenge"},
+  {id:16,t:"ECG Wave-Maven — Harvard/BIDMC",s:"Cardiology",i:"E",u:"http://ecg.bidmc.harvard.edu"},
+  {id:17,t:"ACG Clinical Guidelines — Gastroenterology",s:"GI",i:"G",u:"https://gi.org/guidelines"},
+  {id:18,t:"AASLD Liver Disease Practice Guidelines",s:"Hepatology",i:"L",u:"https://www.aasld.org/publications/practice-guidelines"},
+  {id:19,t:"AGA Clinical Practice Guidelines",s:"GI",i:"A",u:"https://www.gastro.org/guidelines"},
+  {id:20,t:"GOLD COPD Guidelines",s:"Pulmonology",i:"O",u:"https://goldcopd.org/2024-gold-report"},
+  {id:21,t:"GINA Asthma Guidelines",s:"Pulmonology",i:"G",u:"https://ginasthma.org/reports"},
+  {id:22,t:"Surviving Sepsis Campaign Guidelines",s:"Critical Care",i:"S",u:"https://www.sccm.org/SurvivingSpecialsSepsis/Guidelines"},
+  {id:23,t:"Society of Hospital Medicine — Clinical Guidelines",s:"Hospital Medicine",i:"H",u:"https://www.hospitalmedicine.org/clinical-topics/all-clinical-resources"},
+  {id:24,t:"AASM Sleep Medicine Guidelines",s:"Sleep",i:"Z",u:"https://aasm.org/clinical-resources/practice-standards/practice-guidelines"},
+];
+
+const LEVELS = [
+  {v:"USMLE Step 1", l:"Step 1"},
+  {v:"USMLE Step 2 CK", l:"Step 2"},
+  {v:"USMLE Step 3", l:"Step 3"},
+  {v:"ABIM Internal Medicine", l:"ABIM IM"},
+  {v:"ABIM Endocrinology", l:"ABIM Endo"}
+];
+
+function fmtTime(s) {
+  var m = Math.floor(s / 60);
+  var sec = s % 60;
+  return m + ":" + (sec < 10 ? "0" : "") + sec;
+}
+
+// ─── LAB PANEL ────────────────────────────────────────────────────────────────
 function LabPanel(){
   const [labTab,setLabTab]=React.useState("labs");
+  const [openCat,setOpenCat]=React.useState(null);
   const LAB_DATA=[
-    {cat:"Chemistry", labs:[{n:"Sodium",v:"136-145"},{n:"Potassium",v:"3.5-5.0"},{n:"Creatinine",v:"0.6-1.2"}]},
-    {cat:"Endocrine", labs:[{n:"TSH",v:"0.4-4.0"},{n:"Free T4",v:"0.8-1.8"},{n:"HbA1c",v:"<5.7%"}]}
+    {cat:"Chemistry",color:"#3B82F6",labs:[
+      {n:"Sodium",v:"136-145 mEq/L"},{n:"Potassium",v:"3.5-5.0 mEq/L"},{n:"Chloride",v:"98-106 mEq/L"},
+      {n:"Bicarbonate",v:"22-29 mEq/L"},{n:"BUN",v:"7-20 mg/dL"},{n:"Creatinine",v:"0.6-1.2 mg/dL"},
+      {n:"eGFR",v:">60 mL/min/1.73m2"},{n:"Glucose fasting",v:"70-99 mg/dL"},{n:"Calcium total",v:"8.5-10.5 mg/dL"},
+      {n:"Phosphorus",v:"2.5-4.5 mg/dL"},{n:"Magnesium",v:"1.7-2.2 mg/dL"},{n:"Albumin",v:"3.5-5.0 g/dL"},
+      {n:"ALT",v:"7-56 U/L"},{n:"AST",v:"10-40 U/L"},{n:"Alk Phos",v:"44-147 U/L"},
+      {n:"Total Bilirubin",v:"0.1-1.2 mg/dL"},{n:"Troponin I",v:"<0.04 ng/mL"},{n:"BNP",v:"<100 pg/mL"},
+      {n:"CRP",v:"<1.0 mg/L"},{n:"Lactate",v:"0.5-2.2 mmol/L"},{n:"Serum Osmolality",v:"275-295 mOsm/kg"},
+      {n:"Anion Gap",v:"8-12 mEq/L"},{n:"Ferritin male",v:"24-336 ng/mL"},{n:"B12",v:"200-900 pg/mL"},
+    ]},
+    {cat:"Hematology",color:"#EF4444",labs:[
+      {n:"WBC",v:"4500-11000/uL"},{n:"Hgb male",v:"13.5-17.5 g/dL"},{n:"Hgb female",v:"12.0-15.5 g/dL"},
+      {n:"Hct male",v:"41-53%"},{n:"MCV",v:"80-100 fL"},{n:"Platelets",v:"150-400k/uL"},
+      {n:"Neutrophils",v:"50-70%"},{n:"Lymphocytes",v:"20-40%"},{n:"PT",v:"11-13.5 sec"},
+      {n:"INR",v:"0.8-1.2"},{n:"aPTT",v:"25-35 sec"},{n:"D-dimer",v:"<0.5 ug/mL"},
+      {n:"Fibrinogen",v:"200-400 mg/dL"},{n:"Haptoglobin",v:"30-200 mg/dL"},
+    ]},
+    {cat:"Endocrinology",color:"#C9A84C",labs:[
+      {n:"TSH",v:"0.4-4.0 mIU/L"},{n:"Free T4",v:"0.8-1.8 ng/dL"},{n:"Free T3",v:"2.3-4.2 pg/mL"},
+      {n:"HbA1c normal",v:"<5.7%"},{n:"HbA1c prediabetes",v:"5.7-6.4%"},{n:"HbA1c DM target",v:"<7.0%"},
+      {n:"Fasting insulin",v:"2-25 uIU/mL"},{n:"C-peptide",v:"0.5-2.0 ng/mL"},
+      {n:"Cortisol AM",v:"6-23 ug/dL"},{n:"ACTH",v:"10-60 pg/mL"},{n:"UFC 24hr",v:"<50 ug/24hr"},
+      {n:"LDDST post dex",v:"<1.8 ug/dL"},{n:"Aldosterone upright",v:"4-31 ng/dL"},
+      {n:"Plasma metanephrines",v:"<0.5 nmol/L"},{n:"PTH intact",v:"10-65 pg/mL"},
+      {n:"25-OH Vit D",v:"30-100 ng/mL"},{n:"Prolactin male",v:"2-18 ng/mL"},
+      {n:"IGF-1 adult 20-40yr",v:"115-355 ng/mL"},{n:"Testosterone male",v:"300-1000 ng/dL"},
+      {n:"LH male",v:"1.7-8.6 IU/L"},{n:"FSH male",v:"1.5-12.4 IU/L"},
+    ]},
+    {cat:"Lipidology",color:"#10B981",labs:[
+      {n:"Total cholesterol",v:"<200 mg/dL"},{n:"LDL optimal",v:"<100 mg/dL"},
+      {n:"LDL high risk",v:"<70 mg/dL"},{n:"HDL male",v:">40 mg/dL"},{n:"HDL female",v:">50 mg/dL"},
+      {n:"TG normal",v:"<150 mg/dL"},{n:"TG high",v:"200-499 mg/dL"},{n:"Non-HDL target",v:"<130 mg/dL"},
+      {n:"Apo B",v:"<90 mg/dL"},{n:"Lp(a)",v:"<30 mg/dL"},
+    ]},
+    {cat:"ABG / Acid-Base",color:"#EC4899",labs:[
+      {n:"pH",v:"7.35-7.45"},{n:"PaCO2",v:"35-45 mmHg"},{n:"PaO2",v:"75-100 mmHg"},
+      {n:"HCO3",v:"22-26 mEq/L"},{n:"O2 sat",v:"95-100%"},{n:"Base excess",v:"-2 to +2"},
+      {n:"Anion gap",v:"8-12 mEq/L"},{n:"P/F normal",v:">400"},{n:"P/F mild ARDS",v:"200-300"},
+    ]},
+    {cat:"Rheumatology",color:"#F59E0B",labs:[
+      {n:"ANA screening",v:"<1:40 negative"},{n:"Anti-dsDNA",v:"<30 IU/mL"},
+      {n:"RF IgM",v:"<14 IU/mL"},{n:"Anti-CCP",v:"<20 U/mL"},
+      {n:"C3 complement",v:"90-180 mg/dL"},{n:"C4 complement",v:"16-47 mg/dL"},
+      {n:"Uric acid gout target",v:"<6.0 mg/dL"},
+    ]},
+    {cat:"CSF",color:"#14B8A6",labs:[
+      {n:"Opening pressure",v:"70-180 mmH2O"},{n:"WBC",v:"0-5 cells/uL"},
+      {n:"Protein",v:"15-45 mg/dL"},{n:"Glucose",v:"45-80 mg/dL"},
+      {n:"CSF:serum glucose",v:">0.6"},
+    ]},
+  ];
+  const CALCS=[
+    {n:"Anion Gap",f:"Na - (Cl + HCO3)",v:"Normal 8-12 mEq/L",note:"Corrected AG = AG + 2.5 x (4 - albumin)"},
+    {n:"Corrected Calcium",f:"Ca + 0.8 x (4 - albumin)",v:"Normal 8.5-10.5 mg/dL",note:"Add 0.8 per 1 g/dL drop in albumin below 4"},
+    {n:"Corrected Sodium",f:"Na + 2.4 x [(glucose-100)/100]",v:"Normal 136-145 mEq/L",note:"For hyperglycemia correction"},
+    {n:"CrCl Cockcroft-Gault",f:"[(140-age) x wt] / [72 x SCr] x 0.85 female",v:">60 mL/min normal",note:"Use ideal body weight in obese"},
+    {n:"FENa",f:"(uNa x pCr) / (pNa x uCr) x 100",v:"<1% prerenal / >2% intrinsic",note:"Unreliable with diuretics"},
+    {n:"Osmolal Gap",f:"Measured Osm - [2xNa + glucose/18 + BUN/2.8]",v:"Normal <10 mOsm/kg",note:">10 = toxic alcohols"},
+    {n:"Winters Formula",f:"Expected PaCO2 = 1.5 x HCO3 + 8 +/- 2",v:"Validates resp compensation"},
+    {n:"A-a Gradient",f:"(FiO2 x 713 - PaCO2/0.8) - PaO2",v:"Normal < Age/4 + 4 mmHg"},
+    {n:"Delta-Delta Ratio",f:"(AG - 12) / (24 - HCO3)",v:"1-2 = pure AGMA",note:"<1 = non-AG acidosis; >2 = met alkalosis"},
+    {n:"MELD Score",f:"3.78xln(bili) + 11.2xln(INR) + 9.57xln(Cr) + 6.43",v:">=15 consider transplant"},
+    {n:"CHA2DS2-VASc",f:"CHF+HTN+Age>=75(x2)+DM+Stroke(x2)+Vasc+Age65-74+Female",v:">=2 anticoagulate"},
+    {n:"HAS-BLED",f:"HTN+Renal/liver+Stroke+Bleed+INR+Elderly+Drugs",v:">=3 high bleeding risk"},
+    {n:"Wells Score PE",f:"DVT signs(3)+Alt dx(3)+HR>100(1.5)+Immob(1.5)+Prior PE(1.5)+Hemoptysis(1)+Cancer(1)",v:"<2 low / 2-6 mod / >6 high"},
+    {n:"CURB-65",f:"Confusion+BUN>19+RR>=30+BP<90/60+Age>=65",v:"0-1 outpt / 2 admit / >=3 ICU"},
+    {n:"SOFA Score",f:"Resp+Coag+Liver+Cardiovascular+CNS+Renal",v:">=2 increase = organ dysfunction"},
+    {n:"FRAX Score",f:"Age+Sex+BMI+Prior Fx+Parent hip Fx+Smoking+Steroids+RA+Alcohol+BMD",v:"10-yr fracture risk"},
+    {n:"Corrected QTc",f:"QT / sqrt(RR in seconds)",v:"<440ms male / <460ms female",note:">500ms = high risk Torsades"},
+    {n:"BMI",f:"Weight(kg) / Height(m)2",v:"Normal 18.5-24.9"},
+    {n:"Ideal Body Weight M",f:"50 kg + 2.3 kg per inch over 5 feet",v:"Drug dosing reference"},
+    {n:"P/F Ratio",f:"PaO2 / FiO2",v:">400 normal",note:"ARDS: mild 200-300 / mod 100-200 / severe <100"},
   ];
   return(
-    <div style={{marginTop:12, background:"rgba(0,0,0,0.2)", padding:12, borderRadius:8, border:"1px solid "+BDR}}>
+    <div style={{marginTop:12}}>
+      <div style={{height:1,background:BDR,marginBottom:12}}></div>
       <div style={{display:"flex",gap:4,marginBottom:10}}>
-        <button onClick={()=>setLabTab("labs")} style={{flex:1,padding:6,fontSize:11,background:labTab==="labs"?GOLD:"transparent",color:labTab==="labs"?"#000":"#fff",border:"1px solid "+GOLD,borderRadius:4,cursor:"pointer"}}>Labs</button>
-        <button onClick={()=>setLabTab("calcs")} style={{flex:1,padding:6,fontSize:11,background:labTab==="calcs"?GOLD:"transparent",color:labTab==="calcs"?"#000":"#fff",border:"1px solid "+GOLD,borderRadius:4,cursor:"pointer"}}>Calcs</button>
+        <button onClick={function(){setLabTab("labs");}} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="labs"?GOLD:BDR),background:labTab==="labs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="labs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Labs</button>
+        <button onClick={function(){setLabTab("calcs");}} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid "+(labTab==="calcs"?GOLD:BDR),background:labTab==="calcs"?"rgba(201,168,76,0.1)":"transparent",color:labTab==="calcs"?GOLD:"#e2e8f0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Calcs</button>
       </div>
-      {labTab==="labs" ? (
-        <div>{LAB_DATA.map(s=><div key={s.cat} style={{marginBottom:8}}><p style={{fontSize:10,fontWeight:800,color:GOLD}}>{s.cat}</p>{s.labs.map(l=><div key={l.n} style={{display:"flex",justifyContent:"space-between",fontSize:10,borderBottom:"1px solid rgba(255,255,255,0.05)"}}><span>{l.n}</span><span>{l.v}</span></div>)}</div>)}</div>
-      ) : <div style={{fontSize:10, color:"#94a3b8"}}>Anion Gap, Corrected Ca, CrCl...</div>}
+      {labTab==="labs" && (
+        <div>
+          {LAB_DATA.map(function(section){
+            return (
+              <div key={section.cat} style={{marginBottom:4}}>
+                <button onClick={function(){setOpenCat(openCat===section.cat?null:section.cat);}} style={{width:"100%",textAlign:"left",padding:"7px 10px",borderRadius:6,border:"1px solid "+(openCat===section.cat?section.color:BDR),background:openCat===section.cat?section.color+"18":"transparent",color:openCat===section.cat?section.color:"#f1f5f9",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",justifyContent:"space-between"}}>
+                  <span>{section.cat}</span><span style={{fontSize:9}}>{openCat===section.cat?"hide":"show"}</span>
+                </button>
+                {openCat===section.cat && (
+                  <div style={{padding:"4px 0",maxHeight:240,overflowY:"auto"}}>
+                    {section.labs.map(function(lab){
+                      return (
+                        <div key={lab.n} style={{display:"flex",justifyContent:"space-between",padding:"2px 4px",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                          <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>{lab.n}</span>
+                          <span style={{fontSize:11,color:"#f1f5f9",fontWeight:600,textAlign:"right",marginLeft:4}}>{lab.v}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {labTab==="calcs" && (
+        <div style={{maxHeight:440,overflowY:"auto"}}>
+          {CALCS.map(function(c){
+            return (
+              <div key={c.n} style={{marginBottom:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+BDR,borderRadius:6,padding:"6px 8px"}}>
+                <p style={{fontSize:12,fontWeight:800,color:GOLD,marginBottom:2}}>{c.n}</p>
+                <p style={{fontSize:11,color:"#e2e8f0",marginBottom:2,lineHeight:1.4}}>{c.f}</p>
+                <p style={{fontSize:11,color:"#10b981",marginBottom:c.note?2:0}}>{c.v}</p>
+                {c.note && <p style={{fontSize:10,color:"#cbd5e1",lineHeight:1.3}}>{c.note}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// ─── SUPABASE HELPERS ─────────────────────────────────────────────────────────
+async function saveMcq(question, level) {
+  try {
+    await sb.from("mcqs").insert({
+      exam_level: level || "", topic: question.topic || "", stem: question.stem || "",
+      choices: question.choices || {}, correct_answer: question.correct || "", explanation: question.explanation || ""
+    });
+  } catch(e) {}
+}
+
 async function saveResponse(question, choice, isCorrect) {
-  const {data:{session}} = await sb.auth.getSession();
-  if (!session) return;
-  const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
-  const mcqId = mcqRes.data?.[0]?.id;
-  if (!mcqId) return;
-  await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
+  try {
+    var res = await sb.auth.getSession();
+    var session = res.data?.session;
+    if (!session?.user) return;
+    var mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
+    var mcqId = mcqRes.data?.[0]?.id;
+    if (!mcqId) return;
+    await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
+  } catch(e) {}
 }
 
 // ─── LANDING PAGE ─────────────────────────────────────────────────────────────
-function LandingPage({setShowAuth}) {
+function LandingPage(props) {
+  var {showAuth, setShowAuth, authMode, setAuthMode, email, setEmail, pw, setPw, nm, setNm, authErr, authMsg, handleAuth, googleLogin} = props;
+
   return (
     <div style={{minHeight:"100vh",background:BG}}>
+      {/* Nav */}
       <nav style={{padding:"0 5%",height:72,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.97)",backdropFilter:"blur(12px)",zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD}}>M</div>
-          <span style={{fontWeight:800,fontSize:20,color:"#f1f5f9"}}><span style={{color:GOLD}}>Med</span>BoardPro</span>
+          <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:16}}>M</div>
+          <span style={{fontWeight:800,fontSize:20,color:"#f1f5f9"}}><span style={{color:GOLD}}>Med</span>Board<span style={{color:GOLD,fontStyle:"italic",marginLeft:2}}>Pro</span></span>
         </div>
-        <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid #3b82f6",color:"#fff",padding:"10px 24px",borderRadius:8,fontWeight:700,cursor:"pointer"}}>Sign In / Start Trial</button>
+        <div style={{display:"flex",gap:24,color:"#94a3b8",fontSize:14,fontWeight:600,display:window.innerWidth>768?"flex":"none"}}>
+          <a href="#how" style={{color:"inherit",textDecoration:"none"}}>Features</a>
+          <a href="#about" style={{color:"inherit",textDecoration:"none"}}>About</a>
+          <a href="#pricing" style={{color:"inherit",textDecoration:"none"}}>Pricing</a>
+        </div>
+        <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid #3b82f6",color:"#fff",padding:"10px 24px",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14,boxShadow:"0 4px 14px rgba(0,40,104,0.4)"}}>
+          Sign In / Start Trial
+        </button>
       </nav>
 
+      {/* Hero */}
       <section style={{padding:"100px 5% 80px",textAlign:"center",maxWidth:1000,margin:"0 auto"}}>
         <div className="hero-tag">🏥 Created by a Fellowship Associate Program Director at Howard University</div>
-        <h1 style={{fontSize:"clamp(36px,6vw,64px)",fontWeight:900,lineHeight:1.1,marginBottom:24,color:"#f1f5f9"}}>Board Prep That Actually <br/><span style={{color:GOLD}}>Understands Medicine</span></h1>
+        <h1 style={{fontSize:"clamp(36px,6vw,64px)",fontWeight:900,lineHeight:1.1,marginBottom:24,color:"#f1f5f9",letterSpacing:"-1px"}}>
+          Board Prep That Actually <br/><span style={{color:GOLD}}>Understands Medicine</span>
+        </h1>
         <p style={{fontSize:18,color:"#94a3b8",marginBottom:16,fontWeight:600}}>USMLE Step 1, 2 & 3 · ABIM Internal Medicine · ABIM Endocrinology Subspecialty</p>
-        <p style={{fontSize:14,color:"#64748b",marginBottom:48,lineHeight:1.6}}>Built by <strong>Dr. Anteneh Zenebe, MD, FACE</strong> — Assistant Clinical Professor & Associate Program Director,<br/>Howard University College of Medicine</p>
-        
-        <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:48}}>
-          <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid #3b82f6",color:"#fff",padding:"16px 40px",borderRadius:12,fontWeight:800,fontSize:18,cursor:"pointer",boxShadow:"0 8px 24px rgba(0,40,104,0.5)"}}>Start 14-Day Free Trial →</button>
+        <p style={{fontSize:14,color:"#64748b",marginBottom:48,lineHeight:1.6}}>
+          Built by <strong style={{color:"#f1f5f9"}}>Dr. Anteneh Zenebe, MD, FACE</strong> — Assistant Clinical Professor & Associate Program Director,<br/>Howard University College of Medicine
+        </p>
+        <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",marginBottom:32}}>
+          <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid #3b82f6",color:"#fff",padding:"16px 40px",borderRadius:12,fontWeight:800,fontSize:16,cursor:"pointer",boxShadow:"0 8px 24px rgba(0,40,104,0.5)"}}>Start 14-Day Free Trial →</button>
           <button onClick={()=>setShowAuth(true)} style={{background:"transparent",border:"1px solid "+BDR,color:"#e2e8f0",padding:"16px 40px",borderRadius:12,fontWeight:700,fontSize:16,cursor:"pointer"}}>Sign In</button>
         </div>
+        <p style={{fontSize:12,color:"#475569",marginBottom:64}}>Credit card required · No charge until Day 15 · Cancel anytime before trial ends</p>
 
+        {/* Exam Pills Restored */}
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:16}}>
           <div className="exam-pill"><span style={{color:"#3b82f6",fontWeight:800,fontSize:14,marginBottom:4}}>USMLE Step 1</span><span style={{color:"#64748b",fontSize:11}}>M2 Students</span></div>
           <div className="exam-pill"><span style={{color:"#8b5cf6",fontWeight:800,fontSize:14,marginBottom:4}}>USMLE Step 2 CK</span><span style={{color:"#64748b",fontSize:11}}>M3/M4</span></div>
@@ -127,33 +313,131 @@ function LandingPage({setShowAuth}) {
         </div>
       </section>
 
-      <section style={{padding:"80px 5%",background:"linear-gradient(180deg, #0a0a0f 0%, #111827 100%)"}}>
+      {/* Features Grid Restored (All 4 cards) */}
+      <section id="how" style={{padding:"100px 5%",background:"linear-gradient(180deg, #0a0a0f 0%, #111827 100%)"}}>
         <div style={{maxWidth:1200,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:64}}>
             <h2 style={{fontSize:42,fontWeight:800,color:"#f1f5f9",marginBottom:16}}>Everything you need to pass</h2>
             <p style={{color:"#94a3b8",fontSize:18}}>From USMLE Step 1 to subspecialty boards — one platform covers the full training continuum</p>
           </div>
+          
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
-            <div className="quick-card" style={{cursor:"default"}}>
-              <div style={{fontSize:32,marginBottom:20}}>🎯</div>
-              <h3 style={{fontSize:20,fontWeight:800,color:"#f1f5f9",marginBottom:12}}>Premium QBank</h3>
-              <p style={{fontSize:15,color:"#94a3b8",lineHeight:1.7}}>Thousands of board-style clinical vignettes written to NBME and ABIM item-writing standards.</p>
+            {[
+              {icon:"🎯",title:"Premium QBank",desc:"Thousands of board-style clinical vignettes written to NBME and ABIM item-writing standards. Each question simulates real-world clinical decision-making."},
+              {icon:"📚",title:"16+ Medical Society Guidelines",desc:"Stop hunting for answers. Every explanation cites specific, up-to-date guidelines from ADA, ATA, ACC/AHA, Endocrine Society, KDIGO, and 20+ other official specialty societies."},
+              {icon:"🧪",title:"Integrated Labs & Med Calcs",desc:"Access comprehensive normal lab value references across 7 categories and 20+ critical medical calculators (Anion Gap, MELD, FENa, CHA2DS2-VASc) directly inside the testing interface."},
+              {icon:"⏱",title:"Study & Exam Modes",desc:"Study mode provides instant feedback, attending-level explanations, and cognitive error analysis. Exam mode runs a live 90-second countdown timer to simulate real testing conditions."}
+            ].map((feature, i) => (
+              <div key={i} style={{background:CARD,border:"1px solid "+BDR,borderRadius:20,padding:"32px",transition:"transform 0.2s"}}>
+                <div style={{fontSize:32,marginBottom:20}}>{feature.icon}</div>
+                <h3 style={{fontSize:20,fontWeight:800,color:"#f1f5f9",marginBottom:12}}>{feature.title}</h3>
+                <p style={{fontSize:15,color:"#94a3b8",lineHeight:1.7}}>{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* About the Founder */}
+      <section id="about" style={{padding:"100px 5%",background:"#0f172a"}}>
+        <div style={{maxWidth:900,margin:"0 auto"}}>
+          <h2 style={{fontSize:36,fontWeight:800,color:"#f1f5f9",marginBottom:40,textAlign:"center"}}>About the Founder</h2>
+          <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:24,padding:"48px",boxShadow:"0 12px 32px rgba(0,0,0,0.4)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:24,marginBottom:32,flexWrap:"wrap"}}>
+              <div style={{width:80,height:80,borderRadius:"50%",background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",color:GOLD,fontSize:28,fontWeight:900}}>AZ</div>
+              <div>
+                <h3 style={{fontSize:24,fontWeight:800,color:"#f1f5f9",marginBottom:6}}>Dr. Anteneh Zenebe, MD, FACE</h3>
+                <p style={{color:GOLD,fontSize:15,fontWeight:700}}>Fellowship Associate Program Director · Howard University</p>
+              </div>
             </div>
-            <div className="quick-card" style={{cursor:"default"}}>
-              <div style={{fontSize:32,marginBottom:20}}>📚</div>
-              <h3 style={{fontSize:20,fontWeight:800,color:"#f1f5f9",marginBottom:12}}>16+ Society Guidelines</h3>
-              <p style={{fontSize:15,color:"#94a3b8",lineHeight:1.7}}>Stop hunting for answers. Every explanation cites specific guidelines from ADA, ATA, Endocrine Society, and more.</p>
+            <div style={{color:"#cbd5e1",fontSize:16,lineHeight:1.8}}>
+              <p style={{marginBottom:16}}>Hi, I am Dr. Anteneh Zenebe. I am an academic endocrinologist, Assistant Professor of Medicine, and the Associate Program Director for the Endocrinology, Diabetes, and Metabolism Fellowship at Howard University College of Medicine. After earning my MD and completing my ABIM board certifications, my career has been driven by a strong interest in advancing medical knowledge and ensuring young doctors are well-equipped as they enter the field.</p>
+              <p style={{marginBottom:16}}>I built MedBoard Pro because I saw a critical need for a board prep tool that truly understands medicine the way an attending physician does. In addition to this platform, I actively write and develop comprehensive study manuals for M2 and M3 students, Internal Medicine residents, and Endocrinology fellows.</p>
+              <p>My goal is to create resources that move beyond test-taking tricks, focusing instead on up-to-date society guidelines, pathophysiology, and real-world clinical decision-making.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="about" style={{padding:"80px 5%", background:"#0f172a"}}>
-        <div style={{maxWidth:800, margin:"0 auto", textAlign:"center"}}>
-           <h2 style={{fontSize:32, fontWeight:800, color:GOLD, marginBottom:20}}>About the Founder</h2>
-           <p style={{color:"#f1f5f9", fontSize:18, lineHeight:1.8}}>Hi, I am <strong>Dr. Anteneh Zenebe</strong>. I am an academic endocrinologist, Assistant Professor of Medicine, and the Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine. I built MedBoard Pro because I saw a critical need for a board prep tool that truly understands medicine the way an attending physician does.</p>
+      {/* Pricing Restored */}
+      <section id="pricing" style={{padding:"100px 5%"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:64}}>
+            <h2 style={{fontSize:36,fontWeight:800,color:"#f1f5f9",marginBottom:12}}>Simple, Transparent Pricing</h2>
+            <p style={{color:"#64748b",fontSize:16}}>14-day free trial · No charge until Day 15 · Cancel anytime</p>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:24}}>
+            {PLANS.map((plan) => (
+              <div key={plan.key} style={{background:CARD,border:"1px solid "+(plan.badge==="MOST POPULAR"?GOLD:BDR),borderRadius:24,padding:"40px 32px",position:"relative"}}>
+                {plan.badge && <div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:plan.color,color:"#fff",fontSize:12,fontWeight:800,padding:"6px 16px",borderRadius:20,whiteSpace:"nowrap",boxShadow:"0 4px 12px rgba(0,0,0,0.3)"}}>{plan.badge}</div>}
+                <h3 style={{color:"#f1f5f9",fontSize:22,fontWeight:800,marginBottom:8}}>{plan.name}</h3>
+                <div style={{color:GOLD,marginBottom:24}}>
+                  <span style={{fontSize:48,fontWeight:900,letterSpacing:"-1px"}}>${plan.price}</span>
+                  <span style={{color:"#64748b",fontSize:16,fontWeight:600}}>/{plan.period}</span>
+                </div>
+                <ul style={{listStyle:"none",marginBottom:32}}>
+                  {plan.features.map(f => <li key={f} style={{color:"#94a3b8",fontSize:15,padding:"6px 0",display:"flex",alignItems:"flex-start",gap:12,lineHeight:1.4}}><span style={{color:"#10b981",fontSize:14,marginTop:2}}>✓</span>{f}</li>)}
+                </ul>
+                <button onClick={()=>window.open(PAYMENT_LINKS[plan.key],"_blank")} style={{width:"100%",padding:"14px",borderRadius:12,background:plan.badge?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"transparent",border:"1px solid "+(plan.badge?"#3b82f6":BDR),color:plan.badge?"#fff":"#e2e8f0",fontWeight:800,fontSize:15,cursor:"pointer"}}>Start Free Trial</button>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
+
+      {/* Auth Modal Restored Fully */}
+      {showAuth && (
+        <div onClick={(e)=>{if(e.target===e.currentTarget)setShowAuth(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}>
+          <div style={{background:"#0f172a",border:"1px solid "+BDR,borderRadius:24,padding:40,width:"100%",maxWidth:440,boxShadow:"0 24px 48px rgba(0,0,0,0.5)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}}>
+              <h3 style={{color:"#f1f5f9",fontWeight:800,fontSize:22}}>{authMode==="signup"?"Create Account":authMode==="reset"?"Reset Password":"Welcome Back"}</h3>
+              <button onClick={()=>setShowAuth(false)} style={{background:"transparent",border:"none",color:"#64748b",fontSize:28,cursor:"pointer",lineHeight:1}}>×</button>
+            </div>
+            <button onClick={googleLogin} style={{width:"100%",padding:"12px",borderRadius:10,background:"#fff",border:"1px solid #d1d5db",color:"#374151",fontWeight:700,fontSize:15,cursor:"pointer",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continue with Google
+            </button>
+            <div style={{textAlign:"center",color:"#475569",fontSize:13,fontWeight:600,marginBottom:20,textTransform:"uppercase",letterSpacing:"1px"}}>or continue with email</div>
+            <form onSubmit={handleAuth}>
+              {authMode==="signup" && <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Full name" required style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:10,padding:"14px 16px",color:"#f1f5f9",fontSize:15,marginBottom:12,outline:"none",display:"block"}}/>}
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email address" required style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:10,padding:"14px 16px",color:"#f1f5f9",fontSize:15,marginBottom:12,outline:"none",display:"block"}}/>
+              {authMode!=="reset" && <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Password" required style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:10,padding:"14px 16px",color:"#f1f5f9",fontSize:15,marginBottom:12,outline:"none",display:"block"}}/>}
+              {authErr && <p style={{color:"#ef4444",fontSize:13,marginBottom:12,fontWeight:600}}>{authErr}</p>}
+              {authMsg && <p style={{color:"#10b981",fontSize:13,marginBottom:12,fontWeight:600}}>{authMsg}</p>}
+              <button type="submit" style={{width:"100%",padding:"14px",borderRadius:10,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid #3b82f6",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",marginBottom:16,marginTop:8}}>
+                {authMode==="signup"?"Create Account":authMode==="reset"?"Send Reset Email":"Sign In"}
+              </button>
+            </form>
+            <div style={{display:"flex",justifyContent:"center",gap:20,fontSize:14}}>
+              {authMode!=="login" && <button onClick={()=>setAuthMode("login")} style={{background:"none",border:"none",color:GOLD,fontWeight:600,cursor:"pointer"}}>Sign In</button>}
+              {authMode!=="signup" && <button onClick={()=>setAuthMode("signup")} style={{background:"none",border:"none",color:GOLD,fontWeight:600,cursor:"pointer"}}>Create Account</button>}
+              {authMode!=="reset" && <button onClick={()=>setAuthMode("reset")} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer"}}>Forgot Password?</button>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EXAM COMPLETE SCREEN Restored ────────────────────────────────────────────
+function ExamComplete({score, examSecs, onReview, onNew}) {
+  var pct = score.t > 0 ? Math.round(score.c / score.t * 100) : 0;
+  var passed = pct >= 70;
+  var mins = Math.floor(examSecs / 60);
+  var secs = examSecs % 60;
+  return (
+    <div className="fade" style={{background:CARD,border:"2px solid "+(passed?GOLD:BDR),borderRadius:20,padding:"40px 32px",textAlign:"center",marginBottom:24}}>
+      <div style={{fontSize:52,marginBottom:12}}>{passed?"🎓":"📚"}</div>
+      <h2 style={{color:"#f1f5f9",fontSize:26,fontWeight:800,marginBottom:8}}>Exam Complete</h2>
+      <div style={{fontSize:68,fontWeight:900,color:passed?"#10b981":"#f59e0b",lineHeight:1,margin:"16px 0"}}>{pct}%</div>
+      <p style={{color:"#94a3b8",fontSize:16,marginBottom:4}}>{score.c} correct out of {score.t} question{score.t!==1?"s":""}</p>
+      {examSecs>0 && <p style={{color:"#475569",fontSize:13,marginBottom:4}}>Time: {mins}m {secs<10?"0":""}{secs}s</p>}
+      <p style={{color:passed?"#10b981":"#f59e0b",fontWeight:700,fontSize:15,marginBottom:28}}>{passed?"✓ Above 70% passing threshold":"✗ Below 70% — review weak areas"}</p>
+      <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+        <button onClick={onReview} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,color:"#fff",padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>Review Answers</button>
+        <button onClick={onNew} style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"12px 28px",borderRadius:8,fontWeight:700,fontSize:14,cursor:"pointer"}}>Next QBank Item</button>
+      </div>
     </div>
   );
 }
@@ -161,61 +445,217 @@ function LandingPage({setShowAuth}) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [user, setUser] = React.useState(null);
+  const [authLoading, setAuthLoading] = React.useState(true);
+  const [showAuth, setShowAuth] = React.useState(false);
+  const [authMode, setAuthMode] = React.useState("login");
+  const [email, setEmail] = React.useState("");
+  const [pw, setPw] = React.useState("");
+  const [nm, setNm] = React.useState("");
+  const [authErr, setAuthErr] = React.useState("");
+  const [authMsg, setAuthMsg] = React.useState("");
+
   const [tab, setTab] = React.useState("home");
-  const [topic, setTopic] = React.useState("DKA and HHS");
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [topic, setTopic] = React.useState("Random -- All Specialties");
   const [lvl, setLvl] = React.useState(LEVELS[3]);
+  const [examMode, setExamMode] = React.useState(false);
+
   const [appState, setAppState] = React.useState("idle");
   const [question, setQuestion] = React.useState(null);
   const [preloadedQ, setPreloadedQ] = React.useState(null);
   const [sel, setSel] = React.useState("");
+  const [examSel, setExamSel] = React.useState("");
+  const [examCorrect, setExamCorrect] = React.useState(false);
   const [revealed, setRevealed] = React.useState(false);
-  const [history, setHistory] = React.useState({t:0, c:0});
-  const [showAuth, setShowAuth] = React.useState(false);
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [revealText, setRevealText] = React.useState("");
+  const [err, setErr] = React.useState("");
+
+  const [score, setScore] = React.useState({t:0, c:0}); // Session score
+  const [history, setHistory] = React.useState({t:0, c:0}); // All-time score
+
+  // Timer states
+  const [tLeft, setTLeft] = React.useState(null);
+  const [examStartMs, setExamStartMs] = React.useState(0);
+  const [examSecs, setExamSecs] = React.useState(0);
+  const timerRef = React.useRef(null);
 
   React.useEffect(() => {
     sb.auth.getSession().then(res => {
-      if(res.data.session) { setUser(res.data.session.user); fetchHistory(res.data.session.user.id); }
+      setUser(res.data.session?.user || null);
+      if(res.data.session?.user) { setTab("home"); fetchHistory(res.data.session.user.id); }
+      setAuthLoading(false);
+    });
+    sb.auth.onAuthStateChange((_, s) => {
+      setUser(s?.user || null);
+      if(s?.user) { setTab("home"); fetchHistory(s.user.id); }
     });
   }, []);
 
+  // Keyboard Shortcuts Restored
+  React.useEffect(() => {
+    function onKey(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      var map = {a:"A",b:"B",c:"C",d:"D",e:"E"};
+      var letter = map[e.key.toLowerCase()];
+      if (letter) {
+        if (appState === "studying" && !revealed) setSel(letter);
+        if (appState === "exam_running" && !examSel) setSel(letter);
+      }
+      if (e.key === "Enter") {
+        if (appState === "studying" && !revealed && sel) submitStudy();
+        if (appState === "exam_running" && !examSel && sel) submitExam();
+      }
+      if ((e.key === "n" || e.key === "N") && (appState === "studying" || appState === "idle")) handleLoadNext();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [appState, revealed, sel, examSel, question]);
+
+  // Auth Handlers
+  function googleLogin() { sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:"https://medboardpro.org"}}); }
+  async function handleAuth(e) {
+    e.preventDefault(); setAuthErr(""); setAuthMsg("");
+    try {
+      if (authMode === "signup") {
+        const {error} = await sb.auth.signUp({email, password:pw, options:{data:{full_name:nm}}});
+        if (error) throw error; setAuthMsg("Check email to confirm.");
+      } else if (authMode === "reset") {
+        const {error} = await sb.auth.resetPasswordForEmail(email);
+        if (error) throw error; setAuthMsg("Reset email sent.");
+      } else {
+        const {error} = await sb.auth.signInWithPassword({email, password:pw});
+        if (error) throw error; setShowAuth(false);
+      }
+    } catch(ex) { setAuthErr(ex.message); }
+  }
+
+  // Database & Logic
   async function fetchHistory(uid) {
     const {data} = await sb.from("user_responses").select("is_correct").eq("user_id", uid);
     if(data) setHistory({t: data.length, c: data.filter(r => r.is_correct).length});
   }
 
-  async function fetchOne(targetTopic, targetLvl) {
-    const {data: bank} = await sb.from("mcqs").select("*").eq("topic", targetTopic).eq("exam_level", targetLvl).limit(10);
-    if (bank?.length > 0) return bank[Math.floor(Math.random() * bank.length)];
-    const res = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: targetTopic, level: targetLvl}) });
-    const items = await res.json();
-    return items[0];
+  async function fetchNewQuestion(t, l) {
+    let answeredIds = [];
+    if (user) {
+      const ur = await sb.from("user_responses").select("mcq_id").eq("user_id", user.id);
+      if (ur.data) answeredIds = ur.data.map(r => r.mcq_id);
+    }
+    const bankRes = await sb.from("mcqs").select("*").eq("topic", t).eq("exam_level", l).limit(50);
+    let q = null;
+    if (bankRes.data?.length > 0) {
+      const unanswered = bankRes.data.filter(row => !answeredIds.includes(row.id));
+      if (unanswered.length > 0) q = unanswered[Math.floor(Math.random() * unanswered.length)];
+    }
+    if (!q) {
+      const apiRes = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: t, level: l}) });
+      if (!apiRes.ok) throw new Error("API Connection Error");
+      const data = await apiRes.json();
+      q = data[0];
+    }
+    return q;
   }
 
+  // Pre-load Core Logic
   async function handleLoadNext() {
-    setSel(""); setRevealed(false);
-    if (preloadedQ) { setQuestion(preloadedQ); setPreloadedQ(null); setAppState("studying"); }
-    else { setAppState("generating"); const q = await fetchOne(topic, lvl.v); setQuestion(q); setAppState("studying"); }
+    clearInterval(timerRef.current);
+    setErr(""); setSel(""); setExamSel(""); setRevealed(false); setRevealText("");
+    
+    let q = preloadedQ;
+    setPreloadedQ(null);
+
+    if (!q) {
+      setAppState("generating");
+      try { q = await fetchNewQuestion(topic, lvl.v); } catch(ex) { setErr(ex.message); setAppState("idle"); return; }
+    }
+
+    setQuestion(q);
+    if (examMode) {
+      setAppState("exam_running");
+      startTimer();
+    } else {
+      setAppState("studying");
+      let words = q.stem.split(" "), wi = 0;
+      let tw = setInterval(() => {
+        if(wi >= words.length) { clearInterval(tw); return; }
+        setRevealText(p => p + (wi===0?"":" ") + words[wi]);
+        wi++;
+      }, 15);
+    }
   }
 
-  async function submitAnswer() {
+  // Exam Logic
+  function startTimer() {
+    setExamStartMs(Date.now()); setTLeft(SECS);
+    timerRef.current = setInterval(() => {
+      setTLeft(t => {
+        if (t <= 1) { clearInterval(timerRef.current); endExam(); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+  }
+  function endExam() {
+    clearInterval(timerRef.current);
+    setExamSecs(Math.floor((Date.now() - examStartMs) / 1000));
+    setAppState("exam_done");
+  }
+
+  function submitStudy() {
+    if (!sel || !question || revealed) return;
     const ok = sel === question.correct;
     setRevealed(true);
+    setScore(s => ({t: s.t+1, c: s.c+(ok?1:0)}));
     setHistory(h => ({t: h.t+1, c: h.c+(ok?1:0)}));
-    saveResponse(question, sel, ok);
-    fetchOne(topic, lvl.v).then(q => setPreloadedQ(q));
+    saveResponse(question, sel, ok).catch(()=>{});
+    // SHADOW PRE-LOAD
+    fetchNewQuestion(topic, lvl.v).then(q => setPreloadedQ(q)).catch(()=>{});
   }
 
-  if (!user) return <LandingPage setShowAuth={setShowAuth} />;
+  function submitExam() {
+    if (!sel || !question || examSel) return;
+    const ok = sel === question.correct;
+    setExamSel(sel); setExamCorrect(ok);
+    setScore(s => ({t: s.t+1, c: s.c+(ok?1:0)}));
+    setHistory(h => ({t: h.t+1, c: h.c+(ok?1:0)}));
+    saveResponse(question, sel, ok).catch(()=>{});
+    setTimeout(endExam, 400);
+  }
+
+  function choiceColor(letter) {
+    if (!question) return BDR;
+    var isReview = appState === "exam_review" || revealed;
+    if (isReview) {
+      if (letter === question.correct) return "#10b981";
+      if (letter === (examSel || sel) && letter !== question.correct) return "#ef4444";
+      return BDR;
+    }
+    if (letter === sel) return GOLD;
+    return BDR;
+  }
+  function choiceTextColor(letter) {
+    if (!question) return "#cbd5e1";
+    var isReview = appState === "exam_review" || revealed;
+    if (isReview) {
+      if (letter === question.correct) return "#10b981";
+      if (letter === (examSel || sel) && letter !== question.correct) return "#ef4444";
+      return "#94a3b8";
+    }
+    return "#cbd5e1";
+  }
+
+  if (authLoading) return <div style={{display:"flex",height:"100vh",alignItems:"center",justifyContent:"center",color:GOLD, fontWeight:800}}>Loading MedBoard Pro...</div>;
+  if (!user) return <LandingPage showAuth={showAuth} setShowAuth={setShowAuth} authMode={authMode} setAuthMode={setAuthMode} email={email} setEmail={setEmail} pw={pw} setPw={setPw} nm={nm} setNm={setNm} authErr={authErr} authMsg={authMsg} handleAuth={handleAuth} googleLogin={googleLogin}/>;
 
   return (
     <div style={{minHeight:"100vh",background:BG}}>
+      {/* HEADER LOGGED IN */}
       <nav style={{padding:"0 5%",height:80,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setTab("home")}>
-          <div style={{width:34,height:34,borderRadius:8,background:NAVY,border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD}}>M</div>
-          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:18, display:window.innerWidth>600?"block":"none"}}>MedBoardPro</span>
+          <div style={{width:34,height:34,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD}}>M</div>
+          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:18, display:window.innerWidth>600?"block":"none"}}><span style={{color:GOLD}}>Med</span>BoardPro</span>
         </div>
         
+        {/* Navigation Tabs Restored */}
         <div style={{display:"flex",gap:8, alignItems:"flex-end", height:"100%"}}>
           {[{id:"home", i:"🏠", l:"Home"}, {id:"mcq", i:"🎯", l:"QBank"}, {id:"guides", i:"📚", l:"Guides"}, {id:"progress", i:"📊", l:"Progress"}].map(t => (
             <button key={t.id} onClick={()=>setTab(t.id)} className={tab===t.id?"nav-btn active":"nav-btn"} style={{height:"100%", justifyContent:"center"}}>
@@ -224,7 +664,13 @@ function App() {
           ))}
         </div>
 
+        {/* Golden Buttons Restored */}
         <div style={{display:"flex", alignItems:"center", gap:12}}>
+           {appState==="exam_running" && tLeft!==null && (
+             <span style={{fontSize:15,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",background:"rgba(0,0,0,0.5)",padding:"4px 12px",borderRadius:6,border:"1px solid "+(tLeft<30?"#ef4444":BDR)}}>
+               {fmtTime(tLeft)}
+             </span>
+           )}
            <div style={{textAlign:"right", display:window.innerWidth>900?"block":"none"}}>
               <div style={{fontSize:12, fontWeight:800}}>{user.user_metadata?.full_name || "Doctor"}</div>
               <div style={{fontSize:10, color:"#64748b"}}>{user.email}</div>
@@ -236,89 +682,161 @@ function App() {
       </nav>
 
       <div style={{padding:"40px 5%",maxWidth:1000,margin:"0 auto"}}>
+        {/* HOME DASHBOARD Restored */}
         {tab==="home" && (
           <div className="fade">
             <h2 style={{fontSize:28,fontWeight:800,marginBottom:8}}>Welcome back, {user.user_metadata?.full_name?.split(" ")[0] || "Doctor"}! 👋</h2>
             <p style={{color:"#64748b", fontSize:14, marginBottom:28}}>Howard University College of Medicine · Academic Dashboard</p>
             
-            <div style={{background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:16,padding:"24px",display:"flex",justifyContent:"space-between",alignItems:"center", marginBottom:32}}>
-               <div style={{display:"flex",gap:40}}>
+            <div style={{background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:16,padding:"24px",display:"flex",justifyContent:"space-between",alignItems:"center", marginBottom:32, flexWrap:"wrap", gap:20}}>
+               <div style={{display:"flex",gap:40, flexWrap:"wrap"}}>
                   <div><p style={{fontSize:11,color:"#64748b",fontWeight:700}}>ALL-TIME ITEMS</p><div style={{fontSize:22,fontWeight:900}}>{history.t}</div></div>
                   <div><p style={{fontSize:11,color:"#64748b",fontWeight:700}}>ACCURACY</p><div style={{fontSize:22,fontWeight:900,color:"#10b981"}}>{history.t>0?Math.round(history.c/history.t*100)+"%":"—"}</div></div>
                </div>
                <button onClick={()=>setTab("mcq")} style={{background:GOLD,color:"#000",padding:"10px 20px",borderRadius:8,fontWeight:800,border:"none",cursor:"pointer"}}>Start Practice Session</button>
             </div>
 
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:16}}>
-               <div className="quick-card" onClick={()=>setTab("mcq")}><h3>🎯 Premium QBank</h3><p style={{color:"#64748b", fontSize:13}}>Case-based board review</p></div>
-               <div className="quick-card" onClick={()=>setTab("guides")}><h3>📚 Guidelines</h3><p style={{color:"#64748b", fontSize:13}}>ATA, ADA, Endocrine Society</p></div>
-               <div className="quick-card" onClick={()=>setTab("progress")}><h3>📊 Performance</h3><p style={{color:"#64748b", fontSize:13}}>Weakness and accuracy tracking</p></div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:16, marginBottom:40}}>
+               <div className="quick-card" onClick={()=>setTab("mcq")}>
+                  <div style={{fontSize:28,marginBottom:14}}>🎯</div>
+                  <h3 style={{color:"#6366f1",fontWeight:800,fontSize:16,marginBottom:4}}>Premium QBank</h3>
+                  <p style={{color:"#64748b", fontSize:13}}>Case-based board review</p>
+               </div>
+               <div className="quick-card" onClick={()=>setTab("guides")}>
+                  <div style={{fontSize:28,marginBottom:14}}>📚</div>
+                  <h3 style={{color:"#10b981",fontWeight:800,fontSize:16,marginBottom:4}}>Guidelines</h3>
+                  <p style={{color:"#64748b", fontSize:13}}>ATA, ADA, Endocrine Society</p>
+               </div>
+               <div className="quick-card" onClick={()=>setTab("progress")}>
+                  <div style={{fontSize:28,marginBottom:14}}>📊</div>
+                  <h3 style={{color:GOLD,fontWeight:800,fontSize:16,marginBottom:4}}>Performance</h3>
+                  <p style={{color:"#64748b", fontSize:13}}>Weakness and accuracy tracking</p>
+               </div>
+            </div>
+
+            <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:24}}>
+               <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:20,display:"flex",alignItems:"center",gap:8}}>📋 Your Training Continuum</h3>
+               <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
+                  <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#3b82f6",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 1</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>M2</div></div>
+                  <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#8b5cf6",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 2</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>M3/M4</div></div>
+                  <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#6366f1",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 3</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>PGY-1/2</div></div>
+                  <div style={{flex:1,minWidth:140,background:"rgba(16,185,129,0.05)",border:"1px solid #10b981",borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:"#10b981",fontWeight:800,fontSize:14,marginBottom:6}}>ABIM IM</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>Residents</div></div>
+                  <div style={{flex:1,minWidth:140,background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:12,padding:"16px",textAlign:"center"}}><div style={{color:GOLD,fontWeight:800,fontSize:14,marginBottom:6}}>ABIM Endo</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>Fellows</div></div>
+               </div>
             </div>
           </div>
         )}
 
+        {/* QBANK TAB Restored */}
         {tab==="mcq" && (
           <div className="fade">
-            <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{width:"100%",padding:12,background:CARD,border:"1px solid "+BDR,borderRadius:8,color:GOLD,fontWeight:700,marginBottom:15,cursor:"pointer", textAlign:"left"}}>⚙ Settings: {topic} ({lvl.l})</button>
+            {score.t>0 && (
+              <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16,fontSize:13}}>
+                <span style={{color:"#475569"}}>Session: <strong style={{color:"#f1f5f9"}}>{score.t}</strong> answered</span>
+                <span style={{color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b",fontWeight:700}}>{Math.round(score.c/score.t*100)}% correct</span>
+                {appState==="exam_running" && <span style={{marginLeft:"auto",color:"#f59e0b",fontSize:11,fontWeight:800,border:"1px solid #f59e0b",padding:"3px 10px",borderRadius:6}}>EXAM MODE</span>}
+              </div>
+            )}
+
+            <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:CARD,border:"1px solid "+(sidebarOpen?GOLD:BDR),color:sidebarOpen?GOLD:"#94a3b8",padding:"12px 16px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,marginBottom:14}}>
+              <span>⚙ Settings — {topic} ({lvl.l})</span><span>{sidebarOpen?"▲ Hide":"▼ Options"}</span>
+            </button>
             
             {sidebarOpen && (
-              <div style={{background:CARD,padding:20,borderRadius:12,marginBottom:20}}>
-                <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>{LEVELS.map(l=><button key={l.v} onClick={()=>setLvl(l)} style={{padding:"6px 12px",borderRadius:6,border:"1px solid "+(lvl.v===l.v?GOLD:BDR),background:lvl.v===l.v?GOLD:"transparent",color:lvl.v===l.v?"#000":"#fff"}}>{l.l}</button>)}</div>
-                <div style={{maxHeight:300,overflowY:"auto"}}>{Object.entries(GROUPS).map(([g,ts])=><div key={g}><p style={{fontSize:11,color:GOLD,marginTop:10, fontWeight:800}}>{g}</p><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{ts.map(t=><button key={t} onClick={()=>{setTopic(t);setSidebarOpen(false)}} style={{fontSize:11,padding:5,background:"rgba(255,255,255,0.05)",border:"1px solid "+BDR,color:"#fff", cursor:"pointer"}}>{t}</button>)}</div></div>)}</div>
+              <div className="fade" style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,marginBottom:18}}>
+                <p style={{fontSize:11,color:GOLD,fontWeight:800,marginBottom:10,textTransform:"uppercase"}}>Exam Level & Mode</p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
+                  {LEVELS.map(l=><button key={l.v} onClick={()=>setLvl(l)} style={{padding:"6px 14px",borderRadius:8,border:"1px solid "+(lvl.v===l.v?GOLD:BDR),background:lvl.v===l.v?"rgba(201,168,76,0.1)":"transparent",color:lvl.v===l.v?GOLD:"#94a3b8",fontSize:13,fontWeight:700,cursor:"pointer"}}>{l.l}</button>)}
+                </div>
+                <div style={{display:"flex",gap:10,marginBottom:20}}>
+                  <button onClick={()=>setExamMode(false)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid "+(!examMode?GOLD:BDR),background:!examMode?"rgba(201,168,76,0.1)":"transparent",color:!examMode?GOLD:"#94a3b8",fontSize:14,fontWeight:700,cursor:"pointer"}}>📚 Study Mode</button>
+                  <button onClick={()=>setExamMode(true)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid "+(examMode?GOLD:BDR),background:examMode?"rgba(201,168,76,0.1)":"transparent",color:examMode?GOLD:"#94a3b8",fontSize:14,fontWeight:700,cursor:"pointer"}}>⏱ Exam Mode</button>
+                </div>
+                <p style={{fontSize:11,color:GOLD,fontWeight:800,marginBottom:10,textTransform:"uppercase"}}>Topics</p>
+                <div style={{maxHeight:200,overflowY:"auto"}}>{Object.entries(GROUPS).map(([g,ts])=><div key={g} style={{marginBottom:12}}><p style={{fontSize:11,color:"#475569",fontWeight:700,marginBottom:6}}>{g}</p><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{ts.map(t=><button key={t} onClick={()=>{setTopic(t);setSidebarOpen(false);}} style={{padding:"6px 12px",borderRadius:6,border:"1px solid "+(topic===t?GOLD:BDR),background:topic===t?"rgba(201,168,76,0.1)":"transparent",color:topic===t?GOLD:"#64748b",fontSize:12,cursor:"pointer",fontWeight:topic===t?700:500}}>{t}</button>)}</div></div>)}</div>
                 <LabPanel />
               </div>
             )}
 
-            {appState==="idle" && <button onClick={handleLoadNext} style={{width:"100%",padding:20,background:NAVY,border:"1px solid "+GOLD,color:"#fff",fontWeight:900,fontSize:18,borderRadius:12,cursor:"pointer"}}>Load Next QBank Item ▶</button>}
-            {appState==="generating" && <div style={{textAlign:"center",padding:40}}><div style={{width:40,height:40,border:"4px solid "+GOLD,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 15px"}}></div><p>Consulting Academic Guidelines... (15s)</p></div>}
+            {err && <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,padding:"14px 18px",marginBottom:16,color:"#fca5a5",fontSize:14}}>{err}</div>}
+
+            {(appState==="idle" || appState==="studying" || appState==="exam_review") && (
+              <button onClick={handleLoadNext} style={{width:"100%",padding:"16px",borderRadius:12,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid "+GOLD,color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",marginBottom:16,boxShadow:"0 6px 16px rgba(0,40,104,0.4)"}}>
+                {examMode?"Start Exam Mode ⏱":"Load Next QBank Item ▶"}
+              </button>
+            )}
+            {appState==="generating" && <div className="fade" style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:"32px",textAlign:"center",marginBottom:16}}><div style={{width:40,height:40,border:"4px solid "+GOLD,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 15px"}}></div><p style={{color:"#f1f5f9",fontWeight:700}}>Consulting Guidelines...</p></div>}
             
-            {question && (
-              <div className="fade" style={{background:CARD,padding:30,borderRadius:16,border:"1px solid "+BDR}}>
-                <p style={{fontSize:18,lineHeight:1.8,marginBottom:25}}>{question.stem}</p>
-                <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {Object.entries(question.choices).map(([k,v]) => (
-                    <button key={k} onClick={()=>!revealed && setSel(k)} style={{textAlign:"left",padding:15,borderRadius:10,border:"1px solid "+(revealed? (k===question.correct?"#10b981":k===sel?"#ef4444":BDR) : (k===sel?GOLD:BDR)), background:revealed&&k===question.correct?"rgba(16,185,129,0.1)":"transparent", color:"#fff", cursor:revealed?"default":"pointer"}}>
-                      <strong>{k}.</strong> {v}
-                    </button>
-                  ))}
+            {appState==="exam_done" && question && <ExamComplete score={score} examSecs={examSecs} onReview={()=>{setAppState("exam_review");setRevealed(true);}} onNew={handleLoadNext}/>}
+
+            {question && appState!=="exam_done" && (
+              <div className="fade" style={{background:CARD,padding:32,borderRadius:16,border:"1px solid "+(revealed||appState==="exam_review"?GOLD:BDR)}}>
+                <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+                  <span style={{background:NAVY,border:"1px solid "+GOLD,color:GOLD,borderRadius:6,padding:"4px 14px",fontSize:12,fontWeight:800}}>{appState==="exam_running"?"EXAM":"QBank"}</span>
+                  <span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:600}}>{question.topic || topic}</span>
                 </div>
-                {!revealed ? <button onClick={submitAnswer} disabled={!sel} style={{marginTop:25,width:"100%",padding:15,background:sel?GOLD:BDR,color:"#000",fontWeight:900,borderRadius:10}}>Submit Answer</button>
-                : <div style={{marginTop:25,padding:20,background:"rgba(255,255,255,0.03)",borderRadius:12}}>
-                    <p style={{color:GOLD,fontWeight:800,marginBottom:10}}>ATTENDING EXPLANATION</p>
-                    <p style={{lineHeight:1.6}}>{question.explanation}</p>
-                    <button onClick={handleLoadNext} style={{marginTop:20,width:"100%",padding:12,background:"transparent",border:"1px solid "+GOLD,color:GOLD,fontWeight:800,borderRadius:8}}>Next Item {preloadedQ ? '(Instant Ready)' : '(Pre-loading...)'}</button>
-                  </div>}
+                <p style={{fontSize:16,lineHeight:1.9,marginBottom:24,color:"#f1f5f9"}}>{revealText || question.stem}</p>
+                <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24}}>
+                  {Object.entries(question.choices).map(([letter, text]) => {
+                    var isAnswered = revealed || appState==="exam_review" || (appState==="exam_running" && !!examSel);
+                    var borderColor = choiceColor(letter); var textColor = choiceTextColor(letter);
+                    return (
+                      <button key={letter} onClick={()=>{if(appState==="studying" && !revealed) setSel(letter); if(appState==="exam_running" && !examSel) setSel(letter);}} style={{textAlign:"left",padding:"16px 20px",borderRadius:10,cursor:isAnswered?"default":"pointer",border:"1px solid "+borderColor,background:isAnswered&&borderColor!==BDR?borderColor+"18":"rgba(255,255,255,0.02)",color:textColor,fontWeight:sel===letter||examSel===letter?700:400,fontSize:15}}>
+                        <span style={{fontWeight:800,marginRight:12,color:sel===letter||examSel===letter||(isAnswered&&letter===question.correct)?textColor:"#64748b"}}>{letter}.</span>{text}
+                        {(revealed||appState==="exam_review") && letter===question.correct && <span style={{marginLeft:10,fontSize:13,fontWeight:700,color:"#10b981"}}> ✓ Correct answer</span>}
+                        {(revealed||appState==="exam_review") && (sel===letter||examSel===letter) && letter!==question.correct && <span style={{marginLeft:10,fontSize:13,fontWeight:700,color:"#ef4444"}}> ✗ Your answer</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+                
+                <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                  {appState==="studying" && !revealed && <button onClick={submitStudy} disabled={!sel} style={{background:sel?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"#1e293b",border:"1px solid "+(sel?GOLD:BDR),color:sel?"#fff":"#475569",padding:"14px 32px",borderRadius:10,cursor:sel?"pointer":"not-allowed",fontWeight:800,fontSize:15}}>Submit Answer</button>}
+                  {appState==="exam_running" && !examSel && <button onClick={submitExam} disabled={!sel} style={{background:sel?"linear-gradient(135deg,#7c3aed,#6d28d9)":"#1e293b",border:"1px solid "+(sel?"#8b5cf6":BDR),color:sel?"#fff":"#475569",padding:"14px 32px",borderRadius:10,cursor:sel?"pointer":"not-allowed",fontWeight:800,fontSize:15}}>Submit & Continue ⏱</button>}
+                  {(revealed || appState==="exam_review") && <button onClick={handleLoadNext} style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"14px 28px",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:15}}>Next QBank Item (N) {preloadedQ?'✓ Ready':''}</button>}
+                </div>
+
+                {(revealed || appState==="exam_review") && (
+                  <div className="fade" style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+BDR,borderRadius:12,padding:24,marginTop:24}}>
+                    <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:GOLD,textTransform:"uppercase",letterSpacing:1}}>Attending Explanation</p>
+                    <p style={{margin:"0 0 12px",color:"#e2e8f0",lineHeight:1.85,fontSize:15}}>{question.explanation}</p>
+                    <p style={{margin:"16px 0 0",fontSize:12,color:"#475569",lineHeight:1.6,borderTop:"1px solid "+BDR,paddingTop:12}}>Always verify with current society guidelines. Inaccuracies? Email <span style={{color:GOLD}}>antenehzenebe@gmail.com</span></p>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
+        {/* GUIDES TAB Restored */}
         {tab==="guides" && (
-          <div className="fade" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:15}}>
-            {GUIDES.map(g=><a key={g.id} href={g.u} target="_blank" style={{textDecoration:"none",background:CARD,padding:15,borderRadius:10,border:"1px solid "+BDR,display:"flex",alignItems:"center",gap:15}}><div style={{width:35,height:35,background:NAVY,color:GOLD,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:6,fontWeight:900}}>{g.i}</div><div><div style={{color:"#f1f5f9",fontSize:13,fontWeight:700}}>{g.t}</div><div style={{fontSize:11,color:"#64748b"}}>{g.s}</div></div></a>)}
+          <div className="fade" style={{paddingTop:20}}>
+            <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Clinical Guidelines</h2>
+            <p style={{color:"#94a3b8",fontSize:16,marginBottom:32}}>Direct links to official specialty society guidelines</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+              {GUIDES.map(g=><a key={g.id} href={g.u} target="_blank" rel="noopener noreferrer" style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:"16px 20px",textDecoration:"none",display:"flex",alignItems:"center",gap:16,transition:"border-color 0.2s"}}><div style={{width:42,height:42,borderRadius:10,background:"rgba(0,40,104,0.3)",border:"1px solid #1e40af",display:"flex",alignItems:"center",justifyContent:"center",color:GOLD,fontWeight:800,fontSize:16,flexShrink:0}}>{g.i}</div><div><p style={{color:"#f1f5f9",fontWeight:700,fontSize:15,marginBottom:4,lineHeight:1.3}}>{g.t}</p><p style={{color:"#64748b",fontSize:12,fontWeight:600}}>{g.s}</p></div></a>)}
+            </div>
           </div>
         )}
 
+        {/* PROGRESS TAB Restored */}
         {tab==="progress" && (
-          <div className="fade">
-            <h2 style={{fontSize:24,fontWeight:800,marginBottom:20}}>Performance Analytics</h2>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:20}}>
-               <div style={{background:CARD,padding:25,borderRadius:16,textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:"#3b82f6"}}>{history.t}</div><p style={{color:"#64748b"}}>Items Answered</p></div>
-               <div style={{background:CARD,padding:25,borderRadius:16,textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:"#10b981"}}>{history.c}</div><p style={{color:"#64748b"}}>Correct Answers</p></div>
-               <div style={{background:CARD,padding:25,borderRadius:16,textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:GOLD}}>{history.t>0?Math.round(history.c/history.t*100)+"%":"—"}</div><p style={{color:"#64748b"}}>Mastery Score</p></div>
+          <div className="fade" style={{paddingTop:20}}>
+            <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Your Progress</h2>
+            <p style={{color:"#94a3b8",fontSize:16,marginBottom:32}}>Historical analytics tracked via Supabase</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:20,marginBottom:32}}>
+               <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:"24px 20px",textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:"#3b82f6",marginBottom:8}}>{history.t}</div><p style={{color:"#94a3b8",fontSize:14,fontWeight:600}}>Questions Answered</p></div>
+               <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:"24px 20px",textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:"#10b981",marginBottom:8}}>{history.c}</div><p style={{color:"#94a3b8",fontSize:14,fontWeight:600}}>Correct Answers</p></div>
+               <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:"24px 20px",textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b",marginBottom:8}}>{history.t>0?Math.round(history.c/history.t*100)+"%":"—"}</div><p style={{color:"#94a3b8",fontSize:14,fontWeight:600}}>Accuracy</p></div>
+               <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:"24px 20px",textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:GOLD,marginBottom:18,marginTop:10}}>{lvl.l}</div><p style={{color:"#94a3b8",fontSize:14,fontWeight:600}}>Current Exam Level</p></div>
+            </div>
+            <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:28,textAlign:"center"}}>
+              <p style={{color:"#94a3b8",fontSize:15,marginBottom:16}}>Advanced weakness analysis and cohort comparison coming soon.</p>
+              <button onClick={()=>window.open(PORTAL_URL,"_blank")} style={{background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"10px 24px",borderRadius:10,fontWeight:800,fontSize:14,cursor:"pointer"}}>Manage Subscription</button>
             </div>
           </div>
         )}
       </div>
-
-      {showAuth && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}} onClick={(e)=>e.target===e.currentTarget && setShowAuth(false)}>
-           <div style={{background:"#0f172a", padding:40, borderRadius:20, border:"1px solid "+BDR, textAlign:"center"}}>
-              <h3 style={{color:"#f1f5f9", marginBottom:20}}>Academic Login</h3>
-              <button onClick={()=>sb.auth.signInWithOAuth({provider:'google', options:{redirectTo:'https://medboardpro.org'}})} style={{padding:"15px 30px", background:"#fff", color:"#000", borderRadius:10, fontWeight:800, cursor:"pointer", border:"none"}}>Continue with Google</button>
-           </div>
-        </div>
-      )}
     </div>
   );
 }
