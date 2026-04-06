@@ -18,6 +18,11 @@ button,select,input{font-family:inherit}
 .fade{animation:fadeIn 0.3s ease}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.3);color:#C9A84C;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:600;margin-bottom:24px}
 .exam-pill{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);border:1px solid #1e293b;border-radius:12px;padding:12px 24px;min-width:140px}
+.nav-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#94a3b8;padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;transition:0.2s}
+.nav-btn.active{border-bottom:2px solid #C9A84C;color:#C9A84C;background:rgba(201,168,76,0.05)}
+.nav-btn:hover:not(.active){color:#f1f5f9}
+.quick-card{background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:12px;padding:20px;cursor:pointer;transition:0.2s}
+.quick-card:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px);border-color:#334155}
 </style>
 </head>
 <body>
@@ -494,8 +499,8 @@ function App() {
   var [authErr, setAuthErr] = React.useState("");
   var [authMsg, setAuthMsg] = React.useState("");
 
-  // Navigation
-  var [tab, setTab] = React.useState("mcq");
+  // Navigation (Default to "home" when logged in)
+  var [tab, setTab] = React.useState("home");
   var [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   // Settings
@@ -536,10 +541,12 @@ function App() {
     sb.auth.getSession().then(function(res) {
       var s = res.data && res.data.session;
       setUser(s ? s.user : null);
+      if(s && s.user) setTab("home");
       setAuthLoading(false);
     });
     var sub = sb.auth.onAuthStateChange(function(event, session) {
       setUser(session ? session.user : null);
+      if(session && session.user) setTab("home");
     });
     return function() {
       sub.data && sub.data.subscription && sub.data.subscription.unsubscribe();
@@ -616,6 +623,7 @@ function App() {
     sb.auth.signOut();
     setAppState("idle");
     setQuestion(null);
+    setTab("home");
   }
 
   async function handleAuth(e) {
@@ -794,37 +802,125 @@ function App() {
     return <LandingPage showAuth={showAuth} setShowAuth={setShowAuth} authMode={authMode} setAuthMode={setAuthMode} email={email} setEmail={setEmail} pw={pw} setPw={setPw} nm={nm} setNm={setNm} authErr={authErr} authMsg={authMsg} handleAuth={handleAuth} googleLogin={googleLogin}/>;
   }
 
-  var userName = (user.user_metadata && user.user_metadata.full_name && user.user_metadata.full_name.split(" ")[0]) || (user.email && user.email.split("@")[0]) || "User";
+  var userName = (user.user_metadata && user.user_metadata.full_name) || (user.email && user.email.split("@")[0]) || "User";
 
   return (
     <div style={{minHeight:"100vh",background:BG}}>
 
-      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
-      <div style={{background:"rgba(0,0,0,0.7)",backdropFilter:"blur(12px)",borderBottom:"1px solid "+BDR,padding:"0 5%",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={function(){setTab("mcq");setAppState("idle");setQuestion(null);}}>
-          <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:14}}>M</div>
-          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:16,display:window.innerWidth>600?"block":"none"}}><span style={{color:GOLD}}>Med</span>Board<span style={{color:GOLD,fontStyle:"italic",marginLeft:2}}>Pro</span></span>
+      {/* ── HEADER (LOGGED IN) ───────────────────────────────────────────── */}
+      <nav style={{padding:"0 5%",height:80,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.97)",backdropFilter:"blur(12px)",zIndex:100}}>
+        {/* Left: Logo */}
+        <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setTab("home")}>
+          <div style={{width:34,height:34,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD,fontSize:15}}>M</div>
+          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:18,display:window.innerWidth>768?"block":"none"}}><span style={{color:GOLD}}>Med</span>Board<span style={{color:GOLD,fontStyle:"italic",marginLeft:2}}>Pro</span></span>
         </div>
-        <div style={{display:"flex",gap:4}}>
-          {[["mcq","QBank"],["guides","Guidelines"],["progress","Progress"]].map(function(item){
-            return <button key={item[0]} onClick={function(){setTab(item[0]);}} style={{background:tab===item[0]?"rgba(201,168,76,0.1)":"transparent",border:"1px solid "+(tab===item[0]?GOLD:BDR),color:tab===item[0]?GOLD:"#64748b",padding:"5px 12px",borderRadius:6,cursor:"pointer",fontWeight:700,fontSize:13}}>{item[1]}</button>;
-          })}
+        
+        {/* Center: Navigation Tabs */}
+        <div style={{display:"flex",gap:8,alignItems:"flex-end",height:"100%"}}>
+          {[
+            {id:"home", icon:"🏠", label:"Home"},
+            {id:"mcq", icon:"🎯", label:"QBank"},
+            {id:"guides", icon:"📚", label:"Guides"},
+            {id:"progress", icon:"📊", label:"Progress"}
+          ].map(item => (
+            <button key={item.id} onClick={()=>setTab(item.id)} className={tab===item.id?"nav-btn active":"nav-btn"} style={{height:"100%",justifyContent:"center"}}>
+              <span style={{fontSize:20}}>{item.icon}</span>
+              <span style={{fontWeight:700,fontSize:12}}>{item.label}</span>
+            </button>
+          ))}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          {appState==="exam_running" && tLeft!==null && (
-            <span style={{fontSize:15,fontWeight:800,color:tLeft<30?"#ef4444":tLeft<60?"#f59e0b":"#10b981",fontFamily:"monospace",background:"rgba(0,0,0,0.5)",padding:"4px 12px",borderRadius:6,border:"1px solid "+(tLeft<30?"#ef4444":BDR)}}>
-              {fmtTime(tLeft)}
-            </span>
-          )}
-          <button onClick={logout} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:600}}>
-            {userName} | Sign Out
-          </button>
+
+        {/* Right: Profile & Actions */}
+        <div style={{display:"flex",alignItems:"center",gap:16,display:window.innerWidth>768?"flex":"none"}}>
+           <div style={{textAlign:"right"}}>
+              <div style={{color:"#f1f5f9",fontWeight:700,fontSize:13}}>{userName}</div>
+              <div style={{color:"#64748b",fontSize:11}}>{user.email}</div>
+           </div>
+           <button onClick={()=>window.open(PORTAL_URL,"_blank")} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>💳 Manage Plan</button>
+           <button onClick={logout} style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}}>Sign Out</button>
         </div>
-      </div>
+      </nav>
+
+      {/* ── HOME TAB (DASHBOARD) ─────────────────────────────────────────── */}
+      {tab==="home" && (
+        <div className="fade" style={{padding:"40px 5%",maxWidth:1000,margin:"0 auto"}}>
+          <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:4}}>Welcome back, {userName}! 👋</h2>
+          <p style={{color:"#94a3b8",fontSize:14,marginBottom:28}}>Howard University College of Medicine · Board Prep Dashboard</p>
+          
+          {/* Account Status Card */}
+          <div style={{background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:16,padding:"24px",marginBottom:40,display:"flex",flexWrap:"wrap",gap:24,alignItems:"center",justifyContent:"space-between",boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
+             <div style={{display:"flex",gap:40,flexWrap:"wrap"}}>
+                <div>
+                  <p style={{fontSize:12,color:"#64748b",fontWeight:700,marginBottom:6}}>Account</p>
+                  <div style={{display:"flex",alignItems:"center",gap:6,color:"#10b981",fontWeight:800,fontSize:15}}><span style={{background:"#10b981",color:"#fff",borderRadius:4,padding:"2px 4px",fontSize:10}}>✓</span> Active</div>
+                </div>
+                <div>
+                  <p style={{fontSize:12,color:"#64748b",fontWeight:700,marginBottom:6}}>Email</p>
+                  <div style={{color:"#f1f5f9",fontWeight:800,fontSize:15}}>{user.email}</div>
+                </div>
+                <div>
+                  <p style={{fontSize:12,color:"#64748b",fontWeight:700,marginBottom:6}}>Sessions</p>
+                  <div style={{color:"#f1f5f9",fontWeight:800,fontSize:15}}>1</div>
+                </div>
+                <div>
+                  <p style={{fontSize:12,color:"#64748b",fontWeight:700,marginBottom:6}}>Questions</p>
+                  <div style={{color:"#f1f5f9",fontWeight:800,fontSize:15}}>{score.t}</div>
+                </div>
+                <div>
+                  <p style={{fontSize:12,color:"#64748b",fontWeight:700,marginBottom:6}}>Accuracy</p>
+                  <div style={{color:"#f1f5f9",fontWeight:800,fontSize:15}}>{score.t>0?Math.round(score.c/score.t*100)+"%":"—"}</div>
+                </div>
+             </div>
+             <button onClick={()=>window.open(PORTAL_URL,"_blank")} style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,padding:"10px 20px",borderRadius:8,fontWeight:800,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>💳 Manage Subscription</button>
+          </div>
+
+          {/* Quick Actions Grid */}
+          <h3 style={{fontSize:18,fontWeight:800,color:"#f1f5f9",marginBottom:16}}>Quick Actions</h3>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:40}}>
+             <div className="quick-card" onClick={()=>setTab("mcq")}>
+                <div style={{fontSize:28,marginBottom:14}}>🎯</div>
+                <h4 style={{color:"#6366f1",fontWeight:800,fontSize:16,marginBottom:4}}>Premium QBank</h4>
+                <p style={{color:"#64748b",fontSize:13,lineHeight:1.4}}>Blueprint-aligned board questions</p>
+             </div>
+             <div className="quick-card" onClick={()=>setTab("guides")}>
+                <div style={{fontSize:28,marginBottom:14}}>📚</div>
+                <h4 style={{color:"#10b981",fontWeight:800,fontSize:16,marginBottom:4}}>Guidelines</h4>
+                <p style={{color:"#64748b",fontSize:13,lineHeight:1.4}}>Official society resources</p>
+             </div>
+             <div className="quick-card" onClick={()=>setTab("progress")}>
+                <div style={{fontSize:28,marginBottom:14}}>📊</div>
+                <h4 style={{color:GOLD,fontWeight:800,fontSize:16,marginBottom:4}}>My Progress</h4>
+                <p style={{color:"#64748b",fontSize:13,lineHeight:1.4}}>Track performance & history</p>
+             </div>
+          </div>
+
+          {/* Training Continuum */}
+          <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:24}}>
+             <h3 style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:20,display:"flex",alignItems:"center",gap:8}}>📋 Your Training Continuum</h3>
+             <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
+                <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}>
+                   <div style={{color:"#3b82f6",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 1</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>M2</div>
+                </div>
+                <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}>
+                   <div style={{color:"#8b5cf6",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 2</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>M3/M4</div>
+                </div>
+                <div style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.02)",border:"1px solid #1e293b",borderRadius:12,padding:"16px",textAlign:"center"}}>
+                   <div style={{color:"#6366f1",fontWeight:800,fontSize:14,marginBottom:6}}>USMLE Step 3</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>PGY-1/2</div>
+                </div>
+                <div style={{flex:1,minWidth:140,background:"rgba(16,185,129,0.05)",border:"1px solid #10b981",borderRadius:12,padding:"16px",textAlign:"center"}}>
+                   <div style={{color:"#10b981",fontWeight:800,fontSize:14,marginBottom:6}}>ABIM IM</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>Residents</div>
+                </div>
+                <div style={{flex:1,minWidth:140,background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:12,padding:"16px",textAlign:"center"}}>
+                   <div style={{color:GOLD,fontWeight:800,fontSize:14,marginBottom:6}}>ABIM Endo</div><div style={{color:"#64748b",fontSize:12,fontWeight:600}}>Fellows</div>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MCQ TAB ────────────────────────────────────────────────────────── */}
       {tab==="mcq" && (
-        <div style={{padding:"24px 5%",maxWidth:960,margin:"0 auto"}}>
+        <div className="fade" style={{padding:"24px 5%",maxWidth:960,margin:"0 auto"}}>
 
           {/* Score bar */}
           {score.t>0 && (
@@ -1014,7 +1110,7 @@ function App() {
 
       {/* ── GUIDES TAB ─────────────────────────────────────────────────────── */}
       {tab==="guides" && (
-        <div style={{padding:"30px 5%",maxWidth:1000,margin:"0 auto"}}>
+        <div className="fade" style={{padding:"30px 5%",maxWidth:1000,margin:"0 auto"}}>
           <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Clinical Guidelines</h2>
           <p style={{color:"#94a3b8",fontSize:16,marginBottom:32}}>Direct links to official specialty society guidelines</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
@@ -1036,19 +1132,20 @@ function App() {
 
       {/* ── PROGRESS TAB ───────────────────────────────────────────────────── */}
       {tab==="progress" && (
-        <div style={{padding:"30px 5%",maxWidth:960,margin:"0 auto"}}>
+        <div className="fade" style={{padding:"30px 5%",maxWidth:960,margin:"0 auto"}}>
           <h2 style={{fontSize:28,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Your Progress</h2>
           <p style={{color:"#94a3b8",fontSize:16,marginBottom:32}}>Current session statistics</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:20,marginBottom:32}}>
             {[
-              {label:"Questions Answered",value:score.t,color:"#3b82f6"},
-              {label:"Correct Answers",value:score.c,color:"#10b981"},
-              {label:"Accuracy",value:score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"},
-              {label:"Current Exam Level",value:lvl.l,color:GOLD}
+              {label:"Questions Answered",value:score.t,color:"#3b82f6", icon:"📝"},
+              {label:"Correct Answers",value:score.c,color:"#10b981", icon:"✅"},
+              {label:"Accuracy",value:score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b", icon:"🎯"},
+              {label:"Current Exam Level",value:lvl.l,color:GOLD, icon:"🎓"}
             ].map(function(stat){
               return (
                 <div key={stat.label} style={{background:CARD,border:"1px solid "+BDR,borderRadius:16,padding:"24px 20px",textAlign:"center"}}>
-                  <div style={{fontSize:42,fontWeight:900,color:stat.color,marginBottom:12}}>{stat.value}</div>
+                  <div style={{fontSize:24,marginBottom:12}}>{stat.icon}</div>
+                  <div style={{fontSize:42,fontWeight:900,color:stat.color,marginBottom:8}}>{stat.value}</div>
                   <p style={{color:"#94a3b8",fontSize:14,fontWeight:600}}>{stat.label}</p>
                 </div>
               );
