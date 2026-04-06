@@ -951,3 +951,47 @@ function App() {
                     <p style={{color:"#475569",fontSize:11}}>{g.s}</p>
                   </div>
                 </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── PROGRESS TAB ───────────────────────────────────────────────────── */}
+      {tab==="progress" && (
+        <div style={{padding:"30px 5%",maxWidth:960,margin:"0 auto"}}>
+          <h2 style={{fontSize:22,fontWeight:800,color:"#f1f5f9",marginBottom:6}}>Your Progress</h2>
+          <p style={{color:"#64748b",fontSize:14,marginBottom:24}}>Session statistics</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:24}}>
+            {[
+              {label:"Questions Answered",value:score.t,color:"#6366f1"},
+              {label:"Correct Answers",value:score.c,color:"#10b981"},
+              {label:"Accuracy",value:score.t>0?Math.round(score.c/score.t*100)+"%":"—",color:score.t>0&&score.c/score.t>=0.7?"#10b981":"#f59e0b"},
+              {label:"Exam Level",value:lvl.l,color:GOLD}
+            ].map(function(stat){
+              return (
+                <div key={stat.label} style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:"20px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:34,fontWeight:900,color:stat.color,marginBottom:8}}>{stat.value}</div>
+                  <p style={{color:"#64748b",fontSize:13}}>{stat.label}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{background:CARD,border:"1px solid "+BDR,borderRadius:12,padding:20,textAlign:"center"}}>
+            <p style={{color:"#64748b",fontSize:13}}>Full question history and weakness analysis powered by Supabase — coming soon.</p>
+            <button onClick={function(){window.open(PORTAL_URL,"_blank");}} style={{marginTop:12,background:"rgba(201,168,76,0.1)",border:"1px solid "+GOLD,color:GOLD,padding:"8px 20px",borderRadius:8,fontWeight:700,fontSize:13,cursor:"pointer"}}>Manage Subscription</button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ─── MOUNT ────────────────────────────────────────────────────────────────────
+var rootEl = document.getElementById("root");
+var root = ReactDOM.createRoot(rootEl);
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
