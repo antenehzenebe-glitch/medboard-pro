@@ -19,14 +19,16 @@ button,select,input{font-family:inherit}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.3);color:#C9A84C;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:600;margin-bottom:24px}
 .nav-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#94a3b8;padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;transition:0.2s}
 .nav-btn.active{border-bottom:2px solid #C9A84C;color:#C9A84C;background:rgba(201,168,76,0.05)}
+.nav-btn:hover:not(.active){color:#f1f5f9}
 .quick-card{background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:12px;padding:20px;cursor:pointer;transition:0.2s}
 .quick-card:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px);border-color:#334155}
+.gold-outline-btn{background:transparent;border:1px solid #C9A84C;color:#C9A84C;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:0.2s}
+.gold-outline-btn:hover{background:rgba(201,168,76,0.1)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const {createClient} = supabase;
 const SB_URL = "https://vhzeeskhvkujihuvddcc.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
@@ -49,13 +51,6 @@ const GUIDES=[
   {id:16,t:"ECG Wave-Maven — Harvard/BIDMC",s:"Cardiology",i:"E",u:"http://ecg.bidmc.harvard.edu"}
 ];
 
-const GROUPS={
-  "Diabetes":["Type 2 Management","Type 1 Insulin","DKA and HHS","Hypoglycemia","CGM and AID Systems"],
-  "Thyroid":["Hypothyroidism","Hyperthyroidism","Thyroid Nodule","Thyroid Cancer"],
-  "Adrenal":["Adrenal Insufficiency","Cushings Syndrome","Primary Aldosteronism","Pheochromocytoma"]
-};
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
 async function saveResponse(question, choice, isCorrect) {
   const {data:{session}} = await sb.auth.getSession();
   if (!session) return;
@@ -65,23 +60,35 @@ async function saveResponse(question, choice, isCorrect) {
   await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
 }
 
-// ─── LANDING PAGE ─────────────────────────────────────────────────────────────
 function LandingPage({setShowAuth}) {
   return (
-    <div style={{minHeight:"100vh",background:BG, textAlign:"center", padding:"100px 5%"}}>
-      <div className="hero-tag">🏥 Fellowship Associate Program Director — Howard University</div>
-      <h1 style={{fontSize:"clamp(36px,6vw,64px)",fontWeight:900,color:"#f1f5f9",marginBottom:24}}>Board Prep Built by <br/><span style={{color:GOLD}}>Academic Attendings</span></h1>
-      <p style={{fontSize:18,color:"#94a3b8",marginBottom:48}}>Premium QBank with integrated society guidelines and performance tracking.</p>
-      <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid #3b82f6",color:"#fff",padding:"16px 40px",borderRadius:12,fontWeight:800,fontSize:18,cursor:"pointer"}}>Access Premium QBank →</button>
+    <div style={{minHeight:"100vh",background:BG}}>
+      <nav style={{padding:"0 5%",height:72,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.97)",backdropFilter:"blur(12px)",zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:8,background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD}}>M</div>
+          <span style={{fontWeight:800,fontSize:20,color:"#f1f5f9"}}><span style={{color:GOLD}}>Med</span>BoardPro</span>
+        </div>
+        <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid #3b82f6",color:"#fff",padding:"10px 24px",borderRadius:8,fontWeight:700,cursor:"pointer"}}>Sign In / Start Trial</button>
+      </nav>
+      <section style={{padding:"100px 5% 80px",textAlign:"center",maxWidth:1000,margin:"0 auto"}}>
+        <div className="hero-tag">🏥 Created by a Fellowship Associate Program Director at Howard University</div>
+        <h1 style={{fontSize:"clamp(36px,6vw,64px)",fontWeight:900,lineHeight:1.1,marginBottom:24,color:"#f1f5f9"}}>Board Prep That Actually <br/><span style={{color:GOLD}}>Understands Medicine</span></h1>
+        <p style={{fontSize:18,color:"#94a3b8",marginBottom:48}}>Built by <strong>Dr. Anteneh Zenebe, MD, FACE</strong> — Assistant Clinical Professor & Associate Program Director, Howard University College of Medicine</p>
+        <button onClick={()=>setShowAuth(true)} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid #3b82f6",color:"#fff",padding:"16px 40px",borderRadius:12,fontWeight:800,fontSize:18,cursor:"pointer"}}>Start 14-Day Free Trial →</button>
+      </section>
+      <section style={{padding:"80px 5%", background:"#0f172a"}}>
+        <div style={{maxWidth:800, margin:"0 auto", textAlign:"center"}}>
+           <h2 style={{fontSize:32, fontWeight:800, color:GOLD, marginBottom:20}}>About the Founder</h2>
+           <p style={{color:"#f1f5f9", fontSize:18, lineHeight:1.8}}>Hi, I am <strong>Dr. Anteneh Zenebe</strong>. I am an academic endocrinologist, Assistant Professor of Medicine, and the Associate Program Director for the Endocrinology Fellowship at Howard University College of Medicine. I built MedBoard Pro because I saw a critical need for a board prep tool that truly understands medicine the way an attending physician does.</p>
+        </div>
+      </section>
     </div>
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [user, setUser] = React.useState(null);
   const [tab, setTab] = React.useState("home");
-  const [topic, setTopic] = React.useState("DKA and HHS");
   const [lvl, setLvl] = React.useState(LEVELS[3]);
   const [appState, setAppState] = React.useState("idle");
   const [question, setQuestion] = React.useState(null);
@@ -102,31 +109,18 @@ function App() {
     if(data) setHistory({t: data.length, c: data.filter(r => r.is_correct).length});
   }
 
-  // ─── THE SHADOW PRE-LOADER ──────────────────────────────────────────────────
-  async function fetchOne(targetTopic, targetLvl) {
-    // 1. Check DB first (Fast)
-    const {data: bank} = await sb.from("mcqs").select("*").eq("topic", targetTopic).eq("exam_level", targetLvl).limit(10);
+  async function fetchOne(targetLvl) {
+    const {data: bank} = await sb.from("mcqs").select("*").eq("topic", "DKA and HHS").eq("exam_level", targetLvl).limit(10);
     if (bank?.length > 0) return bank[Math.floor(Math.random() * bank.length)];
-
-    // 2. AI Fallback (Slow)
-    const res = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: targetTopic, level: targetLvl}) });
+    const res = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: "DKA and HHS", level: targetLvl}) });
     const items = await res.json();
     return items[0];
   }
 
   async function handleLoadNext() {
     setSel(""); setRevealed(false);
-    
-    if (preloadedQ) {
-      setQuestion(preloadedQ);
-      setPreloadedQ(null);
-      setAppState("studying");
-    } else {
-      setAppState("generating");
-      const q = await fetchOne(topic, lvl.v);
-      setQuestion(q);
-      setAppState("studying");
-    }
+    if (preloadedQ) { setQuestion(preloadedQ); setPreloadedQ(null); setAppState("studying"); }
+    else { setAppState("generating"); const q = await fetchOne(lvl.v); setQuestion(q); setAppState("studying"); }
   }
 
   async function submitAnswer() {
@@ -134,42 +128,52 @@ function App() {
     setRevealed(true);
     setHistory(h => ({t: h.t+1, c: h.c+(ok?1:0)}));
     saveResponse(question, sel, ok);
-
-    // ─── SHADOW PRE-LOAD STARTS HERE ───
-    // While the user is reading the explanation, get the next one ready.
-    fetchOne(topic, lvl.v).then(q => setPreloadedQ(q));
+    fetchOne(lvl.v).then(q => setPreloadedQ(q));
   }
 
   if (!user) return <LandingPage setShowAuth={setShowAuth} />;
 
   return (
     <div style={{minHeight:"100vh",background:BG}}>
-      {/* Nav */}
       <nav style={{padding:"0 5%",height:80,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.95)",backdropFilter:"blur(12px)",zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setTab("home")}>
           <div style={{width:34,height:34,borderRadius:8,background:NAVY,border:"1px solid "+GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:GOLD}}>M</div>
-          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:18}}>MedBoardPro</span>
+          <span style={{fontWeight:800,color:"#f1f5f9",fontSize:18, display:window.innerWidth>600?"block":"none"}}>MedBoardPro</span>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          {[{id:"home", i:"🏠", l:"Home"}, {id:"mcq", i:"🎯", l:"QBank"}, {id:"guides", i:"📚", l:"Guides"}].map(t => (
-            <button key={t.id} onClick={()=>setTab(t.id)} className={tab===t.id?"nav-btn active":"nav-btn"}>
+        <div style={{display:"flex",gap:8, alignItems:"flex-end", height:"100%"}}>
+          {[{id:"home", i:"🏠", l:"Home"}, {id:"mcq", i:"🎯", l:"QBank"}, {id:"guides", i:"📚", l:"Guides"}, {id:"progress", i:"📊", l:"Progress"}].map(t => (
+            <button key={t.id} onClick={()=>setTab(t.id)} className={tab===t.id?"nav-btn active":"nav-btn"} style={{height:"100%", justifyContent:"center"}}>
               <span style={{fontSize:20}}>{t.i}</span><span style={{fontSize:11,fontWeight:700}}>{t.l}</span>
             </button>
           ))}
         </div>
-        <button onClick={()=>sb.auth.signOut().then(()=>window.location.reload())} style={{color:"#94a3b8", background:"transparent", border:"1px solid #1e293b", padding:"6px 12px", borderRadius:6, cursor:"pointer", fontSize:11}}>Sign Out</button>
+        <div style={{display:"flex", alignItems:"center", gap:12}}>
+           <div style={{textAlign:"right", display:window.innerWidth>800?"block":"none"}}>
+              <div style={{fontSize:12, fontWeight:800}}>{user.user_metadata?.full_name || "Doctor"}</div>
+              <div style={{fontSize:10, color:"#64748b"}}>{user.email}</div>
+           </div>
+           <button onClick={()=>window.open(PORTAL_URL,"_blank")} className="gold-outline-btn">💳 Manage Plan</button>
+           <button onClick={()=>window.open(PORTAL_URL,"_blank")} className="gold-outline-btn">🔄 Change Plan</button>
+           <button onClick={()=>sb.auth.signOut().then(()=>window.location.reload())} style={{color:"#94a3b8", background:"transparent", border:"1px solid #1e293b", padding:"6px 12px", borderRadius:6, cursor:"pointer", fontSize:11}}>Sign Out</button>
+        </div>
       </nav>
 
       <div style={{padding:"40px 5%",maxWidth:1000,margin:"0 auto"}}>
         {tab==="home" && (
           <div className="fade">
-            <h2 style={{fontSize:28,fontWeight:800,marginBottom:28}}>Welcome, Doctor! 👋</h2>
-            <div style={{background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:16,padding:"24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <h2 style={{fontSize:28,fontWeight:800,marginBottom:8}}>Welcome back, {user.user_metadata?.full_name?.split(" ")[0] || "Doctor"}! 👋</h2>
+            <p style={{color:"#64748b", fontSize:14, marginBottom:28}}>Howard University College of Medicine · Academic Dashboard</p>
+            <div style={{background:"rgba(201,168,76,0.05)",border:"1px solid "+GOLD,borderRadius:16,padding:"24px",display:"flex",justifyContent:"space-between",alignItems:"center", marginBottom:32}}>
                <div style={{display:"flex",gap:40}}>
                   <div><p style={{fontSize:11,color:"#64748b",fontWeight:700}}>ALL-TIME ITEMS</p><div style={{fontSize:22,fontWeight:900}}>{history.t}</div></div>
                   <div><p style={{fontSize:11,color:"#64748b",fontWeight:700}}>ACCURACY</p><div style={{fontSize:22,fontWeight:900,color:"#10b981"}}>{history.t>0?Math.round(history.c/history.t*100)+"%":"—"}</div></div>
                </div>
-               <button onClick={()=>setTab("mcq")} style={{background:GOLD,color:"#000",padding:"10px 20px",borderRadius:8,fontWeight:800,border:"none",cursor:"pointer"}}>Start Practice</button>
+               <button onClick={()=>setTab("mcq")} style={{background:GOLD,color:"#000",padding:"10px 20px",borderRadius:8,fontWeight:800,border:"none",cursor:"pointer"}}>Start Practice Session</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:16}}>
+               <div className="quick-card" onClick={()=>setTab("mcq")}><h3>🎯 Premium QBank</h3><p style={{color:"#64748b", fontSize:13}}>Case-based board review</p></div>
+               <div className="quick-card" onClick={()=>setTab("guides")}><h3>📚 Guidelines</h3><p style={{color:"#64748b", fontSize:13}}>ATA, ADA, Endocrine Society</p></div>
+               <div className="quick-card" onClick={()=>setTab("progress")}><h3>📊 Performance</h3><p style={{color:"#64748b", fontSize:13}}>Weakness and accuracy tracking</p></div>
             </div>
           </div>
         )}
@@ -177,8 +181,7 @@ function App() {
         {tab==="mcq" && (
           <div className="fade">
             {appState==="idle" && <button onClick={handleLoadNext} style={{width:"100%",padding:20,background:NAVY,border:"1px solid "+GOLD,color:"#fff",fontWeight:900,fontSize:18,borderRadius:12,cursor:"pointer"}}>Load Next QBank Item ▶</button>}
-            {appState==="generating" && <div style={{textAlign:"center",padding:40}}><div style={{width:40,height:40,border:"4px solid "+GOLD,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 15px"}}></div><p>Consulting Guidelines... (15s)</p></div>}
-            
+            {appState==="generating" && <div style={{textAlign:"center",padding:40}}><div style={{width:40,height:40,border:"4px solid "+GOLD,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 15px"}}></div><p>Consulting Academic Guidelines... (15s)</p></div>}
             {question && (
               <div className="fade" style={{background:CARD,padding:30,borderRadius:16,border:"1px solid "+BDR}}>
                 <p style={{fontSize:18,lineHeight:1.8,marginBottom:25}}>{question.stem}</p>
@@ -193,23 +196,41 @@ function App() {
                 : <div style={{marginTop:25,padding:20,background:"rgba(255,255,255,0.03)",borderRadius:12}}>
                     <p style={{color:GOLD,fontWeight:800,marginBottom:10}}>ATTENDING EXPLANATION</p>
                     <p style={{lineHeight:1.6}}>{question.explanation}</p>
-                    <button onClick={handleLoadNext} style={{marginTop:20,width:"100%",padding:12,background:"transparent",border:"1px solid "+GOLD,color:GOLD,fontWeight:800,borderRadius:8}}>Next Item {preloadedQ ? '(Ready)' : '(Pre-loading...)'}</button>
+                    <button onClick={handleLoadNext} style={{marginTop:20,width:"100%",padding:12,background:"transparent",border:"1px solid "+GOLD,color:GOLD,fontWeight:800,borderRadius:8}}>Next Item {preloadedQ ? '(Instant Ready)' : '(Pre-loading...)'}</button>
                   </div>}
               </div>
             )}
           </div>
         )}
-      </div>
 
+        {tab==="guides" && (
+          <div className="fade" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:15}}>
+            {GUIDES.map(g=><a key={g.id} href={g.u} target="_blank" style={{textDecoration:"none",background:CARD,padding:15,borderRadius:10,border:"1px solid "+BDR,display:"flex",alignItems:"center",gap:15}}><div style={{width:35,height:35,background:NAVY,color:GOLD,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:6,fontWeight:900}}>{g.i}</div><div><div style={{color:"#f1f5f9",fontSize:13,fontWeight:700}}>{g.t}</div><div style={{fontSize:11,color:"#64748b"}}>{g.s}</div></div></a>)}
+          </div>
+        )}
+
+        {tab==="progress" && (
+          <div className="fade">
+            <h2 style={{fontSize:24,fontWeight:800,marginBottom:20}}>Performance Analytics</h2>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:20}}>
+               <div style={{background:CARD,padding:25,borderRadius:16,textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:"#3b82f6"}}>{history.t}</div><p style={{color:"#64748b"}}>Items Answered</p></div>
+               <div style={{background:CARD,padding:25,borderRadius:16,textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:"#10b981"}}>{history.c}</div><p style={{color:"#64748b"}}>Correct Answers</p></div>
+               <div style={{background:CARD,padding:25,borderRadius:16,textAlign:"center"}}><div style={{fontSize:42,fontWeight:900,color:GOLD}}>{history.t>0?Math.round(history.c/history.t*100)+"%":"—"}</div><p style={{color:"#64748b"}}>Mastery Score</p></div>
+            </div>
+          </div>
+        )}
+      </div>
       {showAuth && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
-           <button onClick={()=>sb.auth.signInWithOAuth({provider:'google'})} style={{padding:"15px 30px", background:"#fff", borderRadius:10, fontWeight:800, cursor:"pointer"}}>Continue with Google</button>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}} onClick={(e)=>e.target===e.currentTarget && setShowAuth(false)}>
+           <div style={{background:"#0f172a", padding:40, borderRadius:20, border:"1px solid "+BDR, textAlign:"center"}}>
+              <h3 style={{color:"#f1f5f9", marginBottom:20}}>Academic Login</h3>
+              <button onClick={()=>sb.auth.signInWithOAuth({provider:'google', options:{redirectTo:'https://medboardpro.org'}})} style={{padding:"15px 30px", background:"#fff", color:"#000", borderRadius:10, fontWeight:800, cursor:"pointer", border:"none"}}>Continue with Google</button>
+           </div>
         </div>
       )}
     </div>
   );
 }
-
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
 </script>
