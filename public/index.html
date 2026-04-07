@@ -13,7 +13,6 @@
 body{font-family:'Segoe UI',sans-serif;background:#0a0a0f;color:#f1f5f9;min-height:100vh}
 button,select,input{font-family:inherit}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .fade{animation:fadeIn 0.3s ease}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.3);color:#C9A84C;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:600;margin-bottom:24px}
@@ -605,25 +604,14 @@ function App() {
   }
 
   async function fetchOne(targetTopic, targetLvl) {
-    let answeredIds = [];
-    if (user) {
-      const {data: ur} = await sb.from("user_responses").select("mcq_id").eq("user_id", user.id);
-      if (ur) answeredIds = ur.map(r => r.mcq_id);
-    }
-    
-    const {data: bank} = await sb.from("mcqs").select("*").eq("topic", targetTopic).eq("exam_level", targetLvl).limit(50);
-    if (bank?.length > 0) {
-      const unanswered = bank.filter(q => !answeredIds.includes(q.id));
-      if (unanswered.length > 0) return unanswered[Math.floor(Math.random() * unanswered.length)];
-    }
-    
+    // DB bypass implemented to prevent drawing from the poisoned cache of "58-year-old man" questions.
     const res = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: targetTopic, level: targetLvl}) });
     if (!res.ok) throw new Error("Connection failed");
     const items = await res.json();
     return items[0];
   }
 
-  async function handleLoadNext() {
+  function handleLoadNext() {
     clearInterval(timerRef.current);
     clearInterval(typeRef.current);
     setErr(""); setSel(""); setExamSel(""); setRevealed(false); setRevealText("");
@@ -633,19 +621,35 @@ function App() {
 
     if (!q) { 
       setAppState("generating"); 
-      try { q = await fetchOne(topic, lvl.v); } catch(ex) { setErr("Unable to connect to QBank. Please retry."); setAppState("idle"); return; }
+      fetchOne(topic, lvl.v).then(newQ => {
+         setQuestion(newQ);
+         startQ(newQ);
+      }).catch(ex => {
+         setErr("Unable to connect to QBank. Please retry."); setAppState("idle");
+      });
+    } else {
+      setQuestion(q); 
+      startQ(q);
     }
-    
-    setQuestion(q); 
+  }
+
+  function startQ(q) {
     if (examMode) {
       setAppState("exam_running");
+      setRevealText(q.stem);
       startTimer();
     } else {
       setAppState("studying");
       let words = q.stem.split(" "), wi = 0;
+      let currentText = "";
       typeRef.current = setInterval(() => {
-        if(wi >= words.length) { clearInterval(typeRef.current); return; }
-        setRevealText(p => p + (wi===0?"":" ") + words[wi]);
+        if(wi >= words.length) { 
+          clearInterval(typeRef.current); 
+          setRevealText(q.stem); 
+          return; 
+        }
+        currentText += (wi===0?"":" ") + words[wi];
+        setRevealText(currentText);
         wi++;
       }, 15);
     }
