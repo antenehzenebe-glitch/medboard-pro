@@ -13,6 +13,7 @@
 body{font-family:'Segoe UI',sans-serif;background:#0a0a0f;color:#f1f5f9;min-height:100vh}
 button,select,input{font-family:inherit}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .fade{animation:fadeIn 0.3s ease}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.3);color:#C9A84C;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:600;margin-bottom:24px}
@@ -297,7 +298,7 @@ function LegalModal({type, onClose}) {
               <p style={{marginBottom:16}}>You agree to indemnify and hold harmless MedBoard Pro and its affiliates from any claims, damages, or expenses arising from your use of the platform or violation of these terms.</p>
 
               <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>13. Governing Law</h4>
-              <p style={{marginBottom:16}}>These Terms shall be governed and construed in accordance with the laws of the State of Maryland, United States, without regard to its conflict of law provisions.</p>
+              <p style={{marginBottom:16}}>These Terms shall be governed and construed in accordance with the laws of the State of Maryland, United States, without regard to its conflict of law provisions. However, if you are a resident of the European Union, this does not deprive you of mandatory consumer protections under the laws of your country of residence.</p>
             </div>
           )}
 
@@ -318,6 +319,12 @@ function LegalModal({type, onClose}) {
 
               <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>5. Data Retention & User Rights</h4>
               <p style={{marginBottom:16}}>We retain your data for as long as your account is active. You have the right to request access to, correction of, or deletion of your personal data by contacting our support team.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>6. California Privacy Rights (CCPA/CPRA)</h4>
+              <p style={{marginBottom:16}}>If you are a California resident, you have the right to request disclosure of the specific categories of personal information we have collected about you over the past 12 months. You also have the right to request deletion of your data and the right to not face discrimination for exercising these rights. <strong>MedBoard Pro does not sell or share your personal information for cross-context behavioral advertising.</strong> To exercise your CCPA rights, contact us at antenehzenebe@gmail.com.</p>
+              
+              <h4 style={{color:"#f1f5f9",marginTop:20,marginBottom:8}}>7. European Union Privacy Rights (GDPR)</h4>
+              <p style={{marginBottom:16}}>If you reside in the EU, we process your personal data based on the lawful basis of fulfilling our contract with you (providing the QBank service). You have the Right to be Forgotten, the Right to Data Portability, and the Right to Restrict Processing. By using this service, you consent to the transfer and storage of your data on servers located within the United States. You also have the right to lodge a complaint with a supervisory data protection authority in your member state.</p>
             </div>
           )}
 
@@ -604,7 +611,6 @@ function App() {
   }
 
   async function fetchOne(targetTopic, targetLvl) {
-    // DB bypass implemented to prevent drawing from the poisoned cache of "58-year-old man" questions.
     const res = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: targetTopic, level: targetLvl}) });
     if (!res.ok) throw new Error("Connection failed");
     const items = await res.json();
