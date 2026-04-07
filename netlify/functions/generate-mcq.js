@@ -1,6 +1,5 @@
-// generate-mcq.js — MedBoard Pro (v2.0 — Logic Guardrail Edition)
-// Enforces Clinical Realism & Cognitive Trap Analysis
-// Final Build Date: April 2026
+// generate-mcq.js — MedBoard Pro (v2.5 — Randomizer Interceptor Update)
+// Enforces Clinical Realism, Cognitive Traps, Strict Clearance Rules, Imaging URLs & True Randomization
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -66,22 +65,51 @@ async function saveMcqToSupabase(p, level) {
 }
 
 function buildPrompt(level, topic) {
-  var systemText = `You are a Fellowship Program Director writing high-yield Board Exam QBank items for ${level}. 
+  // --- THE RANDOMIZER INTERCEPTOR ---
+  var promptTopic = topic;
+  
+  if (topic.includes("Random -- All Specialties") || topic.includes("ABIM IM Blueprint") || topic.includes("USMLE High-Yield")) {
+    const allSpecs = [
+      "Cardiology (e.g., Acute Coronary Syndrome, Heart Failure, Arrhythmias)",
+      "Pulmonology (e.g., Asthma exacerbation, COPD, Pulmonary Embolism, ILD)",
+      "Gastroenterology (e.g., Cirrhosis complications, IBD, Pancreatitis)",
+      "Nephrology (e.g., AKI, Glomerulonephritis, Severe Acid-Base disorders)",
+      "Infectious Disease (e.g., Endocarditis, Opportunistic HIV infections, Meningitis)",
+      "Hematology/Oncology (e.g., Sickle Cell crisis, Leukemia, Bleeding disorders)",
+      "Rheumatology (e.g., Rheumatoid Arthritis, SLE, Systemic Vasculitis)",
+      "Endocrinology (e.g., Diabetic emergencies, Thyroid Storm, Adrenal Crisis)",
+      "Neurology (e.g., Stroke syndromes, Seizures, Multiple Sclerosis)"
+    ];
+    promptTopic = allSpecs[Math.floor(Math.random() * allSpecs.length)];
+  } else if (topic.includes("Random -- Endocrinology Only")) {
+    const endoSpecs = [
+      "Type 2 Diabetes Pharmacotherapy", "Type 1 Diabetes and DKA", "Hyperthyroidism and Graves", 
+      "Hypothyroidism and Myxedema", "Adrenal Insufficiency", "Cushing's Syndrome", 
+      "Pituitary Adenomas", "Hypercalcemia and Primary Hyperparathyroidism", "PCOS and Hypogonadism"
+    ];
+    promptTopic = endoSpecs[Math.floor(Math.random() * endoSpecs.length)];
+  }
+
+  var systemText = `You are a Fellowship Program Director writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
   
   CLINICAL GUARDRAILS:
-  1. SETTING VALIDATION: If the vignette involves hypotension (SBP < 90), tachycardia (HR > 100), acute severe metabolic derangement (pH < 7.2), or requires IV drips (insulin, non-heparin anticoagulants), you MUST place the patient in the EMERGENCY DEPARTMENT or INPATIENT WARD. Do not manage ICU-level care in a clinic.
+  1. SETTING VALIDATION: If the vignette involves hypotension (SBP < 90), tachycardia (HR > 100), acute severe metabolic derangement (pH < 7.2), or requires IV drips, you MUST place the patient in the EMERGENCY DEPARTMENT or INPATIENT WARD.
   2. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent one of these cognitive errors: Anchoring, Premature Closure, or Availability Bias. 
   3. EXPLANATION: 3-sentence rule. 
-     - S1: Why the correct answer is right + official society citation (e.g., ADA, ATA, ASH, ACC/AHA).
-     - S2: Why tempting wrong answers fail, explicitly naming the cognitive trap (e.g. "Option B is an anchoring trap").
-     - S3: THE BOARD PEARL. A hard clinical rule or cutoff (e.g. QTc > 500ms).
+     - S1: Why the correct answer is right + official society citation.
+     - S2: Why tempting wrong answers fail, explicitly naming the cognitive trap.
+     - S3: THE BOARD PEARL. A hard clinical rule or cutoff.
+  4. VISUAL DIAGNOSIS: If the vignette relies heavily on imaging or a classic physical exam finding, include a sentence in the explanation directing the user to review classic examples and explicitly include the full URL (e.g., "Review classic examples on Radiopaedia at https://radiopaedia.org or the NEJM Image Challenge at https://www.nejm.org/image-challenge").
+  5. PATIENT VARIATION: Strictly vary the age and sex of the patient (e.g., 22-year-old woman, 74-year-old man) to prevent repetitive vignette stems.
   
-  CLINICAL FOCUS: 
-  - HIT: Argatroban (liver) vs Bivalirudin (renal). 
-  - DKA: K+ must be known (>3.3) before insulin start.
+  HARD CLINICAL RULES (DO NOT VIOLATE): 
+  - HIT Anticoagulation: Argatroban is hepatically cleared (USE in renal failure, AVOID in hepatic failure). Bivalirudin/Fondaparinux are renally cleared (USE in hepatic failure, AVOID in severe renal failure).
+  - DKA/HHS: K+ must be known (>3.3) before insulin start.
+  - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour. Beta-blockers can worsen cardiogenic shock if severe hypotension is present.
   - UC: Fecal calpro > 1500 + tachycardia = biologic induction.`;
 
-  var userText = `Write 1 vignette about ${topic}. JSON Format: {"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"...","topic":"${topic}"}`;
+  // We feed the AI the 'promptTopic', but we force it to output the original 'topic' so your UI stays consistent.
+  var userText = `Write 1 highly complex vignette specifically about: ${promptTopic}. JSON Format: {"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"...","topic":"${topic}"}`;
   return { systemText, userText };
 }
 
@@ -94,7 +122,13 @@ exports.handler = async function(event) {
     var res = await callClaude(pd.systemText, pd.userText);
     var cleaned = res.substring(res.indexOf("{"), res.lastIndexOf("}") + 1);
     var p = JSON.parse(cleaned);
-    saveMcqToSupabase(p, b.level).catch(() => {});
-    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
+    
+    // UI Safety Check: Prevents "undefined" from showing up
+    if (p.stem && p.choices && p.correct && p.explanation) {
+      saveMcqToSupabase(p, b.level).catch(() => {});
+      return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
+    } else {
+      throw new Error("Invalid QBank generation format.");
+    }
   } catch(e) { return { statusCode: 500, body: JSON.stringify({ error: e.message }) }; }
 };
