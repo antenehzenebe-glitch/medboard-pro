@@ -1,5 +1,5 @@
-// generate-mcq.js — MedBoard Pro (v2.5 — Randomizer Interceptor Update)
-// Enforces Clinical Realism, Cognitive Traps, Strict Clearance Rules, Imaging URLs & True Randomization
+// generate-mcq.js — MedBoard Pro (v2.7 — Question Type Randomizer)
+// Enforces Clinical Realism, Blueprint Randomizer, Strict PK, and Question Variety
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -65,23 +65,35 @@ async function saveMcqToSupabase(p, level) {
 }
 
 function buildPrompt(level, topic) {
-  // --- THE RANDOMIZER INTERCEPTOR ---
   var promptTopic = topic;
   
-  if (topic.includes("Random -- All Specialties") || topic.includes("ABIM IM Blueprint") || topic.includes("USMLE High-Yield")) {
+  // 1. Topic Randomizer
+  if (topic === "Random -- ABIM IM Blueprint") {
+    const blueprint = [
+      { s: "Cardiology (e.g., Acute Coronary Syndrome, Heart Failure, Arrhythmias)", w: 14 },
+      { s: "Pulmonology (e.g., Asthma exacerbation, COPD, Pulmonary Embolism)", w: 9 },
+      { s: "Gastroenterology (e.g., Cirrhosis complications, IBD, Pancreatitis)", w: 9 },
+      { s: "Infectious Disease (e.g., Endocarditis, Opportunistic HIV infections, Sepsis)", w: 9 },
+      { s: "Rheumatology (e.g., Rheumatoid Arthritis, SLE, Systemic Vasculitis)", w: 9 },
+      { s: "Endocrinology (e.g., Diabetic emergencies, Thyroid Storm, Adrenal Crisis)", w: 9 },
+      { s: "Nephrology (e.g., AKI, Glomerulonephritis, Severe Acid-Base disorders)", w: 9 },
+      { s: "Hematology/Oncology (e.g., Sickle Cell crisis, Leukemia, Bleeding disorders)", w: 12 },
+      { s: "Neurology (e.g., Stroke syndromes, Seizures, Multiple Sclerosis)", w: 4 }
+    ];
+    let totalWeight = blueprint.reduce((acc, curr) => acc + curr.w, 0);
+    let randomNum = Math.random() * totalWeight;
+    let sum = 0;
+    for (let item of blueprint) {
+      sum += item.w;
+      if (randomNum <= sum) { promptTopic = item.s; break; }
+    }
+  } else if (topic === "Random -- All Specialties" || topic === "Random -- USMLE High-Yield") {
     const allSpecs = [
-      "Cardiology (e.g., Acute Coronary Syndrome, Heart Failure, Arrhythmias)",
-      "Pulmonology (e.g., Asthma exacerbation, COPD, Pulmonary Embolism, ILD)",
-      "Gastroenterology (e.g., Cirrhosis complications, IBD, Pancreatitis)",
-      "Nephrology (e.g., AKI, Glomerulonephritis, Severe Acid-Base disorders)",
-      "Infectious Disease (e.g., Endocarditis, Opportunistic HIV infections, Meningitis)",
-      "Hematology/Oncology (e.g., Sickle Cell crisis, Leukemia, Bleeding disorders)",
-      "Rheumatology (e.g., Rheumatoid Arthritis, SLE, Systemic Vasculitis)",
-      "Endocrinology (e.g., Diabetic emergencies, Thyroid Storm, Adrenal Crisis)",
-      "Neurology (e.g., Stroke syndromes, Seizures, Multiple Sclerosis)"
+      "Cardiology", "Pulmonology", "Gastroenterology", "Nephrology", 
+      "Infectious Disease", "Hematology/Oncology", "Rheumatology", "Endocrinology", "Neurology"
     ];
     promptTopic = allSpecs[Math.floor(Math.random() * allSpecs.length)];
-  } else if (topic.includes("Random -- Endocrinology Only")) {
+  } else if (topic === "Random -- Endocrinology Only") {
     const endoSpecs = [
       "Type 2 Diabetes Pharmacotherapy", "Type 1 Diabetes and DKA", "Hyperthyroidism and Graves", 
       "Hypothyroidism and Myxedema", "Adrenal Insufficiency", "Cushing's Syndrome", 
@@ -89,6 +101,18 @@ function buildPrompt(level, topic) {
     ];
     promptTopic = endoSpecs[Math.floor(Math.random() * endoSpecs.length)];
   }
+
+  // 2. Question Type Randomizer (Forces variety beyond just "management")
+  const qTypes = [
+    "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP (e.g., what lab/imaging to order)",
+    "the MOST LIKELY DIAGNOSIS",
+    "the most appropriate NEXT STEP IN MANAGEMENT OR TREATMENT",
+    "the underlying PATHOPHYSIOLOGY OR MECHANISM of the patient's condition",
+    "the STRONGEST RISK FACTOR or expected PROGNOSIS for this condition"
+  ];
+  // Weight it slightly so management/diagnosis still appear often, but the others get mixed in.
+  const weightedTypes = [0, 0, 1, 1, 2, 2, 3, 4]; 
+  var promptQType = qTypes[weightedTypes[Math.floor(Math.random() * weightedTypes.length)]];
 
   var systemText = `You are a Fellowship Program Director writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
   
@@ -105,11 +129,14 @@ function buildPrompt(level, topic) {
   HARD CLINICAL RULES (DO NOT VIOLATE): 
   - HIT Anticoagulation: Argatroban is hepatically cleared (USE in renal failure, AVOID in hepatic failure). Bivalirudin/Fondaparinux are renally cleared (USE in hepatic failure, AVOID in severe renal failure).
   - DKA/HHS: K+ must be known (>3.3) before insulin start.
-  - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour. Beta-blockers can worsen cardiogenic shock if severe hypotension is present.
+  - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.
   - UC: Fecal calpro > 1500 + tachycardia = biologic induction.`;
 
-  // We feed the AI the 'promptTopic', but we force it to output the original 'topic' so your UI stays consistent.
-  var userText = `Write 1 highly complex vignette specifically about: ${promptTopic}. JSON Format: {"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"...","topic":"${topic}"}`;
+  var userText = `Write 1 highly complex vignette specifically about: ${promptTopic}. 
+  CRITICAL INSTRUCTION: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
+  
+  JSON Format: {"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
+  
   return { systemText, userText };
 }
 
@@ -118,13 +145,15 @@ exports.handler = async function(event) {
   try {
     var b = JSON.parse(event.body);
     if (b.warmup) return { statusCode: 200, body: "{}" };
+    
     var pd = buildPrompt(b.level, b.topic);
     var res = await callClaude(pd.systemText, pd.userText);
     var cleaned = res.substring(res.indexOf("{"), res.lastIndexOf("}") + 1);
+    
     var p = JSON.parse(cleaned);
     
-    // UI Safety Check: Prevents "undefined" from showing up
     if (p.stem && p.choices && p.correct && p.explanation) {
+      p.topic = b.topic; 
       saveMcqToSupabase(p, b.level).catch(() => {});
       return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
     } else {
