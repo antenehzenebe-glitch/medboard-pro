@@ -230,13 +230,18 @@ function LabPanel(){
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
+// BUG FIX 3: try-catch block added to prevent unhandled rejection crashes
 async function saveResponse(question, choice, isCorrect) {
-  const {data:{session}} = await sb.auth.getSession();
-  if (!session) return;
-  const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
-  const mcqId = mcqRes.data?.[0]?.id;
-  if (!mcqId) return;
-  await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
+  try {
+    const {data:{session}} = await sb.auth.getSession();
+    if (!session) return;
+    const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
+    const mcqId = mcqRes.data?.[0]?.id;
+    if (!mcqId) return;
+    await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 // ─── LEGAL MODAL COMPONENT ────────────────────────────────────────────
@@ -610,8 +615,13 @@ function App() {
     } catch(ex) { setAuthErr(ex.message); }
   }
 
+  // BUG FIX 2: Added {"Content-Type": "application/json"} to the fetch headers
   async function fetchOne(targetTopic, targetLvl) {
-    const res = await fetch("/.netlify/functions/generate-mcq", { method: "POST", body: JSON.stringify({topic: targetTopic, level: targetLvl}) });
+    const res = await fetch("/.netlify/functions/generate-mcq", { 
+      method: "POST", 
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({topic: targetTopic, level: targetLvl}) 
+    });
     if (!res.ok) throw new Error("Connection failed");
     const items = await res.json();
     return items[0];
@@ -706,32 +716,26 @@ function App() {
     return "#cbd5e1";
   }
 
+  // BUG FIX 1: Passed all the missing authentication props into LandingPage so login works if logged out
   if (!user) return (
     <>
-      <LandingPage setShowAuth={setShowAuth} setLegalModal={setLegalModal} />
+      <LandingPage 
+        showAuth={showAuth} 
+        setShowAuth={setShowAuth} 
+        authMode={authMode} 
+        setAuthMode={setAuthMode} 
+        email={email} 
+        setEmail={setEmail} 
+        pw={pw} 
+        setPw={setPw} 
+        nm={nm} 
+        setNm={setNm} 
+        authErr={authErr} 
+        handleAuth={handleAuth} 
+        googleLogin={()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://medboardpro.org'}})} 
+        setLegalModal={setLegalModal} 
+      />
       {legalModal && <LegalModal type={legalModal} onClose={()=>setLegalModal(null)} />}
-      {showAuth && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}} onClick={(e)=>e.target===e.currentTarget && setShowAuth(false)}>
-           <div style={{background:"#0f172a", padding:40, borderRadius:20, border:"1px solid "+BDR, width:"100%", maxWidth:400}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:24}}>
-                 <h3 style={{color:"#f1f5f9", fontSize:22}}>{authMode==="signup"?"Create Account":"Welcome Back"}</h3>
-                 <button onClick={()=>setShowAuth(false)} style={{background:"none",border:"none",color:"#94a3b8",fontSize:24,cursor:"pointer"}}>×</button>
-              </div>
-              <button onClick={()=>sb.auth.signInWithOAuth({provider:'google', options:{redirectTo:'https://medboardpro.org'}})} style={{width:"100%", padding:"12px", background:"#fff", color:"#000", borderRadius:10, fontWeight:800, cursor:"pointer", border:"none", marginBottom:20}}>Continue with Google</button>
-              <div style={{textAlign:"center", color:"#64748b", fontSize:12, marginBottom:20}}>OR EMAIL</div>
-              <form onSubmit={handleAuth}>
-                {authMode==="signup" && <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Full Name" required style={{width:"100%", padding:12, borderRadius:8, border:"1px solid "+BDR, background:"rgba(255,255,255,0.05)", color:"#fff", marginBottom:12}} />}
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email Address" required style={{width:"100%", padding:12, borderRadius:8, border:"1px solid "+BDR, background:"rgba(255,255,255,0.05)", color:"#fff", marginBottom:12}} />
-                <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Password" required style={{width:"100%", padding:12, borderRadius:8, border:"1px solid "+BDR, background:"rgba(255,255,255,0.05)", color:"#fff", marginBottom:12}} />
-                {authErr && <p style={{color:"#ef4444", fontSize:12, marginBottom:12}}>{authErr}</p>}
-                <button type="submit" style={{width:"100%", padding:12, borderRadius:8, background:NAVY, border:"1px solid "+GOLD, color:"#fff", fontWeight:800, cursor:"pointer", marginTop:10}}>{authMode==="signup"?"Sign Up":"Sign In"}</button>
-              </form>
-              <div style={{marginTop:20, textAlign:"center"}}>
-                <button onClick={()=>setAuthMode(authMode==="login"?"signup":"login")} style={{background:"none",border:"none",color:GOLD,cursor:"pointer",fontSize:13}}>{authMode==="login"?"Need an account? Sign up":"Already have an account? Sign in"}</button>
-              </div>
-           </div>
-        </div>
-      )}
     </>
   );
 
