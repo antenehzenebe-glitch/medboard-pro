@@ -1,5 +1,5 @@
-// generate-mcq.js — MedBoard Pro (v2.7 — Question Type Randomizer)
-// Enforces Clinical Realism, Blueprint Randomizer, Strict PK, and Question Variety
+// generate-mcq.js — MedBoard Pro (v3.0 — The Master Blueprint Engine)
+// Official ABIM/NBME Weights, Dynamic Exam Triage, Ethics/HIPAA Integration, and Forced Demographics
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -64,76 +64,136 @@ async function saveMcqToSupabase(p, level) {
   } catch (e) { console.log("DB Save Failed:", e.message); }
 }
 
+// Helper: Roulette Wheel for Weighted Arrays
+function pickWeighted(blueprint) {
+  let totalWeight = blueprint.reduce((acc, curr) => acc + curr.w, 0);
+  let randomNum = Math.random() * totalWeight;
+  let sum = 0;
+  for (let item of blueprint) {
+    sum += item.w;
+    if (randomNum <= sum) return item.s;
+  }
+  return blueprint[0].s;
+}
+
 function buildPrompt(level, topic) {
   var promptTopic = topic;
   
-  // 1. Topic Randomizer
-  if (topic === "Random -- ABIM IM Blueprint") {
-    const blueprint = [
-      { s: "Cardiology (e.g., Acute Coronary Syndrome, Heart Failure, Arrhythmias)", w: 14 },
-      { s: "Pulmonology (e.g., Asthma exacerbation, COPD, Pulmonary Embolism)", w: 9 },
-      { s: "Gastroenterology (e.g., Cirrhosis complications, IBD, Pancreatitis)", w: 9 },
-      { s: "Infectious Disease (e.g., Endocarditis, Opportunistic HIV infections, Sepsis)", w: 9 },
-      { s: "Rheumatology (e.g., Rheumatoid Arthritis, SLE, Systemic Vasculitis)", w: 9 },
-      { s: "Endocrinology (e.g., Diabetic emergencies, Thyroid Storm, Adrenal Crisis)", w: 9 },
-      { s: "Nephrology (e.g., AKI, Glomerulonephritis, Severe Acid-Base disorders)", w: 9 },
-      { s: "Hematology/Oncology (e.g., Sickle Cell crisis, Leukemia, Bleeding disorders)", w: 12 },
-      { s: "Neurology (e.g., Stroke syndromes, Seizures, Multiple Sclerosis)", w: 4 }
-    ];
-    let totalWeight = blueprint.reduce((acc, curr) => acc + curr.w, 0);
-    let randomNum = Math.random() * totalWeight;
-    let sum = 0;
-    for (let item of blueprint) {
-      sum += item.w;
-      if (randomNum <= sum) { promptTopic = item.s; break; }
+  // ======================================================================
+  // 1. THE MASTER BLUEPRINT ROUTER
+  // ======================================================================
+  if (topic.includes("Random")) {
+    if (level === "ABIM Endocrinology" || topic === "Random -- Endocrinology Only") {
+      promptTopic = pickWeighted([
+        { s: "Diabetes Mellitus and Hypoglycemia Management", w: 25 },
+        { s: "Thyroid Disorders and Thyroid Cancer", w: 20 },
+        { s: "Pituitary and Neuroendocrine Tumors", w: 15 },
+        { s: "Bone, Calcium, and Parathyroid Disorders", w: 15 },
+        { s: "Adrenal Disorders and Hypertension", w: 10 },
+        { s: "Reproductive Endocrinology, PCOS, and Hypogonadism", w: 10 },
+        { s: "Lipid Disorders and Multiple Endocrine Neoplasia", w: 5 }
+      ]);
+    } 
+    else if (level === "USMLE Step 1") {
+      promptTopic = pickWeighted([
+        { s: "Systemic Pathology and Pathophysiology", w: 30 },
+        { s: "Pharmacology, Pharmacokinetics, and Adverse Effects", w: 20 },
+        { s: "Physiology and Clinical Biochemistry", w: 20 },
+        { s: "Microbiology, Virology, and Immunology", w: 15 },
+        { s: "Anatomy, Neuroanatomy, and Embryology", w: 5 },
+        { s: "Behavioral Science, Medical Ethics, and Biostatistics", w: 10 }
+      ]);
     }
-  } else if (topic === "Random -- All Specialties" || topic === "Random -- USMLE High-Yield") {
-    const allSpecs = [
-      "Cardiology", "Pulmonology", "Gastroenterology", "Nephrology", 
-      "Infectious Disease", "Hematology/Oncology", "Rheumatology", "Endocrinology", "Neurology"
-    ];
-    promptTopic = allSpecs[Math.floor(Math.random() * allSpecs.length)];
-  } else if (topic === "Random -- Endocrinology Only") {
-    const endoSpecs = [
-      "Type 2 Diabetes Pharmacotherapy", "Type 1 Diabetes and DKA", "Hyperthyroidism and Graves", 
-      "Hypothyroidism and Myxedema", "Adrenal Insufficiency", "Cushing's Syndrome", 
-      "Pituitary Adenomas", "Hypercalcemia and Primary Hyperparathyroidism", "PCOS and Hypogonadism"
-    ];
-    promptTopic = endoSpecs[Math.floor(Math.random() * endoSpecs.length)];
+    else if (level === "USMLE Step 2 CK" || level === "USMLE Step 3") {
+      promptTopic = pickWeighted([
+        { s: "Internal Medicine (Cardio, Pulm, GI, Renal, Endo, ID)", w: 45 },
+        { s: "General Surgery and Trauma Management", w: 15 },
+        { s: "Pediatrics and Congenital Issues", w: 10 },
+        { s: "Obstetrics and Gynecology", w: 10 },
+        { s: "Psychiatry and Substance Abuse", w: 10 },
+        { s: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", w: 10 }
+      ]);
+    }
+    else {
+      // Default: ABIM Internal Medicine
+      promptTopic = pickWeighted([
+        { s: "Cardiology (e.g., ACS, Heart Failure, Arrhythmias)", w: 14 },
+        { s: "Hematology and Oncology", w: 12 },
+        { s: "Pulmonology", w: 9 }, { s: "Gastroenterology and Hepatology", w: 9 },
+        { s: "Infectious Disease", w: 9 }, { s: "Rheumatology", w: 9 },
+        { s: "Endocrinology", w: 9 }, { s: "Nephrology", w: 9 },
+        { s: "Neurology", w: 4 }, { s: "General Internal Medicine", w: 10 },
+        { s: "Medical Ethics, HIPAA Compliance, Patient Counseling, and Palliative/End-of-Life Care", w: 6 }
+      ]);
+    }
   }
 
-  // 2. Question Type Randomizer (Forces variety beyond just "management")
-  const qTypes = [
-    "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP (e.g., what lab/imaging to order)",
-    "the MOST LIKELY DIAGNOSIS",
-    "the most appropriate NEXT STEP IN MANAGEMENT OR TREATMENT",
-    "the underlying PATHOPHYSIOLOGY OR MECHANISM of the patient's condition",
-    "the STRONGEST RISK FACTOR or expected PROGNOSIS for this condition"
-  ];
-  // Weight it slightly so management/diagnosis still appear often, but the others get mixed in.
-  const weightedTypes = [0, 0, 1, 1, 2, 2, 3, 4]; 
-  var promptQType = qTypes[weightedTypes[Math.floor(Math.random() * weightedTypes.length)]];
-
-  var systemText = `You are a Fellowship Program Director writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
+  // ======================================================================
+  // 2. EXAM-SPECIFIC QUESTION TYPE CALIBRATION
+  // ======================================================================
+  let qTypePool = [];
   
-  CLINICAL GUARDRAILS:
-  1. SETTING VALIDATION: If the vignette involves hypotension (SBP < 90), tachycardia (HR > 100), acute severe metabolic derangement (pH < 7.2), or requires IV drips, you MUST place the patient in the EMERGENCY DEPARTMENT or INPATIENT WARD.
-  2. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent one of these cognitive errors: Anchoring, Premature Closure, or Availability Bias. 
-  3. EXPLANATION: 3-sentence rule. 
+  if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
+    // Force Ethics formats
+    qTypePool = [
+      "the most appropriate NEXT STEP IN PATIENT COUNSELING OR COMMUNICATION",
+      "the LEGAL OR ETHICAL REQUIREMENT in this scenario (e.g., HIPAA, surrogate decision-making, autonomy)",
+      "the most appropriate approach to PALLIATIVE OR END-OF-LIFE CARE for this patient"
+    ];
+  } else if (level === "USMLE Step 1") {
+    // Force Foundational Science formats
+    qTypePool = [
+      "the UNDERLYING MECHANISM, ENZYME DEFICIENCY, OR PATHOPHYSIOLOGY of the condition",
+      "the MECHANISM OF ACTION, PHARMACODYNAMICS, OR TOXICITY of the appropriate drug",
+      "the MOST LIKELY HISTOLOGICAL, GROSS ANATOMICAL, OR BIOCHEMICAL finding"
+    ];
+  } else {
+    // Force Clinical formats (ABIM, Step 2/3)
+    qTypePool = [
+      "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP (e.g., what lab/imaging to order)",
+      "the MOST LIKELY DIAGNOSIS",
+      "the most appropriate NEXT STEP IN MANAGEMENT OR TREATMENT",
+      "the STRONGEST RISK FACTOR or expected PROGNOSIS for this condition"
+    ];
+  }
+  const promptQType = qTypePool[Math.floor(Math.random() * qTypePool.length)];
+
+  // ======================================================================
+  // 3. DEMOGRAPHICS & CLINICAL SETTING
+  // ======================================================================
+  const randomAge = Math.floor(Math.random() * 66) + 20; 
+  const randomSex = Math.random() > 0.5 ? "man" : "woman";
+
+  let settingPool = ["an acute emergency department presentation", "a routine chronic outpatient clinic follow-up", "an inpatient hospital ward admission"];
+  if (level === "USMLE Step 3" || level.includes("ABIM")) settingPool.push("a telephone consult or telemedicine follow-up", "an intensive care unit (ICU) transfer");
+  const promptSetting = settingPool[Math.floor(Math.random() * settingPool.length)];
+
+  // ======================================================================
+  // 4. THE PROMPT COMPILER
+  // ======================================================================
+  var systemRole = level.includes("USMLE") ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
+  
+  var systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
+  
+  CLINICAL & ETHICAL GUARDRAILS:
+  1. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions (e.g., reportable diseases), or advanced directives. Do not make the correct answer "call the ethics committee."
+  2. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
+  3. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error: Anchoring, Premature Closure, or Availability Bias. 
+  4. EXPLANATION: 3-sentence rule. 
      - S1: Why the correct answer is right + official society citation.
      - S2: Why tempting wrong answers fail, explicitly naming the cognitive trap.
      - S3: THE BOARD PEARL. A hard clinical rule or cutoff.
-  4. VISUAL DIAGNOSIS: If the vignette relies heavily on imaging or a classic physical exam finding, include a sentence in the explanation directing the user to review classic examples and explicitly include the full URL (e.g., "Review classic examples on Radiopaedia at https://radiopaedia.org or the NEJM Image Challenge at https://www.nejm.org/image-challenge").
-  5. PATIENT VARIATION: Strictly vary the age and sex of the patient (e.g., 22-year-old woman, 74-year-old man) to prevent repetitive vignette stems.
+  5. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
   
   HARD CLINICAL RULES (DO NOT VIOLATE): 
-  - HIT Anticoagulation: Argatroban is hepatically cleared (USE in renal failure, AVOID in hepatic failure). Bivalirudin/Fondaparinux are renally cleared (USE in hepatic failure, AVOID in severe renal failure).
+  - HIT Anticoagulation: Argatroban is hepatically cleared. Bivalirudin/Fondaparinux are renally cleared.
   - DKA/HHS: K+ must be known (>3.3) before insulin start.
-  - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.
-  - UC: Fecal calpro > 1500 + tachycardia = biologic induction.`;
+  - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.`;
 
   var userText = `Write 1 highly complex vignette specifically about: ${promptTopic}. 
-  CRITICAL INSTRUCTION: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
+  CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
+  CRITICAL INSTRUCTION 2: The patient in the vignette MUST be exactly a ${randomAge}-year-old ${randomSex}. You must use this exact age and sex.
+  CRITICAL INSTRUCTION 3: The clinical setting of this vignette MUST be ${promptSetting}. Ensure the acuity of the presentation matches this setting.
   
   JSON Format: {"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
   
