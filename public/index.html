@@ -230,7 +230,6 @@ function LabPanel(){
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-// Added try-catch explicitly here as requested by Claude
 async function saveResponse(question, choice, isCorrect) {
   try {
     const {data:{session}} = await sb.auth.getSession();
@@ -457,7 +456,7 @@ function LandingPage(props) {
                   <ul style={{listStyle:"none",marginBottom:32}}>
                     {plan.features.map(f => <li key={f} style={{color:"#94a3b8",fontSize:15,padding:"6px 0",display:"flex",alignItems:"flex-start",gap:12,lineHeight:1.4}}><span style={{color:"#10b981",fontSize:14,marginTop:2}}>✓</span>{f}</li>)}
                   </ul>
-                  <button onClick={()=>window.open(PAYMENT_LINKS[plan.key],"_blank")} style={{width:"100%",padding:"14px",borderRadius:12,background:plan.badge?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"transparent",border:"1px solid "+(plan.badge?"#3b82f6":BDR),color:plan.badge?"#fff":"#e2e8f0",fontWeight:800,fontSize:15,cursor:"pointer"}}>Start Free Trial</button>
+                  <button onClick={()=>{setAuthMode('signup'); setShowAuth(true);}} style={{width:"100%",padding:"14px",borderRadius:12,background:plan.badge?"linear-gradient(135deg,"+NAVY+",#1a4a9a)":"transparent",border:"1px solid "+(plan.badge?"#3b82f6":BDR),color:plan.badge?"#fff":"#e2e8f0",fontWeight:800,fontSize:15,cursor:"pointer"}}>Start Free Trial</button>
                 </div>
               ))}
             </div>
