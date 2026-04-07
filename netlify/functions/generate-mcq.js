@@ -1,5 +1,5 @@
-// generate-mcq.js — MedBoard Pro (v3.0 — The Master Blueprint Engine)
-// Official ABIM/NBME Weights, Dynamic Exam Triage, Ethics/HIPAA Integration, and Forced Demographics
+// generate-mcq.js — MedBoard Pro (v3.3 — The Master Blueprint + Grok Shuffle + Weighted Settings)
+// Official ABIM/NBME Weights, Ethics Integration, Forced Demographics, Weighted Settings, and Bulletproof Option Shuffling
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -134,21 +134,18 @@ function buildPrompt(level, topic) {
   let qTypePool = [];
   
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
-    // Force Ethics formats
     qTypePool = [
       "the most appropriate NEXT STEP IN PATIENT COUNSELING OR COMMUNICATION",
       "the LEGAL OR ETHICAL REQUIREMENT in this scenario (e.g., HIPAA, surrogate decision-making, autonomy)",
       "the most appropriate approach to PALLIATIVE OR END-OF-LIFE CARE for this patient"
     ];
   } else if (level === "USMLE Step 1") {
-    // Force Foundational Science formats
     qTypePool = [
       "the UNDERLYING MECHANISM, ENZYME DEFICIENCY, OR PATHOPHYSIOLOGY of the condition",
       "the MECHANISM OF ACTION, PHARMACODYNAMICS, OR TOXICITY of the appropriate drug",
       "the MOST LIKELY HISTOLOGICAL, GROSS ANATOMICAL, OR BIOCHEMICAL finding"
     ];
   } else {
-    // Force Clinical formats (ABIM, Step 2/3)
     qTypePool = [
       "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP (e.g., what lab/imaging to order)",
       "the MOST LIKELY DIAGNOSIS",
@@ -159,14 +156,23 @@ function buildPrompt(level, topic) {
   const promptQType = qTypePool[Math.floor(Math.random() * qTypePool.length)];
 
   // ======================================================================
-  // 3. DEMOGRAPHICS & CLINICAL SETTING
+  // 3. DEMOGRAPHICS & WEIGHTED CLINICAL SETTING
   // ======================================================================
   const randomAge = Math.floor(Math.random() * 66) + 20; 
   const randomSex = Math.random() > 0.5 ? "man" : "woman";
 
-  let settingPool = ["an acute emergency department presentation", "a routine chronic outpatient clinic follow-up", "an inpatient hospital ward admission"];
-  if (level === "USMLE Step 3" || level.includes("ABIM")) settingPool.push("a telephone consult or telemedicine follow-up", "an intensive care unit (ICU) transfer");
-  const promptSetting = settingPool[Math.floor(Math.random() * settingPool.length)];
+  let settingBlueprint = [
+    { s: "a routine chronic outpatient clinic follow-up", w: 40 },
+    { s: "an inpatient hospital ward admission", w: 30 },
+    { s: "an acute emergency department presentation", w: 20 }
+  ];
+
+  if (level === "USMLE Step 3" || level.includes("ABIM")) {
+    settingBlueprint.push({ s: "an intensive care unit (ICU) transfer", w: 5 });
+    settingBlueprint.push({ s: "a telephone consult or telemedicine follow-up", w: 5 });
+  }
+
+  const promptSetting = pickWeighted(settingBlueprint);
 
   // ======================================================================
   // 4. THE PROMPT COMPILER
@@ -177,7 +183,7 @@ function buildPrompt(level, topic) {
   
   CLINICAL & ETHICAL GUARDRAILS:
   1. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions (e.g., reportable diseases), or advanced directives. Do not make the correct answer "call the ethics committee."
-  2. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
+  2. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting. A clinic patient should generally be stable.
   3. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error: Anchoring, Premature Closure, or Availability Bias. 
   4. EXPLANATION: 3-sentence rule. 
      - S1: Why the correct answer is right + official society citation.
@@ -214,6 +220,48 @@ exports.handler = async function(event) {
     
     if (p.stem && p.choices && p.correct && p.explanation) {
       p.topic = b.topic; 
+      
+      // ======================================================================
+      // THE GROK FIX: FISHER-YATES POST-GENERATION SHUFFLE
+      // ======================================================================
+      // 1. Extract the options into an array
+      const optionsArray = [
+        { text: p.choices.A },
+        { text: p.choices.B },
+        { text: p.choices.C },
+        { text: p.choices.D },
+        { text: p.choices.E }
+      ].filter(opt => opt.text); 
+      
+      // 2. Capture the actual text of the correct answer before we shuffle
+      const correctText = p.choices[p.correct];
+
+      // 3. Perform the Fisher-Yates Shuffle
+      for (let i = optionsArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [optionsArray[i], optionsArray[j]] = [optionsArray[j], optionsArray[i]];
+      }
+
+      // 4. Rebuild the choices object (A through E) and identify the new correct letter
+      const shuffledChoices = {};
+      let newCorrectLetter = 'A';
+      const letters = ['A', 'B', 'C', 'D', 'E'];
+
+      optionsArray.forEach((item, index) => {
+        const currentLetter = letters[index];
+        shuffledChoices[currentLetter] = item.text;
+        
+        // If this shuffled item matches our original correct text, save this letter!
+        if (item.text === correctText) {
+          newCorrectLetter = currentLetter;
+        }
+      });
+
+      // 5. Overwrite the QBank engine's original output with our newly shuffled data
+      p.choices = shuffledChoices;
+      p.correct = newCorrectLetter;
+      // ======================================================================
+
       saveMcqToSupabase(p, b.level).catch(() => {});
       return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
     } else {
