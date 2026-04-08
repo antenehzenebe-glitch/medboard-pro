@@ -1,10 +1,9 @@
-// generate-mcq.js — MedBoard Pro (v4.2 — The Indestructible Engine)
-// Fixes Network Crash: Restores true Gemini fallback and Supabase defaults.
+// generate-mcq.js — MedBoard Pro (v4.3 — The Apology Update)
+// Fixes: Active Claude 4.6 Model, Disabled Gemini Safety Filters, Transparent Error Logging
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 
-// Restored fallback keys so the app doesn't crash if Netlify Env Vars are missing
 const SUPABASE_URL      = process.env.SUPABASE_URL || "https://vhzeeskhvkujihuvddcc.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
 
@@ -62,7 +61,7 @@ async function callClaude(systemText, userText) {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model:      "claude-3-5-sonnet-20241022", 
+          model:      "claude-opus-4-6", // CORRECTED TO ACTIVE MODEL
           max_tokens: 2048,                         
           temperature: 0.6,
           system:    systemText,
@@ -84,7 +83,6 @@ async function callClaude(systemText, userText) {
 
     } catch (e) {
       console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
-      // IF CLAUDE FAILS COMPLETELY, INSTANTLY FALL BACK TO GEMINI
       if (attempt === maxRetries - 1) {
         console.warn("Switching to Gemini Fallback...");
         return await callGemini(systemText, finalUserText);
@@ -103,6 +101,12 @@ async function callGemini(systemText, userText) {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemText }] },
           contents:          [{ role: "user", parts: [{ text: userText }] }],
+          safetySettings: [
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
+          ],
           generationConfig:  { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 2048 }
         })
       }
@@ -110,7 +114,7 @@ async function callGemini(systemText, userText) {
     if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini returned empty response.");
+    if (!text) throw new Error("Gemini returned empty response. Check if safety filters blocked the clinical content.");
     return text;
   } catch (e) { throw e; }
 }
@@ -268,7 +272,8 @@ exports.handler = async function (event) {
     try {
       res = await callClaude(pd.systemText, pd.userText);
     } catch (apiError) {
-      throw new Error("Both Anthropic and Gemini APIs failed to respond.");
+      // EXPOSING THE REAL ERROR NOW
+      throw new Error(`AI Network Failure: ${apiError.message}`);
     }
 
     const p = extractJSON(res);
