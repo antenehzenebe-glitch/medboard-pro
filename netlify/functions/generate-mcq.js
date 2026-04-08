@@ -1,17 +1,13 @@
-// generate-mcq.js — MedBoard Pro (v4.1 — True Security & Master Psychometrics)
-// STRICT SECURITY: No hardcoded keys. Uses process.env exclusively.
+// generate-mcq.js — MedBoard Pro (v4.2 — The Indestructible Engine)
+// Fixes Network Crash: Restores true Gemini fallback and Supabase defaults.
 
-// ============================================================
-// 1. STRICT ENVIRONMENT VARIABLES (No Hardcoded Fallbacks)
-// ============================================================
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
-const SUPABASE_URL      = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-// ============================================================
-// 2. INPUT VALIDATION WHITELIST
-// ============================================================
+// Restored fallback keys so the app doesn't crash if Netlify Env Vars are missing
+const SUPABASE_URL      = process.env.SUPABASE_URL || "https://vhzeeskhvkujihuvddcc.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+
 const VALID_LEVELS = [
   "ABIM Internal Medicine",
   "ABIM Endocrinology",
@@ -32,9 +28,6 @@ function pickWeighted(blueprint) {
   return blueprint[blueprint.length - 1].s;
 }
 
-// ============================================================
-// 3. ROBUST JSON EXTRACTOR
-// ============================================================
 function extractJSON(raw) {
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
@@ -48,9 +41,12 @@ function extractJSON(raw) {
   }
 }
 
+// ============================================================
+// TRUE FAIL-SAFE AI CALLER
+// ============================================================
 async function callClaude(systemText, userText) {
-  const maxRetries   = 3;
-  const retryDelays  = [1000, 2000, 3000];
+  const maxRetries   = 2;
+  const retryDelays  = [1000];
   const entropySeed  = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
 
@@ -74,22 +70,25 @@ async function callClaude(systemText, userText) {
         })
       });
 
-      if (response.status === 401 || response.status === 403) throw new Error(`Claude auth error ${response.status}: Check ANTHROPIC_API_KEY.`);
       if (response.status === 429) {
-        const retryAfter = parseInt(response.headers.get("retry-after") || "5") * 1000;
-        await sleep(retryAfter);
+        await sleep(2000);
         continue;
       }
-      if (response.status >= 500) {
-        if (attempt === maxRetries - 1) return await callGemini(systemText, finalUserText);
-        continue;
+
+      if (!response.ok) {
+        throw new Error(`Claude HTTP Error: ${response.status}`);
       }
-      if (!response.ok) throw new Error(`Unexpected Claude API status: ${response.status}`);
 
       const data = await response.json();
       return data.content.find(b => b.type === "text").text;
+
     } catch (e) {
-      if (attempt === maxRetries - 1) throw e;
+      console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
+      // IF CLAUDE FAILS COMPLETELY, INSTANTLY FALL BACK TO GEMINI
+      if (attempt === maxRetries - 1) {
+        console.warn("Switching to Gemini Fallback...");
+        return await callGemini(systemText, finalUserText);
+      }
     }
   }
 }
@@ -116,9 +115,6 @@ async function callGemini(systemText, userText) {
   } catch (e) { throw e; }
 }
 
-// ============================================================
-// 4. SUPABASE HTTP STATUS CHECK
-// ============================================================
 async function saveMcqToSupabase(p, level) {
   try {
     const res = await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
@@ -138,11 +134,7 @@ async function saveMcqToSupabase(p, level) {
         explanation:    p.explanation
       })
     });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.warn(`Supabase save failed (${res.status}):`, errBody);
-    }
+    if (!res.ok) console.warn(`Supabase save failed: ${res.status}`);
   } catch (e) { console.error("DB Save Exception:", e.message); }
 }
 
@@ -271,15 +263,25 @@ exports.handler = async function (event) {
     if (typeof b.topic !== "string" || b.topic.length > 200) return { statusCode: 400, body: JSON.stringify({ error: "Topic must be a string under 200 characters." }) };
 
     const pd  = buildPrompt(b.level, b.topic);
-    const res = await callClaude(pd.systemText, pd.userText);
-    const p = extractJSON(res);
+    
+    let res;
+    try {
+      res = await callClaude(pd.systemText, pd.userText);
+    } catch (apiError) {
+      throw new Error("Both Anthropic and Gemini APIs failed to respond.");
+    }
 
-    if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields (stem/choices/correct/explanation).");
+    const p = extractJSON(res);
+    if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
     p.topic = b.topic;
 
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
-    const optionsArray = letters.map((letter, i) => ({ text: p.choices[letter], isCorrect: i === correctIndex })).filter(opt => opt.text); 
+    
+    const optionsArray = letters.map((letter, i) => ({ 
+        text: p.choices[letter], 
+        isCorrect: i === correctIndex 
+    })).filter(opt => opt.text != null); 
 
     for (let i = optionsArray.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
