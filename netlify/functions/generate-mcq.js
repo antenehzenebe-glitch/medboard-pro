@@ -1,5 +1,5 @@
-// generate-mcq.js — MedBoard Pro (v4.3 — The Apology Update)
-// Fixes: Active Claude 4.6 Model, Disabled Gemini Safety Filters, Transparent Error Logging
+// generate-mcq.js — MedBoard Pro (v4.4 — The Sonnet Speed Update)
+// Fixes: Restored claude-sonnet-4-6 for faster generation while keeping all fail-safes intact.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -41,7 +41,7 @@ function extractJSON(raw) {
 }
 
 // ============================================================
-// TRUE FAIL-SAFE AI CALLER
+// TRUE FAIL-SAFE AI CALLER (Now Using Faster Sonnet Model)
 // ============================================================
 async function callClaude(systemText, userText) {
   const maxRetries   = 2;
@@ -61,7 +61,7 @@ async function callClaude(systemText, userText) {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model:      "claude-opus-4-6", // CORRECTED TO ACTIVE MODEL
+          model:      "claude-sonnet-4-6", // RESTORED TO FAST & BALANCED SONNET MODEL
           max_tokens: 2048,                         
           temperature: 0.6,
           system:    systemText,
@@ -272,7 +272,6 @@ exports.handler = async function (event) {
     try {
       res = await callClaude(pd.systemText, pd.userText);
     } catch (apiError) {
-      // EXPOSING THE REAL ERROR NOW
       throw new Error(`AI Network Failure: ${apiError.message}`);
     }
 
