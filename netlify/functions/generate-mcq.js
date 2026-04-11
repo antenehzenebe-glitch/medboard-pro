@@ -281,7 +281,8 @@ exports.handler = async function (event) {
       catch (apiError) { throw new Error(`AI Network Failure: ${apiError.message}`); }
 
       p = extractJSON(res);
-      if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");console.log("=== RAW FROM AI ===");
+      if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
+      console.log("=== RAW FROM AI ===");
       console.log(JSON.stringify(p, null, 2));
       console.log("=== END RAW ===");
 
@@ -329,7 +330,8 @@ exports.handler = async function (event) {
 
     p.choices = shuffledChoices;
     p.correct = newCorrectLetter;
-    p.explanation = rewriteExplanationLetters(p.explanation, letterMap);console.log("=== AFTER SHUFFLE + REWRITE ===");
+    p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
+    console.log("=== AFTER SHUFFLE + REWRITE ===");
     console.log("Letter map:", JSON.stringify(letterMap));
     console.log(JSON.stringify(p, null, 2));
     console.log("=== END AFTER ===");
