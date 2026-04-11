@@ -1,5 +1,4 @@
-// generate-mcq.js — MedBoard Pro (v4.4 — The Sonnet Speed Update)
-// Fixes: Restored claude-sonnet-4-6 for faster generation while keeping all fail-safes intact.
+// generate-mcq.js — MedBoard Pro (v4.6 — Sonnet 4.6 + Pertinent-Negative Demographic Fix)
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -41,7 +40,38 @@ function extractJSON(raw) {
 }
 
 // ============================================================
-// TRUE FAIL-SAFE AI CALLER (Now Using Faster Sonnet Model)
+// DETERMINISTIC DEMOGRAPHIC FILTER (v4.6)
+// Catches both positive assertions AND pertinent negatives
+// of biologically incongruous terms.
+// ============================================================
+function validateDemographics(stem, sex) {
+  const lowerText = stem.toLowerCase();
+  if (sex === "man") {
+    const femaleTerms = [
+      "oral contraceptive", "ocp", "ocps", "birth control pill",
+      "pregnant", "pregnancy", "gravida", "gestation", "g1p", "g2p", "g3p",
+      "menopause", "menopausal", "perimenopausal", "postmenopausal",
+      "menstrual", "menses", "menarche", "amenorrhea", "dysmenorrhea",
+      "ovary", "ovarian", "uterus", "uterine", "endometrial", "endometriosis",
+      "vaginal", "vulvar", "cervical cancer",
+      "progesterone", "progestin",
+      "hormone replacement therapy", "hrt", "hormonal contraception",
+      "tamoxifen", "raloxifene", "clomiphene"
+    ];
+    return !femaleTerms.some(term => lowerText.includes(term));
+  } else {
+    const maleTerms = [
+      "prostate", "bph", "psa level",
+      "testicle", "testicular", "scrotal", "scrotum",
+      "sildenafil", "tadalafil", "finasteride", "dutasteride",
+      "erectile dysfunction"
+    ];
+    return !maleTerms.some(term => lowerText.includes(term));
+  }
+}
+
+// ============================================================
+// TRUE FAIL-SAFE AI CALLER
 // ============================================================
 async function callClaude(systemText, userText) {
   const maxRetries   = 2;
@@ -56,16 +86,16 @@ async function callClaude(systemText, userText) {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          "Content-Type":    "application/json",
-          "x-api-key":       ANTHROPIC_API_KEY,
+          "Content-Type":      "application/json",
+          "x-api-key":         ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model:      "claude-sonnet-4-6", // RESTORED TO FAST & BALANCED SONNET MODEL
-          max_tokens: 2048,                         
+          model:       "claude-sonnet-4-6", // Upgraded from Sonnet 3.5 to Sonnet 4.6
+          max_tokens:  2048,
           temperature: 0.6,
-          system:    systemText,
-          messages:  [{ role: "user", content: finalUserText }]
+          system:      systemText,
+          messages:    [{ role: "user", content: finalUserText }]
         })
       });
 
@@ -103,18 +133,18 @@ async function callGemini(systemText, userText) {
           contents:          [{ role: "user", parts: [{ text: userText }] }],
           safetySettings: [
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
           ],
-          generationConfig:  { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 2048 }
+          generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 2048 }
         })
       }
     );
     if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini returned empty response. Check if safety filters blocked the clinical content.");
+    if (!text) throw new Error("Gemini returned empty response.");
     return text;
   } catch (e) { throw e; }
 }
@@ -127,7 +157,7 @@ async function saveMcqToSupabase(p, level) {
         "Content-Type":  "application/json",
         "apikey":        SUPABASE_ANON_KEY,
         "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-        "Prefer":        "return=minimal" 
+        "Prefer":        "return=minimal"
       },
       body: JSON.stringify({
         exam_level:     level,
@@ -167,7 +197,7 @@ function buildPrompt(level, topic) {
       ]);
     } else if (level === "USMLE Step 2 CK" || level === "USMLE Step 3") {
       promptTopic = pickWeighted([
-        { s: "Internal Medicine (Cardio, Pulm, GI, Renal, Endo, ID)", w: 45 },
+        { s: "Internal Medicine (Cardio, Pulm, GI, Renal, Endo, ID)",  w: 45 },
         { s: "General Surgery and Trauma Management",                  w: 15 },
         { s: "Pediatrics and Congenital Issues",                       w: 10 },
         { s: "Obstetrics and Gynecology",                              w: 10 },
@@ -176,16 +206,16 @@ function buildPrompt(level, topic) {
       ]);
     } else {
       promptTopic = pickWeighted([
-        { s: "Cardiology (e.g., ACS, Heart Failure, Arrhythmias)",    w: 14 },
-        { s: "Hematology and Oncology",                               w: 12 },
-        { s: "Pulmonology",                                           w:  9 },
-        { s: "Gastroenterology and Hepatology",                       w:  9 },
-        { s: "Infectious Disease",                                    w:  9 },
-        { s: "Rheumatology",                                          w:  9 },
-        { s: "Endocrinology",                                         w:  9 },
-        { s: "Nephrology",                                            w:  9 },
-        { s: "Neurology",                                             w:  4 },
-        { s: "General Internal Medicine",                             w: 10 },
+        { s: "Cardiology (e.g., ACS, Heart Failure, Arrhythmias)",     w: 14 },
+        { s: "Hematology and Oncology",                                w: 12 },
+        { s: "Pulmonology",                                            w:  9 },
+        { s: "Gastroenterology and Hepatology",                        w:  9 },
+        { s: "Infectious Disease",                                     w:  9 },
+        { s: "Rheumatology",                                           w:  9 },
+        { s: "Endocrinology",                                          w:  9 },
+        { s: "Nephrology",                                             w:  9 },
+        { s: "Neurology",                                              w:  4 },
+        { s: "General Internal Medicine",                              w: 10 },
         { s: "Medical Ethics, HIPAA Compliance, Patient Counseling, and Palliative/End-of-Life Care", w: 6 }
       ]);
     }
@@ -214,22 +244,28 @@ function buildPrompt(level, topic) {
   }
   const promptQType = pickWeighted(qTypePool);
 
-  const randomAge    = Math.floor(Math.random() * 66) + 20;
-  const randomSex    = Math.random() > 0.5 ? "man" : "woman";
+  const randomAge = Math.floor(Math.random() * 66) + 20;
+  const randomSex = Math.random() > 0.5 ? "man" : "woman";
 
   let settingBlueprint = [
     { s: "a routine chronic outpatient clinic follow-up", w: 40 },
-    { s: "an inpatient hospital ward admission", w: 30 },
-    { s: "an acute emergency department presentation", w: 20 }
+    { s: "an inpatient hospital ward admission",          w: 30 },
+    { s: "an acute emergency department presentation",    w: 20 }
   ];
   if (level === "USMLE Step 3" || level.includes("ABIM")) {
-    settingBlueprint.push({ s: "an intensive care unit (ICU) transfer", w: 5 }, { s: "a telephone consult or telemedicine follow-up", w: 5 });
+    settingBlueprint.push(
+      { s: "an intensive care unit (ICU) transfer", w: 5 },
+      { s: "a telephone consult or telemedicine follow-up", w: 5 }
+    );
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  const systemRole = level.includes("USMLE") ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
+  const systemRole = level.includes("USMLE")
+    ? "an NBME Senior Item Writer for the USMLE"
+    : "an ABIM Fellowship Program Director";
+
   const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
-  
+
 CLINICAL & ETHICAL GUARDRAILS:
 1. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions (e.g., reportable diseases), or advanced directives. Do not make the correct answer "call the ethics committee."
 2. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
@@ -241,6 +277,7 @@ CLINICAL & ETHICAL GUARDRAILS:
 5. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
 
 HARD CLINICAL RULES (DO NOT VIOLATE):
+- STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications (e.g., oral contraceptives, HRT, progesterone), anatomies (e.g., ovaries, uterus), or states (e.g., pregnancy, menopause) — NOT EVEN AS PERTINENT NEGATIVES. Do NOT write phrases like "denies oral contraceptive use" or "no history of HRT" for a male patient; simply omit the irrelevant negative entirely. The same rule applies in reverse: female patients MUST NOT have prostate/BPH medications, PSA levels, or testicular references, even phrased as negatives. Every pertinent negative in the stem must be biologically possible for the patient's assigned sex.
 - HIT Anticoagulation: Argatroban is hepatically cleared. Bivalirudin/Fondaparinux are renally cleared.
 - DKA/HHS: K+ must be known (>3.3) before insulin start.
 - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.`;
@@ -249,10 +286,11 @@ HARD CLINICAL RULES (DO NOT VIOLATE):
 CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
 CRITICAL INSTRUCTION 2: The patient in the vignette MUST be exactly a ${randomAge}-year-old ${randomSex}. You must use this exact age and sex.
 CRITICAL INSTRUCTION 3: The clinical setting of this vignette MUST be ${promptSetting}. Ensure the acuity of the presentation matches this setting.
+CRITICAL INSTRUCTION 4: Every pertinent negative you include must be biologically possible for a ${randomSex}. Do not list negatives for conditions, medications, anatomies, or states that this patient cannot biologically have.
 
-JSON Format: {"stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
+JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}. I will not include any physiologically impossible medications, conditions, or pertinent negatives.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
-  return { systemText, userText };
+  return { systemText, userText, randomSex };
 }
 
 exports.handler = async function (event) {
@@ -266,26 +304,49 @@ exports.handler = async function (event) {
     if (!VALID_LEVELS.includes(b.level)) return { statusCode: 400, body: JSON.stringify({ error: `Invalid exam level: "${b.level}". Valid options: ${VALID_LEVELS.join(", ")}` }) };
     if (typeof b.topic !== "string" || b.topic.length > 200) return { statusCode: 400, body: JSON.stringify({ error: "Topic must be a string under 200 characters." }) };
 
-    const pd  = buildPrompt(b.level, b.topic);
-    
-    let res;
-    try {
-      res = await callClaude(pd.systemText, pd.userText);
-    } catch (apiError) {
-      throw new Error(`AI Network Failure: ${apiError.message}`);
+    const pd = buildPrompt(b.level, b.topic);
+
+    let p;
+    let isValid = false;
+    let attempts = 0;
+    const maxAttempts = 3; // Bumped from 2 to 3: Claude → Claude (new seed) → Gemini
+
+    // Retry loop with biological validation check
+    while (!isValid && attempts < maxAttempts) {
+      attempts++;
+      let res;
+      try {
+        res = await callClaude(pd.systemText, pd.userText);
+      } catch (apiError) {
+        throw new Error(`AI Network Failure: ${apiError.message}`);
+      }
+
+      p = extractJSON(res);
+      if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
+
+      isValid = validateDemographics(p.stem, pd.randomSex);
+
+      if (!isValid) {
+        console.warn(`Attempt ${attempts} failed demographic check. Patient is ${pd.randomSex} but biologically incongruous terms were found.`);
+        if (attempts === maxAttempts) {
+          console.warn("Switching to Gemini Fallback for final attempt...");
+          res = await callGemini(pd.systemText, pd.userText);
+          p = extractJSON(res);
+          isValid = validateDemographics(p.stem, pd.randomSex);
+          if (!isValid) throw new Error("Failed biological consistency check across all models.");
+        }
+      }
     }
 
-    const p = extractJSON(res);
-    if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
     p.topic = b.topic;
 
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
-    
-    const optionsArray = letters.map((letter, i) => ({ 
-        text: p.choices[letter], 
-        isCorrect: i === correctIndex 
-    })).filter(opt => opt.text != null); 
+
+    const optionsArray = letters.map((letter, i) => ({
+      text: p.choices[letter],
+      isCorrect: i === correctIndex
+    })).filter(opt => opt.text != null);
 
     for (let i = optionsArray.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -304,8 +365,12 @@ exports.handler = async function (event) {
     p.correct = newCorrectLetter;
 
     saveMcqToSupabase(p, b.level).catch(() => {});
+
+    // Remove the demographic_check key before sending to frontend
+    delete p.demographic_check;
+
     return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
-    
+
   } catch (e) {
     console.error("Handler Error:", e.message);
     return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
