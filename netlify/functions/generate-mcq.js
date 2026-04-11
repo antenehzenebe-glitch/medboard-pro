@@ -1,4 +1,4 @@
-// generate-mcq.js — MedBoard Pro (v4.7 — Shuffle-Aware Explanation Rewriter + Cushing's Workup Fixes)
+// generate-mcq.js — MedBoard Pro (v4.8 — Topic-Sex Coupling Fix + Debug Logs Removed)
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -7,6 +7,26 @@ const SUPABASE_URL      = process.env.SUPABASE_URL || "https://vhzeeskhvkujihuvd
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
 
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
+
+// ============================================================
+// TOPIC-SEX COUPLING (v4.8)
+// Sex-specific topics force the matching sex; everything else
+// remains a random coin flip.
+// ============================================================
+const MALE_ONLY_TOPIC_KEYWORDS = [
+  "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
+];
+const FEMALE_ONLY_TOPIC_KEYWORDS = [
+  "pcos", "polycystic ovary", "menopause", "ovarian", "endometri",
+  "pregnancy", "obstetric", "gynecolog", "turner syndrome"
+];
+
+function pickSexForTopic(promptTopic) {
+  const t = promptTopic.toLowerCase();
+  if (MALE_ONLY_TOPIC_KEYWORDS.some(k => t.includes(k)))   return "man";
+  if (FEMALE_ONLY_TOPIC_KEYWORDS.some(k => t.includes(k))) return "woman";
+  return Math.random() > 0.5 ? "man" : "woman";
+}
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -39,9 +59,8 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER (v4.7)
-// Two-pass placeholder substitution prevents double-replacement
-// (e.g. A→C followed by C→E corrupting the result).
+// SHUFFLE-AWARE EXPLANATION REWRITER
+// Two-pass placeholder substitution prevents double-replacement.
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -209,7 +228,8 @@ function buildPrompt(level, topic) {
   const promptQType = pickWeighted(qTypePool);
 
   const randomAge = Math.floor(Math.random() * 66) + 20;
-  const randomSex = Math.random() > 0.5 ? "man" : "woman";
+  // v4.8: Sex is now coupled to topic when topic is sex-specific
+  const randomSex = pickSexForTopic(promptTopic);
 
   let settingBlueprint = [
     { s: "a routine chronic outpatient clinic follow-up", w: 40 },
@@ -282,9 +302,6 @@ exports.handler = async function (event) {
 
       p = extractJSON(res);
       if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
-      console.log("=== RAW FROM AI ===");
-      console.log(JSON.stringify(p, null, 2));
-      console.log("=== END RAW ===");
 
       isValid = validateDemographics(p.stem, pd.randomSex);
       if (!isValid) {
@@ -301,9 +318,7 @@ exports.handler = async function (event) {
 
     p.topic = b.topic;
 
-    // ============================================================
-    // SHUFFLE CHOICES + REWRITE EXPLANATION LETTERS (v4.7)
-    // ============================================================
+    // Shuffle choices and rewrite explanation letters
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
 
@@ -331,10 +346,6 @@ exports.handler = async function (event) {
     p.choices = shuffledChoices;
     p.correct = newCorrectLetter;
     p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
-    console.log("=== AFTER SHUFFLE + REWRITE ===");
-    console.log("Letter map:", JSON.stringify(letterMap));
-    console.log(JSON.stringify(p, null, 2));
-    console.log("=== END AFTER ===");
 
     saveMcqToSupabase(p, b.level).catch(() => {});
     delete p.demographic_check;
