@@ -1,4 +1,4 @@
-// generate-mcq.js — MedBoard Pro (v4.8 — Topic-Sex Coupling Fix + Debug Logs Removed)
+// generate-mcq.js — MedBoard Pro (v4.9 — Prompt Isolation for USMLE vs ABIM)
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -10,8 +10,6 @@ const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 
 
 // ============================================================
 // TOPIC-SEX COUPLING (v4.8)
-// Sex-specific topics force the matching sex; everything else
-// remains a random coin flip.
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -60,7 +58,6 @@ function validateDemographics(stem, sex) {
 
 // ============================================================
 // SHUFFLE-AWARE EXPLANATION REWRITER
-// Two-pass placeholder substitution prevents double-replacement.
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -228,7 +225,6 @@ function buildPrompt(level, topic) {
   const promptQType = pickWeighted(qTypePool);
 
   const randomAge = Math.floor(Math.random() * 66) + 20;
-  // v4.8: Sex is now coupled to topic when topic is sex-specific
   const randomSex = pickSexForTopic(promptTopic);
 
   let settingBlueprint = [
@@ -244,29 +240,50 @@ function buildPrompt(level, topic) {
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  const systemRole = level.includes("USMLE") ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
+  // ============================================================
+  // v4.9: PROMPT ISOLATION FOR USMLE VS ABIM
+  // ============================================================
+  const isUSMLE = level.includes("USMLE");
+  const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
+
+  let specificGuardrails = "";
+  if (isUSMLE) {
+    specificGuardrails = `
+USMLE SPECIFIC RULES:
+1. NBME VIGNETTE STRUCTURE: Strictly follow the standard NBME format: Age/Sex/Setting -> Chief Complaint -> History of Present Illness -> Past Medical History -> Medications/Social/Family History -> Vitals -> Physical Exam -> Labs/Imaging.
+2. COGNITIVE LEVEL: Target medical students (M2 for Step 1, M3/M4 for Step 2/3). Do NOT test fellowship-level subspecialty management.
+3. DISTRACTORS: Distractors must be distinct, plausible alternative diagnoses or underlying mechanisms, not nuanced variations in subspecialty management.`;
+  } else {
+    specificGuardrails = `
+ABIM SPECIFIC RULES:
+1. COMPLEXITY: Test complex management, esoteric guidelines, and nuanced clinical reasoning appropriate for a subspecialty fellowship level.
+2. ENDOCRINE HARD RULES (DO NOT VIOLATE):
+   - DEXAMETHASONE SUPPRESSION TESTS: The 1 mg overnight DST is a SCREENING test (cutoff: <1.8 mcg/dL = normal). The 8 mg high-dose DST is a LOCALIZATION test used AFTER ACTH-dependence is established. NEVER apply the 1 mg DST cutoff to an 8 mg DST result.
+   - CUSHING'S WORKUP SEQUENCE: After biochemical confirmation, ACTH measurement is the MANDATORY next step. Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.`;
+  }
 
   const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
 
 CLINICAL & ETHICAL GUARDRAILS:
-1. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions (e.g., reportable diseases), or advanced directives. Do not make the correct answer "call the ethics committee."
-2. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
-3. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error: Anchoring, Premature Closure, or Availability Bias.
-4. EXPLANATION: 3-sentence rule.
+1. TERMINOLOGY: Always use the precise medical term "glucose". Never use the colloquial term "sugar" in any stem, choice, or explanation.
+2. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions, or advanced directives. Do not make the correct answer "call the ethics committee."
+3. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
+4. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error: Anchoring, Premature Closure, or Availability Bias.
+5. EXPLANATION: 3-sentence rule.
    - S1: Why the correct answer is right + official society citation.
    - S2: Why tempting wrong answers fail, explicitly naming the cognitive trap.
    - S3: THE BOARD PEARL. A hard clinical rule or cutoff.
-5. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
+6. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
 
-HARD CLINICAL RULES (DO NOT VIOLATE):
-- STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications (e.g., oral contraceptives, HRT, progesterone), anatomies (e.g., ovaries, uterus), or states (e.g., pregnancy, menopause) — NOT EVEN AS PERTINENT NEGATIVES. Do NOT write phrases like "denies oral contraceptive use" or "no history of HRT" for a male patient; simply omit the irrelevant negative entirely. The same rule applies in reverse: female patients MUST NOT have prostate/BPH medications, PSA levels, or testicular references, even phrased as negatives. Every pertinent negative in the stem must be biologically possible for the patient's assigned sex.
-- DEXAMETHASONE SUPPRESSION TESTS: The 1 mg overnight DST is a SCREENING test for Cushing's syndrome (cutoff: serum cortisol <1.8 mcg/dL the next morning = normal suppression; >1.8 mcg/dL = positive screen). The 8 mg high-dose DST is a LOCALIZATION test used AFTER ACTH-dependence is established, to distinguish pituitary Cushing's disease from ectopic ACTH (criterion: >50% suppression of baseline serum cortisol favors pituitary source; failure to suppress favors ectopic). NEVER apply the 1 mg DST cutoff (<1.8 mcg/dL) to interpret an 8 mg DST result, and never conflate the purposes of these two tests.
-- CUSHING'S WORKUP SEQUENCE: After biochemical confirmation of hypercortisolism (any two of: 24-hr UFC, late-night salivary cortisol, 1 mg DST), measurement of plasma ACTH is the MANDATORY next step to classify the disease as ACTH-dependent vs ACTH-independent. Pituitary MRI is appropriate ONLY after ACTH-dependence is established. Adrenal CT is appropriate ONLY after ACTH-independence is established. IPSS is reserved for ACTH-dependent cases with negative or equivocal pituitary MRI.
+${specificGuardrails}
+
+UNIVERSAL HARD RULES (DO NOT VIOLATE):
+- STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications, anatomies, or states. The same applies in reverse. Do NOT write phrases like "denies oral contraceptive use" for a male patient; simply omit it. Every pertinent negative must be biologically possible.
 - HIT Anticoagulation: Argatroban is hepatically cleared. Bivalirudin/Fondaparinux are renally cleared.
 - DKA/HHS: K+ must be known (>3.3) before insulin start.
 - Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.
 
-EXPLANATION LETTER REFERENCES: When you reference distractors in the explanation, use ONLY these exact formats: "Choice X", "choice X", "Option X", "answer X", or "(X)" where X is A–E. Do not invent other forms (no "the first option", no "letter B", no "A and C"). The system will automatically rewrite letter references after shuffling, so you may write naturally using your original A–E ordering.`;
+EXPLANATION LETTER REFERENCES: When referencing distractors in the explanation, use ONLY these exact formats: "Choice X", "choice X", "Option X", "answer X", or "(X)" where X is A–E.`;
 
   const userText = `Write 1 highly complex vignette specifically about: ${promptTopic}.
 CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
