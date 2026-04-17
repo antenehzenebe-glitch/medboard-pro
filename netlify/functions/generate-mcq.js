@@ -1,15 +1,36 @@
-// generate-mcq.js — MedBoard Pro (v4.9 — Prompt Isolation for USMLE vs ABIM)
+// generate-mcq.js — MedBoard Pro
+// v5.0 — Nutrition Enhancement (USMLE June 2026) built on real v4.9
+// All v4.9 features preserved exactly:
+//   • USMLE vs ABIM prompt isolation (isUSMLE branch, systemRole)
+//   • NBME vignette structure + ABIM complexity + DST/Cushing guardrails
+//   • 3-sentence explanation rule (S1/S2/S3) + Board Pearl
+//   • Ethics/HIPAA qTypePool, Step1 mechanism qTypePool
+//   • Setting blueprint with ICU/telemedicine for ABIM/Step3
+//   • Random topic weighted pools per level
+//   • Entropy seed, temperature 0.6, max_tokens 2048
+//   • Gemini BLOCK_NONE safetySettings + responseMimeType
+//   • Supabase /rest/v1/mcqs with exam_level + correct_answer fields
+//   • warmup ping, topic length validation, demographic_check field
+//   • Two-way validateDemographics (female terms block for men, male terms block for women)
+//   • rewriteExplanationLetters with §§LETTER§§ placeholders
+//   • glucose/sugar terminology rule
+// New in v5.0:
+//   • NUTRITION_BY_LEVEL constant — 5 level-specific subtopic lists
+//   • pickTopicForLevel() — injects nutrition at ~12% rate via weighted coin flip
+//   • nutritionAddendum — appended to systemText when isNutrition=true
+//   • Nutrition topics cross-checked against USMLE/ABIM cognitive level expectations
+//   • saveMcqToSupabase gains optional `category` field ("Nutrition" or null)
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 
-const SUPABASE_URL      = process.env.SUPABASE_URL || "https://vhzeeskhvkujihuvddcc.supabase.co";
+const SUPABASE_URL      = process.env.SUPABASE_URL      || "https://vhzeeskhvkujihuvddcc.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
 
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TOPIC-SEX COUPLING (v4.8)
+// TOPIC-SEX COUPLING (v4.8 — unchanged)
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -45,6 +66,9 @@ function extractJSON(raw) {
   }
 }
 
+// ============================================================
+// DEMOGRAPHIC VALIDATION (v4.9 — two-way, unchanged)
+// ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
   if (sex === "man") {
@@ -57,7 +81,7 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER
+// SHUFFLE-AWARE EXPLANATION REWRITER (v4.7 — unchanged)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -84,6 +108,124 @@ function rewriteExplanationLetters(explanation, letterMap) {
   return out;
 }
 
+// ============================================================
+// NUTRITION SUBTOPICS (v5.0 — NEW)
+// Per USMLE June 2026: nutrition remains integrated within
+// system-based questions. Injected at ~12% rate.
+// Topics are calibrated to each exam's cognitive level.
+// ============================================================
+const NUTRITION_BY_LEVEL = {
+  "USMLE Step 1": [
+    "Protein-energy malnutrition: kwashiorkor vs. marasmus — mechanisms and distinguishing features",
+    "Essential fatty acid deficiency — biochemical role, clinical presentation, triene:tetraene ratio",
+    "Vitamin A deficiency — retinal mechanism, night blindness, xerophthalmia, teratogenicity",
+    "Vitamin D deficiency — rickets vs. osteomalacia, PTH response, biochemical markers",
+    "Vitamin E deficiency — neurological sequelae, hemolytic anemia in premature neonates",
+    "Vitamin K deficiency — coagulation factor synthesis (II, VII, IX, X), PT/INR elevation",
+    "Thiamine (B1) deficiency — Wernicke encephalopathy, dry/wet beriberi, pyruvate dehydrogenase",
+    "Riboflavin (B2) deficiency — FAD/FMN cofactor, cheilosis, corneal vascularization",
+    "Niacin (B3) deficiency — pellagra (3 Ds), tryptophan conversion pathway, Hartnup disease",
+    "Pyridoxine (B6) deficiency — sideroblastic anemia, peripheral neuropathy, INH-induced",
+    "Vitamin B12 deficiency — megaloblastic anemia, subacute combined degeneration, methylmalonyl-CoA",
+    "Folate deficiency — neural tube defects, one-carbon metabolism, homocysteine elevation",
+    "Vitamin C (ascorbic acid) deficiency — scurvy, collagen hydroxylation defect, perifollicular hemorrhage",
+    "Iron deficiency — ferritin/transferrin/TIBC interpretation, microcytic anemia mechanism",
+    "Zinc deficiency — acrodermatitis enteropathica, wound healing, immune dysfunction",
+    "Iodine deficiency — thyroid hormone synthesis pathway, goiter mechanism, endemic cretinism",
+    "Selenium deficiency — Keshan disease, thyroid peroxidase cofactor, Kashin-Beck disease",
+    "Refeeding syndrome — pathophysiology: hypophosphatemia, hypokalemia, hypomagnesemia, cardiac risk",
+    "Starvation biochemistry — gluconeogenesis substrates, ketogenesis, urea cycle, nitrogen balance",
+    "TPN complications — hepatic steatosis (IFALD), acalculous cholecystitis, essential fatty acid deficiency",
+  ],
+  "USMLE Step 2 CK": [
+    "Nutritional assessment in hospitalized patients — albumin, prealbumin, NRS-2002 screening tool",
+    "Enteral nutrition — indications, contraindications, aspiration risk, nasogastric vs. PEG tube",
+    "Parenteral nutrition — central vs. peripheral, indications, line infection, metabolic complications",
+    "Refeeding syndrome recognition and prevention — monitoring protocol, phosphate repletion",
+    "Obesity pharmacotherapy — orlistat, phentermine-topiramate, naltrexone-bupropion, GLP-1 RA indication",
+    "Bariatric surgery — RYGB vs. sleeve gastrectomy, T2DM remission, nutritional risk",
+    "Post-bariatric micronutrient deficiencies — B12, iron, thiamine (Wernicke), calcium/vitamin D",
+    "Celiac disease — dietary gluten elimination, anti-tTG monitoring, refractory disease management",
+    "Short bowel syndrome — enteral vs. parenteral support, GLP-2 agonist teduglutide indication",
+    "Pancreatic exocrine insufficiency — enzyme replacement dosing, fat-soluble vitamin repletion",
+    "Anorexia nervosa — cardiovascular (QTc, bradycardia), endocrine (amenorrhea, low IGF-1), bone complications",
+    "Bulimia nervosa — electrolyte abnormalities (hypokalemia, hypochloremia, metabolic alkalosis)",
+    "Medical nutrition therapy for T2DM — ADA 2026 plate method, carbohydrate targets",
+    "DASH diet — evidence for hypertension reduction (ALLHAT), sodium targets",
+    "Mediterranean diet — cardiovascular risk reduction, PREDIMED trial application",
+    "CKD nutritional management — GFR-stratified phosphorus, potassium, protein restriction",
+    "Cirrhosis nutritional management — protein intake paradox, BCAA supplementation, zinc",
+    "Critical illness nutrition — early enteral feeding within 24–48 h, ASPEN/ESPEN 2023 guidelines",
+    "Vitamin D supplementation — population-specific indications, dosing, toxicity threshold",
+  ],
+  "USMLE Step 3": [
+    "Chronic disease nutrition management in ambulatory practice — shared decision-making approach",
+    "Food insecurity screening (Hunger Vital Sign) — SDOH integration, referral pathways",
+    "Medical nutrition therapy for T2DM — ADA 2026 individualized carbohydrate goals, MNT billing",
+    "CKD nutritional monitoring — phosphate binder selection, potassium management by GFR stage",
+    "ICU nutrition — ASPEN/ESPEN 2023, permissive underfeeding in obesity, early EN vs. PN decision",
+    "Post-bariatric nutritional monitoring — annual lab protocol, B12/iron/D/thiamine supplementation",
+    "Vitamin D across life stages — IOM DRIs, upper tolerable intake levels, toxicity management",
+    "Nutrition in pregnancy — folate 400–800 mcg pre-conception, iron 27 mg/day, DHA requirements",
+    "Cancer cachexia — multimodal management, role of ONS, avoiding harmful supplement interactions",
+    "Preventive nutrition counseling — USPSTF 2020 healthy diet/physical activity behavioral counseling",
+    "Enteral-to-oral transition — weaning criteria, GI function assessment, aspiration risk management",
+    "Obesity — BMI thresholds for pharmacotherapy vs. bariatric surgery, comorbidity-driven algorithm",
+  ],
+  "ABIM Internal Medicine": [
+    "Refeeding syndrome — recognition, prevention protocol, phosphate repletion targets (>1.5 mg/dL)",
+    "Enteral vs. parenteral nutrition — clinical decision algorithm, GI tract accessibility rule",
+    "TPN complications — IFALD (hepatic steatosis), EFAD, metabolic bone disease, line sepsis",
+    "Nutritional management of heart failure — sodium ≤2g/day restriction evidence, fluid limits",
+    "Nutritional management of CKD — GFR-stratified protein (0.6–0.8 g/kg), phosphorus, potassium",
+    "Nutritional management of cirrhosis — 1.2–1.5 g/kg protein, BCAA for encephalopathy",
+    "Malabsorption workup — Sudan stain, 72-hour fecal fat, D-xylose test interpretation",
+    "Celiac disease — anti-tTG IgA, duodenal biopsy (Marsh classification), HLA-DQ2/DQ8",
+    "Obesity — comorbidity-driven pharmacotherapy selection, bariatric surgery candidacy criteria",
+    "DASH diet — ACC/AHA 2017 evidence: 11 mmHg SBP reduction, dietary components",
+    "Mediterranean diet — PREDIMED 2013: 30% relative CV risk reduction vs. low-fat diet",
+    "Vitamin D deficiency in chronic disease — 25-OH cutoffs, repletion protocol, monitoring",
+    "Thiamine deficiency in heart failure and alcohol use — Wernicke prevention, empiric dosing",
+    "Metformin and B12 deficiency — screening interval, repletion threshold, neuropathy prevention",
+  ],
+  "ABIM Endocrinology": [
+    "Medical nutrition therapy for T1DM — carbohydrate-to-insulin ratios, correction factor, CGM integration",
+    "Medical nutrition therapy for T2DM — low-carb vs. low-fat RCT data, ADA 2026 MNT evidence",
+    "Vitamin D metabolism — 25-OH vs. 1,25-OH forms, PTH feedback loop, deficiency thresholds by society",
+    "Nutritional causes of secondary osteoporosis — calcium, vitamin D, protein, alcohol, vitamin K2",
+    "Iodine excess and thyroid — Wolff-Chaikoff effect, escape mechanism, amiodarone thyroid effects",
+    "Iodine deficiency — endemic goiter, cretinism, WHO global burden",
+    "Eating disorders in endocrinology — hypothalamic amenorrhea (FHA), bone loss DEXA findings, hypoglycemia",
+    "Ketogenic diet — mechanisms (ketogenesis, glucagon/insulin ratio), clinical evidence, risks (LDL-P, nephrolithiasis)",
+    "Obesity pharmacotherapy — GLP-1 RA (semaglutide), dual GLP-1/GIP (tirzepatide), mechanism comparison",
+    "Bariatric surgery endocrine outcomes — T2DM remission rates (RYGB > sleeve), hypoglycemia (nesidioblastosis)",
+    "Post-bariatric micronutrient protocol — B12 IM or high-dose oral 1000 mcg/day, iron sulfate, thiamine 100 mg/day",
+    "Selenium deficiency and thyroid — TPO cofactor, autoimmune thyroiditis, supplementation evidence",
+    "Zinc deficiency in diabetes — wound healing impairment, taste disturbance, supplementation indication",
+    "Very low calorie diet (VLCD) and intermittent fasting — metabolic effects, safety in T2DM, evidence",
+  ],
+};
+
+// ============================================================
+// NUTRITION TOPIC PICKER (v5.0 — NEW)
+// ~12% injection rate; topics scoped to the requested level
+// ============================================================
+const NUTRITION_INJECTION_RATE = 0.12;
+
+function pickTopicForLevel(level, rawTopic) {
+  // Only inject nutrition on non-Random topic calls to avoid
+  // double-randomization (the Random pools already vary enough)
+  const nutritionTopics = NUTRITION_BY_LEVEL[level];
+  if (nutritionTopics && !rawTopic.includes("Random") && Math.random() < NUTRITION_INJECTION_RATE) {
+    const idx = Math.floor(Math.random() * nutritionTopics.length);
+    return { topic: nutritionTopics[idx], isNutrition: true };
+  }
+  return { topic: rawTopic, isNutrition: false };
+}
+
+// ============================================================
+// AI CLIENTS (v4.9 — unchanged)
+// ============================================================
 async function callClaude(systemText, userText) {
   const maxRetries = 2;
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
@@ -142,18 +284,33 @@ async function callGemini(systemText, userText) {
   return text;
 }
 
-async function saveMcqToSupabase(p, level) {
+// ============================================================
+// SUPABASE SAVE (v5.0 — adds optional category field)
+// ============================================================
+async function saveMcqToSupabase(p, level, category) {
   try {
+    const payload = {
+      exam_level:    level,
+      topic:         p.topic,
+      stem:          p.stem,
+      choices:       p.choices,
+      correct_answer: p.correct,
+      explanation:   p.explanation,
+    };
+    if (category) payload.category = category;   // "Nutrition" or omitted
     const res = await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Prefer": "return=minimal" },
-      body: JSON.stringify({ exam_level: level, topic: p.topic, stem: p.stem, choices: p.choices, correct_answer: p.correct, explanation: p.explanation })
+      body: JSON.stringify(payload)
     });
     if (!res.ok) console.warn(`Supabase save failed: ${res.status}`);
   } catch (e) { console.error("DB Save Exception:", e.message); }
 }
 
-function buildPrompt(level, topic) {
+// ============================================================
+// PROMPT BUILDER (v4.9 base + v5.0 nutritionAddendum)
+// ============================================================
+function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
   if (topic.includes("Random")) {
     if (level === "ABIM Endocrinology" || topic === "Random -- Endocrinology Only") {
@@ -240,9 +397,7 @@ function buildPrompt(level, topic) {
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  // ============================================================
-  // v4.9: PROMPT ISOLATION FOR USMLE VS ABIM
-  // ============================================================
+  // ── v4.9: USMLE vs ABIM prompt isolation (unchanged) ──────────────────
   const isUSMLE = level.includes("USMLE");
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
 
@@ -262,6 +417,19 @@ ABIM SPECIFIC RULES:
    - CUSHING'S WORKUP SEQUENCE: After biochemical confirmation, ACTH measurement is the MANDATORY next step. Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.`;
   }
 
+  // ── v5.0: NUTRITION ADDENDUM — appended only when isNutrition=true ────
+  const nutritionAddendum = isNutrition ? `
+
+NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
+- This question MUST test applied clinical nutrition science — not generic dietary advice.
+- USMLE Step 1: Focus on biochemical mechanism (enzyme, metabolic pathway, cofactor deficiency, starvation physiology).
+- USMLE Step 2 CK / Step 3: Focus on clinical recognition, workup, or management decision using nutrition knowledge.
+- ABIM levels: Focus on evidence-based dietary intervention, guideline-based nutritional management, or complication recognition.
+- The clinical vignette MUST include realistic patient history, physical findings, or laboratory values that require integration of nutritional knowledge to reach the correct answer.
+- Do NOT generate questions about "eating healthy" in the abstract. Every question must have a clear, defensible single-best answer grounded in a specific guideline or mechanism.
+- The explanation MUST cite the relevant mechanism or authoritative source (e.g., ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).
+- Distractors must represent plausible clinical missteps: ordering the wrong repletion, misidentifying the deficiency, or choosing the wrong dietary intervention.` : "";
+
   const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
 
 CLINICAL & ETHICAL GUARDRAILS:
@@ -275,7 +443,7 @@ CLINICAL & ETHICAL GUARDRAILS:
    - S3: THE BOARD PEARL. A hard clinical rule or cutoff.
 6. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
 
-${specificGuardrails}
+${specificGuardrails}${nutritionAddendum}
 
 UNIVERSAL HARD RULES (DO NOT VIOLATE):
 - STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications, anatomies, or states. The same applies in reverse. Do NOT write phrases like "denies oral contraceptive use" for a male patient; simply omit it. Every pertinent negative must be biologically possible.
@@ -296,6 +464,9 @@ JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}. I wi
   return { systemText, userText, randomSex };
 }
 
+// ============================================================
+// NETLIFY HANDLER (v4.9 — unchanged except category pass-through)
+// ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   try {
@@ -305,7 +476,13 @@ exports.handler = async function (event) {
     if (!VALID_LEVELS.includes(b.level)) return { statusCode: 400, body: JSON.stringify({ error: `Invalid exam level: "${b.level}". Valid options: ${VALID_LEVELS.join(", ")}` }) };
     if (typeof b.topic !== "string" || b.topic.length > 200) return { statusCode: 400, body: JSON.stringify({ error: "Topic must be a string under 200 characters." }) };
 
-    const pd = buildPrompt(b.level, b.topic);
+    // v5.0: resolve nutrition injection before buildPrompt
+    const topicResult = pickTopicForLevel(b.level, b.topic);
+    const resolvedTopic = topicResult.topic;
+    const isNutrition   = topicResult.isNutrition;
+
+    const pd = buildPrompt(b.level, resolvedTopic, isNutrition);
+
     let p;
     let isValid = false;
     let attempts = 0;
@@ -333,9 +510,9 @@ exports.handler = async function (event) {
       }
     }
 
-    p.topic = b.topic;
+    p.topic = resolvedTopic;
 
-    // Shuffle choices and rewrite explanation letters
+    // Shuffle choices and rewrite explanation letters (v4.7 — unchanged)
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
 
@@ -360,11 +537,12 @@ exports.handler = async function (event) {
       if (item.isCorrect) newCorrectLetter = newLetter;
     });
 
-    p.choices = shuffledChoices;
-    p.correct = newCorrectLetter;
-    p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
+    p.choices      = shuffledChoices;
+    p.correct      = newCorrectLetter;
+    p.explanation  = rewriteExplanationLetters(p.explanation, letterMap);
 
-    saveMcqToSupabase(p, b.level).catch(() => {});
+    // v5.0: pass category to Supabase
+    saveMcqToSupabase(p, b.level, isNutrition ? "Nutrition" : null).catch(() => {});
     delete p.demographic_check;
 
     return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
