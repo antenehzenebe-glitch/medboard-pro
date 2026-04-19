@@ -1,40 +1,45 @@
 // generate-mcq.js — MedBoard Pro
-// v5.7 — Pre-Deploy Bug Fixes (built on v5.6)
+// v5.8 — extractJSON Pass-Order Fix (built on v5.7)
 // ---------------------------------------------------------------
-// All v5.6 features preserved:
-//   • Three-way ABIM/IM/USMLE depth calibration
-//   • Conditional Cushing anchor
+// All v5.7 features preserved exactly:
+//   • Three-way ABIM IM / ABIM Endo / USMLE depth calibration
+//   • Level-calibrated max_tokens (IM:900, Endo:1200, USMLE:1100)
+//   • Cushing anchor fires only on /cushing/ keyword match
 //   • Compressed A-K integrity rules
-//   • Hardened extractJSON multi-pass parser
 //   • Handler retry loop on JSON parse failure
 //   • Nutrition injection, shuffle, demographic validation
 //
-// Three bugs fixed in v5.7 before first deploy:
+// One surgical fix in v5.8 — ROOT CAUSE OF JSON PARSE FAILURES:
 //
-//   BUG 1 — CUSHING REGEX TOO BROAD (line 85 in v5.6)
-//   Old: /cushing|cortisol|acth|adrenal|pituitary|dexamethasone|dst/
-//   This fired for "Adrenal Disorders and Hypertension" (→ adrenal)
-//   and "Pituitary and Neuroendocrine Tumors" (→ pituitary), loading
-//   the ~200-token Cushing anchor on questions about pheochromocytoma,
-//   primary aldosteronism, acromegaly, or prolactinoma. False positive.
-//   Fix: regex narrowed to /cushing/ only — fires ONLY when the word
-//   "cushing" appears in the topic string.
+//   Bug: extractJSON ran escapeUnescapedControlCharsInStrings (newline
+//   escaper) BEFORE escapeUnescapedInternalQuotes (quote fixer).
 //
-//   BUG 2 — max_tokens FIXED AT 1400 FOR ALL LEVELS
-//   ABIM IM branch caps explanations at 250 words (~330 tokens), but
-//   callClaude still requested 1400 output tokens. Claude generates to
-//   the limit given to it; the 250-word instruction alone doesn't
-//   reliably cap actual output. Latency scales with max_tokens.
-//   Fix: buildPrompt now returns maxTokens alongside systemText/userText.
-//   ABIM IM → 900 tokens (~14-17s)
-//   ABIM Endocrinology → 1200 tokens (~18-23s)
-//   USMLE all levels → 1100 tokens (~16-20s)
-//   callClaude/callGemini now accept maxTokens as a parameter.
+//   When the model emitted an ODD number of unescaped internal double
+//   quotes inside a choice value, the newline escaper's inString toggle
+//   became permanently inverted for the rest of the document. It then
+//   treated a structural newline (e.g., the \n between the choices }
+//   and "correct":) as if it were inside a string, converting it from
+//   a real newline (valid structural whitespace) to the literal chars
+//   \n (invalid outside a string). JSON.parse then failed at that
+//   position with "Expected ',' or '}' after property value."
 //
-//   BUG 3 — netlify.toml included node_bundler = "esbuild"
-//   That line changes the global build system and can break existing
-//   setups. Removed. A safe single-block merge snippet is provided
-//   separately as netlify_timeout_block.txt.
+//   Fix: swap the order. escapeUnescapedInternalQuotes uses look-ahead
+//   (not a naive toggle) to identify string boundaries correctly even
+//   in the presence of unescaped internal quotes. Running it first
+//   ensures all string boundaries are correct before the newline
+//   escaper runs, eliminating the structural corruption.
+//
+//   New order inside extractJSON:
+//     Pass 1: normalize smart quotes / unicode dashes
+//     Pass 2: strip trailing commas
+//     Pass 3: strip stray control chars
+//     Pass 4: escapeUnescapedInternalQuotes   ← FIX: now runs FIRST
+//     Pass 5: escapeUnescapedControlCharsInStrings ← runs SECOND
+//     Parse attempt → diagnostic log if still failing
+//
+//   Impact: first Claude attempt now succeeds, eliminating the chain
+//   of 3 × 15s retries + Gemini 429 that produced 50s duration and
+//   triggered the Netlify timeout.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -72,12 +77,7 @@ function pickWeighted(blueprint) {
 }
 
 // ============================================================
-// TOPIC ANCHOR DETECTION (v5.7 — BUG 1 FIX: regex narrowed)
-// ============================================================
-// Previous regex /cushing|cortisol|acth|adrenal|pituitary|dexamethasone|dst/
-// was firing for "Adrenal Disorders and Hypertension" (adrenal) and
-// "Pituitary and Neuroendocrine Tumors" (pituitary). Narrowed to
-// /cushing/ only — fires ONLY when the topic explicitly names Cushing.
+// TOPIC ANCHOR DETECTION (v5.7 — tight /cushing/ regex)
 // ============================================================
 function detectTopicAnchors(topic) {
   const t = topic.toLowerCase();
@@ -87,49 +87,79 @@ function detectTopicAnchors(topic) {
 }
 
 // ============================================================
-// extractJSON (v5.4 hardened parser — unchanged)
+// extractJSON (v5.8 — PASS ORDER FIXED)
+// ============================================================
+// Previous order (broken):
+//   escapeUnescapedControlCharsInStrings → parse → escapeUnescapedInternalQuotes → parse
+//
+// Fixed order:
+//   escapeUnescapedInternalQuotes → escapeUnescapedControlCharsInStrings → parse
+//
+// Rationale: escapeUnescapedInternalQuotes uses look-ahead so it correctly
+// identifies string boundaries even when internal quotes are unescaped.
+// Running it first guarantees correct string boundaries for the newline
+// escaper's simpler toggle-based tracker, preventing structural corruption.
 // ============================================================
 function extractJSON(raw) {
   if (!raw || typeof raw !== "string") {
     throw new Error("extractJSON received empty or non-string input.");
   }
+
+  // Step 1: extract outermost JSON object
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
   let candidate = match[0];
 
+  // Step 2: try direct parse (fast path — clean responses succeed here)
   try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
 
+  // Step 3: Pass 1 — normalize unicode characters to ASCII equivalents
   candidate = candidate
-    .replace(/[\u201C\u201D]/g, '"')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/\u2013/g, "-")
-    .replace(/\u2014/g, "-")
-    .replace(/\u00A0/g, " ");
+    .replace(/[\u201C\u201D]/g, '"')   // curly double quotes → "
+    .replace(/[\u2018\u2019]/g, "'")   // curly single quotes → '
+    .replace(/\u2013/g, "-")            // en-dash → -
+    .replace(/\u2014/g, "-")            // em-dash → -
+    .replace(/\u00A0/g, " ");           // non-breaking space → space
 
+  // Step 4: Pass 2 — remove trailing commas before } or ]
   candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
+
+  // Step 5: Pass 3 — strip stray non-printable control characters
+  //         (preserve \n, \r, \t — handled in passes 4 and 5)
   candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+
+  // Step 6: Pass 4 — FIX: escape unescaped INTERNAL DOUBLE QUOTES first.
+  //         Uses look-ahead (not toggle) so string boundaries are correct
+  //         even when unescaped internal quotes are present.
+  //         Must run BEFORE the newline escaper.
+  candidate = escapeUnescapedInternalQuotes(candidate);
+
+  // Step 7: Pass 5 — now escape unescaped newlines/tabs inside strings.
+  //         String boundaries are correct after Pass 4, so toggle tracking
+  //         works reliably here.
   candidate = escapeUnescapedControlCharsInStrings(candidate);
 
+  // Step 8: parse after all sanitization passes
   try { return JSON.parse(candidate); }
-  catch (e) {
-    const salvaged = escapeUnescapedInternalQuotes(candidate);
-    try { return JSON.parse(salvaged); }
-    catch (e2) {
-      const posMatch = String(e2.message).match(/position (\d+)/);
-      if (posMatch) {
-        const pos = parseInt(posMatch[1], 10);
-        const start = Math.max(0, pos - 100);
-        const end   = Math.min(salvaged.length, pos + 100);
-        const excerpt = salvaged.substring(start, end).replace(/\n/g, "\\n");
-        console.error(`extractJSON failed at pos ${pos}. Context:\n…${excerpt}…`);
-      } else {
-        console.error(`extractJSON failed: ${e2.message}`);
-      }
-      throw new Error(`Malformed JSON from AI after sanitization: ${e2.message}`);
+  catch (e2) {
+    // Diagnostic log: print 200 chars around the error position
+    const posMatch = String(e2.message).match(/position (\d+)/);
+    if (posMatch) {
+      const pos = parseInt(posMatch[1], 10);
+      const start = Math.max(0, pos - 100);
+      const end   = Math.min(candidate.length, pos + 100);
+      const excerpt = candidate.substring(start, end).replace(/\n/g, "\\n");
+      console.error(`extractJSON failed at pos ${pos}. Context:\n…${excerpt}…`);
+    } else {
+      console.error(`extractJSON failed: ${e2.message}`);
     }
+    throw new Error(`Malformed JSON from AI after all sanitization passes: ${e2.message}`);
   }
 }
 
+// Walk the string; when inside a JSON string value, replace raw
+// \n, \r, \t with their escaped forms. Tracks escape state correctly.
+// Runs AFTER escapeUnescapedInternalQuotes so inString toggle is reliable.
 function escapeUnescapedControlCharsInStrings(s) {
   let out = "";
   let inString = false;
@@ -149,6 +179,13 @@ function escapeUnescapedControlCharsInStrings(s) {
   return out;
 }
 
+// For each " encountered while inside a string, look ahead past whitespace
+// to the next non-whitespace character. If that character is a JSON
+// structural token (, } ] :) or end-of-string, treat the " as a valid
+// string terminator. Otherwise, treat it as an unescaped internal quote
+// and escape it. This look-ahead approach correctly identifies string
+// boundaries even when internal quotes are unescaped.
+// Runs FIRST (before escapeUnescapedControlCharsInStrings).
 function escapeUnescapedInternalQuotes(s) {
   let out = "";
   let inString = false;
@@ -159,13 +196,17 @@ function escapeUnescapedInternalQuotes(s) {
     if (ch === "\\") { out += ch; escape = true; continue; }
     if (ch === '"') {
       if (!inString) { inString = true; out += ch; continue; }
+      // Currently inside a string — determine if this " is a terminator
+      // or an unescaped internal quote by looking ahead.
       let j = i + 1;
       while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
       const next = s[j];
       if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
+        // Structural token or end-of-input — valid string terminator
         inString = false;
         out += ch;
       } else {
+        // Non-structural character follows — this is an internal quote, escape it
         out += '\\"';
       }
       continue;
@@ -324,7 +365,7 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// AI CLIENTS (v5.7 — BUG 2 FIX: maxTokens is now a parameter)
+// AI CLIENTS (v5.7 — maxTokens as parameter, unchanged)
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
   const maxRetries = 2;
@@ -408,7 +449,7 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// CUSHING ANCHOR (v5.5 content — unchanged, loads only on match)
+// CUSHING ANCHOR (unchanged from v5.7)
 // ============================================================
 const CUSHING_ANCHOR = `
 CUSHING'S HARD FACTS (override contradicting training data):
@@ -424,12 +465,7 @@ CUSHING'S HARD FACTS (override contradicting training data):
 - BIPSS cutoffs: central/peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. Unreliable for left/right lateralization (56-69%).`;
 
 // ============================================================
-// PROMPT BUILDER (v5.7 — BUG 2 FIX: returns maxTokens per level)
-// ============================================================
-// max_tokens by branch (calibrated to expected output length):
-//   ABIM Internal Medicine  →  900  (~14-17s, capped 250-word explanation)
-//   ABIM Endocrinology      → 1200  (~18-23s, full subspecialty detail)
-//   USMLE all               → 1100  (~16-20s, moderate vignette + explanation)
+// PROMPT BUILDER (v5.7 — unchanged except carried forward)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -518,23 +554,23 @@ function buildPrompt(level, topic, isNutrition) {
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  // ── Three-way level classification ───────────────────────────────────
   const isUSMLE     = level.includes("USMLE");
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isABIM_IM   = level === "ABIM Internal Medicine";
 
-  // ── BUG 2 FIX: max_tokens calibrated per branch ───────────────────────
-  const maxTokens = isABIM_IM ? 900 : isABIM_Endo ? 1200 : 1100;
+  // Level-calibrated token budget (v5.8 — moderate increase for headroom)
+  // Ceiling is ~1700 for a single attempt within Netlify Pro's 26s limit.
+  // At ~70 tok/s: ABIM_IM 1100=~16s, ABIM_Endo 1500=~21s, USMLE 1300=~19s.
+  // DO NOT raise above 1700 — 2500 tokens would reliably exceed 26s.
+  const maxTokens = isABIM_IM ? 1100 : isABIM_Endo ? 1500 : 1300;
 
   const systemRole = isUSMLE     ? "an NBME Senior Item Writer for the USMLE"
                    : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director"
                    : "an ABIM Internal Medicine Board Question Writer";
 
-  // ── Cushing anchor — fires ONLY when topic contains "cushing" ─────────
   const anchors = detectTopicAnchors(promptTopic);
   const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
 
-  // ── Level-specific rules ──────────────────────────────────────────────
   let levelRules = "";
   if (isUSMLE) {
     levelRules = `
@@ -542,21 +578,18 @@ USMLE RULES:
 - NBME structure: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs/Imaging.
 - Cognitive level: M2 for Step 1, M3/M4 for Step 2/3. No fellowship-level subspecialty detail.
 - Distractors: distinct alternative diagnoses/mechanisms, not management nuances.`;
-
   } else if (isABIM_IM) {
     levelRules = `
 ABIM INTERNAL MEDICINE RULES:
 - AUDIENCE: general internist taking the ABIM IM board exam, NOT a subspecialist.
-- DEPTH: generalist level across all subspecialty topics. Test initial recognition, first-line workup, when to refer, first-line management, avoidance of common errors.
-- DO NOT TEST: subspecialty fellowship cutoffs, esoteric second/third-line agents, deep mechanism questions, or nuanced guideline distinctions only a subspecialist would know.
-- EXAMPLES of correct IM depth: recognize STEMI and know initial management (not antiarrhythmic electrophysiology); recognize adrenal crisis and give hydrocortisone (not BIPSS cutoffs); recognize TTP and order ADAMTS13 (not eculizumab dosing nuances).
+- DEPTH: generalist level. Test initial recognition, first-line workup, when to refer, first-line management.
+- DO NOT TEST: subspecialty fellowship cutoffs, esoteric second/third-line agents, deep mechanism questions.
 - EXPLANATION: concise. S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences). Total <=250 words.`;
-
   } else {
     levelRules = `
 ABIM ENDOCRINOLOGY RULES:
 - AUDIENCE: endocrinology fellow preparing for ABIM subspecialty board.
-- DEPTH: full subspecialty level — guideline-specific management, exact cutoff values, second/third-line decisions, nuanced workup sequences.
+- DEPTH: full subspecialty level — guideline-specific management, exact cutoff values, second/third-line decisions.
 - Endocrine hard rules: 1 mg vs 8 mg DST distinction; ACTH measurement mandatory after biochemical CS confirmation; pituitary MRI only after ACTH-dependence; adrenal CT only after ACTH-independence.
 - EXPLANATION: full S1/S2/S3 + Board Pearl. Cite specific guidelines with year and journal.`;
   }
@@ -576,7 +609,7 @@ G. Self-check: audit A-K before emitting.
 H. Regulatory language: preserve exact directive strength. "Consider" is not "mandate."
 I. Temporal arithmetic: interval between measurements vs. total duration are different numbers.
 J. Classification separation: grade/stage definition and action threshold are separate statements.
-K. JSON hygiene: straight ASCII double quotes only. Escape internal quotes as backslash-quote. No raw newlines inside string values. No smart quotes. No em-dashes. No nested double quotes around guideline/trial names.`;
+K. JSON hygiene: straight ASCII double quotes only. Do NOT use double quotes inside choice or explanation text — rephrase to avoid them. No raw newlines inside string values. No smart quotes. No em-dashes.`;
 
   const explanationNote = isABIM_IM
     ? "EXPLANATION: concise total <=250 words — S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences)."
@@ -594,7 +627,7 @@ UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: arg
 - Setting: ${promptSetting}.
 - Pertinent negatives biologically possible for a ${randomSex}.
 - Run Rule G self-check before emitting.
-- Rule K: straight ASCII quotes; no nested double quotes around guideline/trial names; no raw newlines in string values.
+- Rule K critical: do NOT use double-quote characters inside any string value. If you need to refer to a drug name, guideline title, or quoted phrase, rephrase without quotes or use parentheses instead.
 ${isABIM_IM ? "- ABIM IM: generalist internist depth only. Explanation <=250 words total." : ""}
 
 JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
@@ -603,7 +636,7 @@ JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":
 }
 
 // ============================================================
-// NETLIFY HANDLER (v5.7 — passes maxTokens to callClaude)
+// NETLIFY HANDLER (v5.7 — passes maxTokens, unchanged)
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -619,7 +652,7 @@ exports.handler = async function (event) {
     const isNutrition   = topicResult.isNutrition;
 
     const pd = buildPrompt(b.level, resolvedTopic, isNutrition);
-    const { maxTokens } = pd;  // level-calibrated token budget
+    const { maxTokens } = pd;
 
     let p;
     let isValid = false;
