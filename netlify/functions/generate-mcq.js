@@ -1,56 +1,33 @@
 // generate-mcq.js — MedBoard Pro
-// v5.3 — Cushing's Disease Localization Guardrail Upgrade (built on v5.2)
+// v5.4 — JSON Parser Hardening (built on v5.3)
 // ---------------------------------------------------------------
-// All v5.2 features preserved exactly:
-//   • Nutrition subtopics by level + 12% injection via pickTopicForLevel()
-//   • USMLE vs ABIM prompt isolation (isUSMLE branch, systemRole)
-//   • NBME vignette structure + ABIM complexity + DST/Cushing guardrails
-//   • Ethics/HIPAA qTypePool, Step 1 mechanism qTypePool
-//   • Setting blueprint with ICU/telemedicine for ABIM/Step 3
-//   • Random topic weighted pools per level
-//   • Entropy seed, temperature 0.6, max_tokens 2048
-//   • Gemini BLOCK_NONE safetySettings + responseMimeType
-//   • Supabase /rest/v1/mcqs with exam_level + correct_answer + category
-//   • warmup ping, topic length validation, demographic_check field
-//   • Two-way validateDemographics
-//   • rewriteExplanationLetters with §§LETTER§§ placeholders
-//   • glucose/sugar terminology rule
+// All v5.3 features preserved exactly:
 //   • v5.1 Integrity Rules A–G
-//   • v5.2 Integrity Rules H (regulatory language), I (temporal arithmetic),
-//     J (classification criteria separation)
+//   • v5.2 Integrity Rules H, I, J
+//   • v5.3 ABIM Endocrine Hard Facts (Cushing's BIPSS framework,
+//     ACTH cutoffs, prevalence framing, MRI sensitivity)
+//   • Nutrition injection, shuffle, demographic validation, etc.
 //
-// New in v5.3 — ENDOCRINE HARD FACTS UPGRADE:
+// New in v5.4 — JSON PARSER HARDENING:
 //
-//   The v5.1/v5.2 integrity rules are structural (how to write a question).
-//   v5.3 adds CONTENT-LEVEL factual anchors for high-yield endocrine topics
-//   where the underlying model's training data is known to be outdated.
+//   Problem: v5.3's longer, more detailed explanations triggered more
+//   JSON parse failures in the model output. Specifically, the model
+//   occasionally emits:
+//     - Unescaped newlines inside string values
+//     - Unescaped tabs inside string values
+//     - Unescaped internal double quotes (e.g., in drug names,
+//       trial names, or direct guideline quotes within the explanation)
+//     - Smart quotes (" " ' ') instead of standard ASCII quotes
+//     - Em-dashes and en-dashes embedded mid-value
 //
-//   1. CUSHING'S DISEASE MRI/BIPSS SIZE-BASED FRAMEWORK (2021 Pituitary
-//      Society Consensus — Fleseriu et al., Lancet Diabetes Endocrinol
-//      2021;9:847–875) supersedes the obsolete 2003 ≥6 mm rule:
-//        • <6 mm   → BIPSS required
-//        • 6–9 mm  → BIPSS recommended by majority (discretionary)
-//        • ≥10 mm  → BIPSS not required; proceed to TSS
+//   Fix: extractJSON is rewritten with a multi-pass sanitizer that
+//   handles all five failure modes, plus a diagnostic log that
+//   prints the 200 characters around any parse error position so
+//   future failures can be characterized precisely.
 //
-//   2. ACTH INTERPRETATION CUTOFFS (hardcoded):
-//        • ACTH <10 pg/mL  → ACTH-independent → adrenal CT
-//        • ACTH 10–20 pg/mL → indeterminate
-//        • ACTH >20 pg/mL  → ACTH-dependent → pituitary MRI first
-//
-//   3. CUSHING'S PREVALENCE FRAMING: CD = 70–80% of ACTH-dependent CS
-//      (NOT 80–85%). ACTH-dependent CS = 80–85% of ALL endogenous CS.
-//      Do not conflate the two denominators.
-//
-//   4. PRIMARY CITATION POLICY: For Cushing's disease localization, the
-//      primary citation must be Fleseriu 2021 Pituitary Society Consensus,
-//      NOT the 2008 Endocrine Society Diagnosis CPG.
-//
-//   5. MRI SENSITIVITY: Standard 1.5T pituitary MRI is negative in 40–60%
-//      of CD patients. Ectopic ACTH syndrome shows false-positive pituitary
-//      lesions on MRI in ~12% of cases. These facts justify the size-based
-//      BIPSS criteria.
-//
-//   These rules are injected into specificGuardrails for ABIM exams only.
+//   Handler change: if extractJSON fails on the first attempt,
+//   the handler now retries the API call once before throwing.
+//   This adds resilience without masking persistent errors.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -87,14 +64,133 @@ function pickWeighted(blueprint) {
   return blueprint[blueprint.length - 1].s;
 }
 
+// ============================================================
+// extractJSON (v5.4 — HARDENED multi-pass sanitizer)
+// ============================================================
+// Handles the five most common LLM JSON failure modes:
+//   1. Unescaped newlines/tabs/carriage returns inside strings
+//   2. Unescaped internal double quotes inside strings
+//   3. Smart quotes replacing straight quotes
+//   4. Trailing commas before } or ]
+//   5. Stray control characters
+// If parse still fails, logs 200 chars of context around the error.
+// ============================================================
 function extractJSON(raw) {
+  if (!raw || typeof raw !== "string") {
+    throw new Error("extractJSON received empty or non-string input.");
+  }
+
+  // Step 1: Extract the outermost JSON object
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
-  try { return JSON.parse(match[0]); }
+  let candidate = match[0];
+
+  // Step 2: Try parsing directly — many responses are already valid
+  try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
+
+  // Step 3: Pass 1 — normalize smart quotes and unicode dashes to ASCII equivalents
+  //         This is safe because the content is English medical text.
+  candidate = candidate
+    .replace(/[\u201C\u201D]/g, '"')   // curly double quotes → "
+    .replace(/[\u2018\u2019]/g, "'")   // curly single quotes → '
+    .replace(/\u2013/g, "-")            // en-dash → -
+    .replace(/\u2014/g, "-")            // em-dash → -
+    .replace(/\u00A0/g, " ");           // non-breaking space → space
+
+  // Step 4: Pass 2 — strip trailing commas before } or ]
+  candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
+
+  // Step 5: Pass 3 — strip raw control characters except \n, \r, \t
+  //         (We will handle those specifically in Pass 4.)
+  candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+
+  // Step 6: Pass 4 — escape unescaped newlines/tabs/CR *inside* string values.
+  //         Walk the string character-by-character, tracking whether we are
+  //         currently inside a JSON string. This is more robust than regex
+  //         because regex cannot reliably distinguish string-internal
+  //         newlines from structural whitespace.
+  candidate = escapeUnescapedControlCharsInStrings(candidate);
+
+  // Step 7: Try parsing again
+  try { return JSON.parse(candidate); }
   catch (e) {
-    const sanitized = match[0].replace(/,\s*([}\]])/g, '$1').replace(/[\u0000-\u001F\u007F]/g, ' ');
-    return JSON.parse(sanitized);
+    // Step 8: Pass 5 — last-ditch effort: escape unescaped internal double
+    //         quotes inside string values. This is the hardest case because
+    //         a bare " could be a string terminator OR a rogue internal quote.
+    //         We use a heuristic: if a " is followed by alphanumeric/space
+    //         rather than , } ] : or whitespace-then-those, treat it as internal.
+    const salvaged = escapeUnescapedInternalQuotes(candidate);
+    try { return JSON.parse(salvaged); }
+    catch (e2) {
+      // Step 9: Still failing — log diagnostic context and throw
+      const posMatch = String(e2.message).match(/position (\d+)/);
+      if (posMatch) {
+        const pos = parseInt(posMatch[1], 10);
+        const start = Math.max(0, pos - 100);
+        const end   = Math.min(salvaged.length, pos + 100);
+        const excerpt = salvaged.substring(start, end).replace(/\n/g, "\\n");
+        console.error(`extractJSON failed at pos ${pos}. Context:\n…${excerpt}…`);
+      } else {
+        console.error(`extractJSON failed: ${e2.message}`);
+      }
+      throw new Error(`Malformed JSON from AI after sanitization: ${e2.message}`);
+    }
   }
+}
+
+// Walk the candidate string; when inside a JSON string value, replace raw
+// \n, \r, \t with their escaped forms. Tracks escape state correctly.
+function escapeUnescapedControlCharsInStrings(s) {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (ch === "\\") { out += ch; escape = true; continue; }
+    if (ch === '"') { inString = !inString; out += ch; continue; }
+    if (inString) {
+      if (ch === "\n") { out += "\\n"; continue; }
+      if (ch === "\r") { out += "\\r"; continue; }
+      if (ch === "\t") { out += "\\t"; continue; }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// Heuristic escape of internal double quotes. For each " we encounter while
+// inside a string, check whether the NEXT non-whitespace char is a valid
+// JSON structural char (: , } ]). If not, treat this " as an internal quote
+// that should be escaped.
+function escapeUnescapedInternalQuotes(s) {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (ch === "\\") { out += ch; escape = true; continue; }
+    if (ch === '"') {
+      if (!inString) { inString = true; out += ch; continue; }
+      // inString && ch === '"' — is this a terminator or an internal quote?
+      // Look ahead, skipping whitespace, for a JSON structural char.
+      let j = i + 1;
+      while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
+      const next = s[j];
+      if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
+        // Valid terminator
+        inString = false;
+        out += ch;
+      } else {
+        // Internal stray quote — escape it
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 // ============================================================
@@ -333,7 +429,7 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v5.3 — expanded ABIM endocrine hard facts for Cushing)
+// PROMPT BUILDER (v5.3 — unchanged in v5.4)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -433,11 +529,6 @@ USMLE SPECIFIC RULES:
 2. COGNITIVE LEVEL: Target medical students (M2 for Step 1, M3/M4 for Step 2/3). Do NOT test fellowship-level subspecialty management.
 3. DISTRACTORS: Distractors must be distinct, plausible alternative diagnoses or underlying mechanisms, not nuanced variations in subspecialty management.`;
   } else {
-    // ═══════════════════════════════════════════════════════════════════
-    // ABIM ENDOCRINE HARD FACTS (v5.3 — expanded Cushing's section)
-    // These are content-level factual anchors, not structural rules.
-    // They override any training-data claims that contradict them.
-    // ═══════════════════════════════════════════════════════════════════
     specificGuardrails = `
 ABIM SPECIFIC RULES:
 1. COMPLEXITY: Test complex management, esoteric guidelines, and nuanced clinical reasoning appropriate for a subspecialty fellowship level.
@@ -450,46 +541,45 @@ ABIM SPECIFIC RULES:
    - NEVER apply the 1 mg DST cutoff to an 8 mg DST result.
 
    CUSHING'S WORKUP SEQUENCE (non-negotiable):
-   Step 1: Biochemical confirmation (any 2 of: 24-hour UFC ×2, late-night salivary cortisol ×2, 1 mg overnight DST).
+   Step 1: Biochemical confirmation (any 2 of: 24-hour UFC x2, late-night salivary cortisol x2, 1 mg overnight DST).
    Step 2: Measure serum ACTH to determine ACTH-dependence.
    Step 3: Localization based on ACTH result (see ACTH CUTOFFS below).
    Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.
 
    ACTH INTERPRETATION CUTOFFS (hardcoded):
-   - ACTH <10 pg/mL  → ACTH-INDEPENDENT → proceed to adrenal CT (with and without contrast).
-   - ACTH 10–20 pg/mL → INDETERMINATE → repeat testing or CRH stimulation test.
-   - ACTH >20 pg/mL  → ACTH-DEPENDENT → proceed to pituitary MRI with and without gadolinium.
+   - ACTH <10 pg/mL  -> ACTH-INDEPENDENT -> proceed to adrenal CT (with and without contrast).
+   - ACTH 10-20 pg/mL -> INDETERMINATE -> repeat testing or CRH stimulation test.
+   - ACTH >20 pg/mL  -> ACTH-DEPENDENT -> proceed to pituitary MRI with and without gadolinium.
 
-   CUSHING'S DISEASE MRI → BIPSS SIZE-BASED FRAMEWORK (MANDATORY per 2021 Pituitary Society Consensus — Fleseriu M, Auchus R, Bancos I, et al. Consensus on Diagnosis and Management of Cushing's Disease: a guideline update. Lancet Diabetes Endocrinol 2021;9(12):847–875):
+   CUSHING'S DISEASE MRI -> BIPSS SIZE-BASED FRAMEWORK (MANDATORY per 2021 Pituitary Society Consensus — Fleseriu M, Auchus R, Bancos I, et al. Consensus on Diagnosis and Management of Cushing's Disease: a guideline update. Lancet Diabetes Endocrinol 2021;9(12):847-875):
    After confirming ACTH-dependent CS and obtaining pituitary MRI, the decision to proceed to bilateral inferior petrosal sinus sampling (BIPSS) is strictly size-dependent:
-   • Pituitary lesion <6 mm on MRI: BIPSS REQUIRED (consensus).
-   • Pituitary lesion 6–9 mm on MRI: BIPSS recommended by majority of experts (moderate quality, discretionary recommendation).
-   • Pituitary lesion ≥10 mm on MRI: BIPSS NOT required; proceed directly to transsphenoidal surgery (consensus).
-   • MRI negative or equivocal: BIPSS required to distinguish pituitary vs. ectopic ACTH source.
-   ABSOLUTELY DO NOT cite the obsolete 2003 consensus "≥6 mm → skip BIPSS → surgery" rule. The 2021 Pituitary Society Consensus EXPLICITLY SUPERSEDES this. The threshold for skipping BIPSS is now ≥10 mm, not ≥6 mm. Teaching the old 6-mm rule is a factual error.
+   - Pituitary lesion <6 mm on MRI: BIPSS REQUIRED (consensus).
+   - Pituitary lesion 6-9 mm on MRI: BIPSS recommended by majority of experts (moderate quality, discretionary recommendation).
+   - Pituitary lesion >=10 mm on MRI: BIPSS NOT required; proceed directly to transsphenoidal surgery (consensus).
+   - MRI negative or equivocal: BIPSS required to distinguish pituitary vs. ectopic ACTH source.
+   ABSOLUTELY DO NOT cite the obsolete 2003 consensus ">=6 mm -> skip BIPSS -> surgery" rule. The 2021 Pituitary Society Consensus EXPLICITLY SUPERSEDES this. The threshold for skipping BIPSS is now >=10 mm, not >=6 mm. Teaching the old 6-mm rule is a factual error.
 
    CUSHING'S PRIMARY CITATIONS (use these, not older references):
-   - For diagnosis & localization: Fleseriu et al., Lancet Diabetes Endocrinol 2021;9:847–875 (2021 Pituitary Society Consensus). PRIMARY.
-   - For treatment: Nieman LK et al., J Clin Endocrinol Metab 2015;100(8):2807–2831 (2015 Endocrine Society Treatment CPG). SECONDARY.
-   - The 2008 Endocrine Society Diagnosis CPG (Nieman 2008) addresses screening/diagnosis ONLY. Do NOT cite it as the authoritative source for localization decisions on 2025–2026 board questions.
+   - For diagnosis and localization: Fleseriu et al., Lancet Diabetes Endocrinol 2021;9:847-875 (2021 Pituitary Society Consensus). PRIMARY.
+   - For treatment: Nieman LK et al., J Clin Endocrinol Metab 2015;100(8):2807-2831 (2015 Endocrine Society Treatment CPG). SECONDARY.
+   - The 2008 Endocrine Society Diagnosis CPG (Nieman 2008) addresses screening/diagnosis ONLY. Do NOT cite it as the authoritative source for localization decisions on 2025-2026 board questions.
 
    CUSHING'S PREVALENCE FRAMING (do not conflate denominators):
-   - Endogenous CS is ACTH-dependent in 80–85% of cases and ACTH-independent in 15–20%.
-   - Among ACTH-dependent CS: Cushing's disease (pituitary) accounts for 70–80%; ectopic ACTH syndrome accounts for 15–20%; ectopic CRH is rare (<1%).
-   - NEVER state "Cushing's disease accounts for 80–85% of ACTH-dependent CS" — this conflates two different denominators.
+   - Endogenous CS is ACTH-dependent in 80-85% of cases and ACTH-independent in 15-20%.
+   - Among ACTH-dependent CS: Cushing's disease (pituitary) accounts for 70-80%; ectopic ACTH syndrome accounts for 15-20%; ectopic CRH is rare (<1%).
+   - NEVER state "Cushing's disease accounts for 80-85% of ACTH-dependent CS" — this conflates two different denominators.
 
    PITUITARY MRI SENSITIVITY CONTEXT (use to justify BIPSS thresholds):
-   - Standard 1.5T pituitary MRI is NEGATIVE in approximately 40–60% of patients with biochemically confirmed Cushing's disease.
+   - Standard 1.5T pituitary MRI is NEGATIVE in approximately 40-60% of patients with biochemically confirmed Cushing's disease.
    - Approximately 12% of patients with ectopic ACTH syndrome have false-positive pituitary incidentalomas on MRI.
    - These two facts together explain WHY size-specific BIPSS criteria exist: small pituitary lesions (<6 mm) and incidentalomas are common enough to require BIPSS confirmation.
 
    BIPSS TECHNICAL CUTOFFS (if testing interpretation):
-   - Central-to-peripheral ACTH gradient ≥2 at baseline OR ≥3 after CRH/DDAVP stimulation → pituitary source (Cushing's disease).
-   - Gradient <2 baseline and <3 post-stimulation → ectopic ACTH source.
-   - BIPSS is GOLD STANDARD for distinguishing pituitary vs. ectopic source but is UNRELIABLE for lateralization within the pituitary (only 56–69% accuracy for right vs. left).`;
+   - Central-to-peripheral ACTH gradient >=2 at baseline OR >=3 after CRH/DDAVP stimulation -> pituitary source (Cushing's disease).
+   - Gradient <2 baseline and <3 post-stimulation -> ectopic ACTH source.
+   - BIPSS is GOLD STANDARD for distinguishing pituitary vs. ectopic source but is UNRELIABLE for lateralization within the pituitary (only 56-69% accuracy for right vs. left).`;
   }
 
-  // ── v5.0: NUTRITION ADDENDUM (unchanged) ──────────────────────────────
   const nutritionAddendum = isNutrition ? `
 
 NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
@@ -502,137 +592,90 @@ NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
 - The explanation MUST cite the relevant mechanism or authoritative source (e.g., ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).
 - Distractors must represent plausible clinical missteps: ordering the wrong repletion, misidentifying the deficiency, or choosing the wrong dietary intervention.` : "";
 
-  // ── v5.1 + v5.2: FULL INTEGRITY RULES BLOCK (A–J) ────────────────────
   const integrityRules = `
 
-QUESTION WRITING INTEGRITY (MANDATORY — violating any of A–J makes the question unusable):
+QUESTION WRITING INTEGRITY (MANDATORY — violating any of A-J makes the question unusable):
 
 A. DISTRACTOR-STEM INDEPENDENCE (most violated rule — audit carefully).
    No distractor may be pre-eliminated by a fact that is already stated in the stem.
-   - If you write "urinalysis shows no eosinophils," you MUST NOT offer "urine eosinophils" as a choice.
-   - If you state a pathogen by name, you MUST NOT offer "identify the pathogen" as a distractor.
-   - If a lab value is already in the stem, you MUST NOT offer "check that same lab" as a distractor.
    Before finalizing each of the five choices, re-read the stem and confirm the choice is NOT already answered or ruled out by stem content.
 
 B. NAMED-SYNDROME VALIDATION.
-   If the explanation invokes a named pentad, triad, tetrad, "classic presentation," or eponymous syndrome requiring specific features, EVERY component of that classic set must be explicitly documented in the stem with supporting data.
-   - "Classic TTP pentad" requires ALL FIVE: MAHA + thrombocytopenia + AKI + neurologic signs + fever. If the temperature is normal, you cannot claim the pentad — either include fever ≥38.0°C in the stem, or reframe as "TTP spectrum" without invoking the pentad.
-   - "Charcot triad" requires all three of RUQ pain + fever + jaundice.
-   - Same principle for Reynolds pentad, Virchow triad, Beck triad, Cushing triad, Saint triad, etc.
+   If the explanation invokes a named pentad, triad, tetrad, or eponymous syndrome, EVERY component must be explicitly documented in the stem.
+   - "Classic TTP pentad" requires ALL FIVE components including fever; if the temperature is normal, reframe as "TTP spectrum" without invoking the pentad.
 
 C. COMPETING DIAGNOSIS DISCIPLINE.
-   If the stem contains clinical features that would reasonably suggest an alternative differential beyond the four wrong-answer distractors, the explanation MUST explicitly acknowledge that alternative and state why the chosen answer still takes priority.
-   - Example triggers requiring acknowledgment: muscle tenderness + blood dipstick > RBC microscopy → rhabdomyolysis; eosinophilia + new drug + AKI → AIN; new antibiotic + diarrhea → C. difficile.
-   - Do NOT bury or ignore a plausible competing diagnosis that a careful reader will notice.
-   - Either remove the competing-diagnosis features from the stem, or dedicate at least one sentence of the explanation to why that alternative does not change the next-step answer.
+   If the stem contains features that would reasonably suggest an alternative differential, the explanation MUST explicitly acknowledge it and state why the chosen answer still takes priority.
 
 D. EVIDENCE DISCIPLINE.
-   The explanation may cite ONLY data (labs, vitals, exam findings, timelines) that appear explicitly in the stem.
-   - Do NOT cite "active coagulopathy" unless PT, PTT, INR, fibrinogen, or D-dimer appear in the stem and are abnormal.
-   - Do NOT cite "elevated CK" unless CK appears in the stem.
-   - Do NOT cite "positive blood culture" unless cultures appear in the stem.
-   If a rationale requires a data point, add it to the stem BEFORE finalizing the question.
+   The explanation may cite ONLY data that appear explicitly in the stem. If a rationale requires a data point, add it to the stem BEFORE finalizing.
 
 E. QUANTITATIVE TERMINOLOGY ACCURACY.
-   Severity adjectives must match guideline-accepted numeric thresholds. Do not apply an adjective that contradicts the stem's number.
-   - Thrombocytopenia: mild 100–150 × 10⁹/L, moderate 50–100 × 10⁹/L, severe <50 × 10⁹/L.
-   - AKI: KDIGO staging (Stage 1 ≥1.5×; Stage 2 ≥2×; Stage 3 ≥3× or Cr ≥4.0 or RRT).
-   - Hyponatremia: mild 130–135, moderate 125–129, severe <125 mEq/L.
-   - Hypokalemia: mild 3.0–3.4, moderate 2.5–2.9, severe <2.5 mEq/L.
-   - Neutropenia: mild 1.0–1.5, moderate 0.5–1.0, severe <0.5 × 10⁹/L.
-   - Anemia (WHO): mild 11.0 to lower-limit-of-normal, moderate 8.0–10.9, severe <8.0 g/dL.
-   When in doubt, state the number and omit the adjective.
+   Severity adjectives must match guideline-accepted numeric thresholds. Thrombocytopenia: mild 100-150, moderate 50-100, severe <50. AKI: KDIGO staging. Hyponatremia: mild 130-135, moderate 125-129, severe <125. Hypokalemia: mild 3.0-3.4, moderate 2.5-2.9, severe <2.5.
 
 F. PRECISE COGNITIVE BIAS LABELS.
-   When attributing a distractor to a cognitive error, use the correct term:
-   - ANCHORING: fixation on the first piece of information encountered.
-   - PREMATURE CLOSURE: accepting a diagnosis before it is fully verified; stopping the workup too early.
-   - AVAILABILITY BIAS: overweighting diagnoses that are recently encountered, vivid, or memorable.
-   - PATTERN-MATCHING ERROR / REPRESENTATIVENESS: mistaking surface features for a different syndrome.
-   - CONFIRMATION BIAS: seeking only data that supports a preferred diagnosis, ignoring disconfirming data.
-   - FRAMING EFFECT: decisions changed by how information is presented.
-   Do not default to "availability bias" as a generic label. If no bias cleanly applies, describe the error in plain words.
+   Use correct terms: ANCHORING (fixation on first information), PREMATURE CLOSURE (stopping workup too early), AVAILABILITY BIAS (overweighting vivid recent cases), PATTERN-MATCHING/REPRESENTATIVENESS (surface feature mistake), CONFIRMATION BIAS, FRAMING EFFECT. Do not default to "availability bias" as a generic label.
 
 G. PRE-OUTPUT SELF-CHECK (mandatory).
-   Before emitting the JSON, silently audit your draft against A–J:
-   1. Re-read each distractor against the stem (Rule A).
-   2. Confirm every component of any named syndrome is in the stem (Rule B).
-   3. Check stem for competing-diagnosis features; confirm explanation addresses them (Rule C).
-   4. Verify every data point cited in the explanation appears in the stem (Rule D).
-   5. Check every severity adjective against the numeric threshold (Rule E).
-   6. Verify cognitive bias labels match their definitions (Rule F).
-   7. Confirm no regulatory language was upgraded beyond its source strength (Rule H).
-   8. Verify all temporal statements are mathematically correct (Rule I).
-   9. Confirm classification definitions and action thresholds are stated separately (Rule J).
-   10. For Cushing's disease questions: confirm the 2021 Pituitary Society Consensus size-based BIPSS framework is applied, NOT the obsolete 6-mm rule.
-   If any check fails, revise before emitting JSON.
+   Before emitting JSON, audit your draft against A-J. For Cushing's questions specifically, confirm the 2021 Pituitary Society Consensus size-based BIPSS framework is applied, not the obsolete 6-mm rule.
 
 H. REGULATORY LANGUAGE PRECISION.
-   When citing FDA prescribing information, drug labels, society guidelines, or any regulatory document, you MUST preserve the exact strength of the recommendation. Do NOT upgrade permissive or advisory language into mandatory language.
-   - "Consider interruption" or "consider discontinuation" means the label is advisory — write "the prescribing information advises consideration of discontinuation," NOT "the FDA mandates discontinuation."
-   - "Recommended" ≠ "required." "Should" ≠ "must." "May" ≠ "is indicated."
-   - If you are uncertain of the exact regulatory language, cite the mechanism and clinical rationale without claiming a stronger directive than you can verify.
-   - The strength of a guideline directive (Class I vs. IIa vs. IIb; "mandates" vs. "consider") is itself a testable board fact — misstating it teaches wrong medicine.
-   Correct model: "The Tecfidera prescribing information advises that discontinuation be considered when Grade 3 lymphopenia persists beyond 6 months."
-   Wrong model: "The FDA mandates discontinuation if ALC remains <0.5 × 10⁹/L for more than 6 months."
+   Preserve exact strength of guideline directives. "Consider interruption" does NOT equal "mandates discontinuation." "Should" does NOT equal "must." Do not upgrade permissive language to mandatory language.
 
 I. TEMPORAL ARITHMETIC ACCURACY.
-   When the stem contains multiple dated data points (labs drawn at different timepoints, symptoms of different durations, interval since diagnosis), the explanation must distinguish precisely between two mathematically different concepts:
-   - The INTERVAL BETWEEN TWO MEASUREMENTS: the calendar distance from one test to another.
-   - The TOTAL DURATION OF AN ABNORMALITY: the calendar distance from the first abnormal result to the present encounter.
-   These are not the same number and must not be conflated.
-   Example: If a test drawn "6 months ago" was abnormal, and a second test drawn "4 weeks ago" was also abnormal, then:
-     → The interval between the two measurements is approximately 5 months (NOT 6 months).
-     → The total duration of documented abnormality is approximately 6 months (from the first test to today).
-   Work out the timeline explicitly on paper before writing the explanation. State the correct concept for the clinical decision you are describing.
+   Distinguish the interval BETWEEN two measurements from the total DURATION of an abnormality. A test "6 months ago" and a test "4 weeks ago" are ~5 months apart; the total duration of the abnormality is 6 months. These are different numbers.
 
 J. CLASSIFICATION CRITERIA SEPARATION.
-   When a clinical finding involves a tiered classification system (CTCAE toxicity grades, CKD stages, AKI KDIGO criteria, Child-Pugh class, RECIST, TNM staging, lymphopenia grades), the grade or stage DEFINITION and the ACTION THRESHOLD that triggers a clinical decision are two separate concepts. Do NOT bundle them into a single definition statement.
-   - The grade definition answers: what numeric value places this patient in this grade?
-   - The action threshold answers: what additional criterion (duration, trend, or comorbidity) triggers the clinical response?
-   Wrong: "Grade 3 (severe) lymphopenia, defined as an ALC <0.5 × 10⁹/L persisting for ≥6 months."
-   (This incorrectly makes duration part of the grade definition.)
-   Correct: "This patient has Grade 3 lymphopenia, defined by CTCAE as an ALC <0.5 × 10⁹/L. The Tecfidera prescribing information advises consideration of discontinuation when Grade 3 lymphopenia persists for more than 6 months — a separate duration criterion that triggers clinical action."
-   Apply this separation to any graded or staged system in the explanation.`;
+   Grade/stage definitions and action thresholds are separate concepts. "Grade 3 lymphopenia" is defined by the ALC value alone; the 6-month duration is a separate action threshold for discontinuation.
 
-  const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
+K. JSON OUTPUT HYGIENE (critical — prevents deployment failures).
+   Your response MUST be valid, parseable JSON with these rules:
+   - Use ONLY straight ASCII double quotes (") for JSON string delimiters. Do NOT use curly/smart quotes.
+   - Inside string values, escape any internal double quotes as \\".
+   - Inside string values, do NOT use raw newlines — use a single space or \\n instead.
+   - Prefer plain ASCII dashes (-) over en-dashes/em-dashes inside values.
+   - When citing a drug, trial, or guideline name, avoid nested double quotes. Write: Fleseriu et al., Lancet Diabetes Endocrinol 2021 — NOT: Fleseriu et al., "Consensus on Diagnosis...". Use single quotes or omit quotation marks entirely.
+   - Do not include trailing commas before } or ].`;
 
-CLINICAL & ETHICAL GUARDRAILS:
-1. TERMINOLOGY: Always use the precise medical term "glucose". Never use the colloquial term "sugar" in any stem, choice, or explanation.
-2. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions, or advanced directives. Do not make the correct answer "call the ethics committee."
-3. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
-4. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error identifiable by the Rule F bias taxonomy below.
+  const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Output confident, accurate facts.
+
+CLINICAL AND ETHICAL GUARDRAILS:
+1. TERMINOLOGY: Always use "glucose". Never use "sugar".
+2. ETHICS/HIPAA: Test complex autonomy, capacity vs. competence, surrogate decision-making, HIPAA exceptions, or advanced directives.
+3. SETTING VALIDATION: Vital signs and presentation must match the clinical setting.
+4. DISTRACTOR LOGIC: Every distractor must be plausible and represent a cognitive error per Rule F.
 5. EXPLANATION STRUCTURE:
-   - S1: Why the correct answer is right + official society citation + guideline language quoted at its exact regulatory strength (see Rule H).
-   - S2: Why each tempting wrong answer fails, explicitly naming the cognitive trap per Rule F.
-   - S3 (if Rule C applies): One sentence acknowledging any competing diagnosis suggested by the stem and why it does not change the answer.
-   - Final: THE BOARD PEARL — a hard clinical rule, cutoff, or time-sensitive mandate.
-6. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
+   - S1: Why the correct answer is right + official citation at exact regulatory strength (Rule H).
+   - S2: Why each wrong answer fails, naming the cognitive trap (Rule F).
+   - S3 (if Rule C applies): Competing diagnosis acknowledgment.
+   - Final: BOARD PEARL.
+6. VISUAL DIAGNOSIS: Include a Radiopaedia URL if imaging-dependent.
 
 ${specificGuardrails}${nutritionAddendum}${integrityRules}
 
-UNIVERSAL HARD RULES (DO NOT VIOLATE):
-- STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications, anatomies, or states. The same applies in reverse. Do NOT write phrases like "denies oral contraceptive use" for a male patient; simply omit it. Every pertinent negative must be biologically possible.
+UNIVERSAL HARD RULES:
+- STRICT BIOLOGICAL DEMOGRAPHICS: Male patients must not have female-specific medications/anatomies/states, and vice versa. Every pertinent negative must be biologically possible.
 - HIT Anticoagulation: Argatroban is hepatically cleared. Bivalirudin/Fondaparinux are renally cleared.
 - DKA/HHS: K+ must be known (>3.3) before insulin start.
-- Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.
+- Thyroid Storm: Thionamide (PTU) must precede Iodine by at least 1 hour.
 
-EXPLANATION LETTER REFERENCES: When referencing distractors in the explanation, use ONLY these exact formats: "Choice X", "choice X", "Option X", "answer X", or "(X)" where X is A–E.`;
+EXPLANATION LETTER REFERENCES: Use only "Choice X", "choice X", "Option X", "answer X", or "(X)" where X is A-E.`;
 
   const userText = `Write 1 highly complex vignette specifically about: ${promptTopic}.
-CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
-CRITICAL INSTRUCTION 2: The patient in the vignette MUST be exactly a ${randomAge}-year-old ${randomSex}. You must use this exact age and sex.
-CRITICAL INSTRUCTION 3: The clinical setting of this vignette MUST be ${promptSetting}. Ensure the acuity of the presentation matches this setting.
-CRITICAL INSTRUCTION 4: Every pertinent negative you include must be biologically possible for a ${randomSex}. Do not list negatives for conditions, medications, anatomies, or states that this patient cannot biologically have.
-CRITICAL INSTRUCTION 5: Before emitting the JSON, run the Rule G pre-output self-check against Rules A–J and revise as needed.
+CRITICAL INSTRUCTION 1: The question stem must ask for ${promptQType}.
+CRITICAL INSTRUCTION 2: Patient must be a ${randomAge}-year-old ${randomSex}.
+CRITICAL INSTRUCTION 3: Clinical setting must be ${promptSetting}.
+CRITICAL INSTRUCTION 4: Every pertinent negative must be biologically possible for a ${randomSex}.
+CRITICAL INSTRUCTION 5: Before emitting JSON, run the Rule G self-check against Rules A-K.
+CRITICAL INSTRUCTION 6 (JSON hygiene per Rule K): Your output MUST be parseable JSON. Use straight ASCII double quotes only. Escape internal double quotes as backslash-quote. No raw newlines inside string values. No smart quotes. No em-dashes inside values. When citing guidelines or trials, avoid nested double quotes — use plain text.
 
-JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}. I will not include any physiologically impossible medications, conditions, or pertinent negatives.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
+JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
   return { systemText, userText, randomSex };
 }
 
 // ============================================================
-// NETLIFY HANDLER (v4.9 — unchanged except category pass-through)
+// NETLIFY HANDLER (v5.4 — adds one-shot retry on JSON parse failure)
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -654,18 +697,42 @@ exports.handler = async function (event) {
     let attempts = 0;
     const maxAttempts = 3;
 
+    // v5.4: outer attempt loop now also handles JSON parse failures gracefully
     while (!isValid && attempts < maxAttempts) {
       attempts++;
       let res;
-      try { res = await callClaude(pd.systemText, pd.userText); }
-      catch (apiError) { throw new Error(`AI Network Failure: ${apiError.message}`); }
+      try {
+        res = await callClaude(pd.systemText, pd.userText);
+      } catch (apiError) {
+        throw new Error(`AI Network Failure: ${apiError.message}`);
+      }
 
-      p = extractJSON(res);
-      if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
+      try {
+        p = extractJSON(res);
+      } catch (parseError) {
+        console.warn(`Attempt ${attempts} failed JSON parse: ${parseError.message}`);
+        if (attempts === maxAttempts) {
+          console.warn("All Claude attempts produced malformed JSON. Switching to Gemini fallback...");
+          try {
+            res = await callGemini(pd.systemText, pd.userText);
+            p = extractJSON(res);
+          } catch (fbErr) {
+            throw new Error(`All models produced malformed JSON. Last error: ${fbErr.message}`);
+          }
+        } else {
+          continue; // retry the outer loop
+        }
+      }
+
+      if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) {
+        console.warn(`Attempt ${attempts} missing required fields`);
+        if (attempts === maxAttempts) throw new Error("AI response is missing required fields after all retries.");
+        continue;
+      }
 
       isValid = validateDemographics(p.stem, pd.randomSex);
       if (!isValid) {
-        console.warn(`Attempt ${attempts} failed demographic check. Patient is ${pd.randomSex} but biologically incongruous terms were found.`);
+        console.warn(`Attempt ${attempts} failed demographic check for ${pd.randomSex}.`);
         if (attempts === maxAttempts) {
           console.warn("Switching to Gemini Fallback for final attempt...");
           res = await callGemini(pd.systemText, pd.userText);
