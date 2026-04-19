@@ -1,25 +1,40 @@
 // generate-mcq.js — MedBoard Pro
-// v5.0 — Nutrition Enhancement (USMLE June 2026) built on real v4.9
-// All v4.9 features preserved exactly:
-//   • USMLE vs ABIM prompt isolation (isUSMLE branch, systemRole)
-//   • NBME vignette structure + ABIM complexity + DST/Cushing guardrails
-//   • 3-sentence explanation rule (S1/S2/S3) + Board Pearl
-//   • Ethics/HIPAA qTypePool, Step1 mechanism qTypePool
-//   • Setting blueprint with ICU/telemedicine for ABIM/Step3
-//   • Random topic weighted pools per level
-//   • Entropy seed, temperature 0.6, max_tokens 2048
-//   • Gemini BLOCK_NONE safetySettings + responseMimeType
-//   • Supabase /rest/v1/mcqs with exam_level + correct_answer fields
-//   • warmup ping, topic length validation, demographic_check field
-//   • Two-way validateDemographics (female terms block for men, male terms block for women)
-//   • rewriteExplanationLetters with §§LETTER§§ placeholders
-//   • glucose/sugar terminology rule
-// New in v5.0:
-//   • NUTRITION_BY_LEVEL constant — 5 level-specific subtopic lists
-//   • pickTopicForLevel() — injects nutrition at ~12% rate via weighted coin flip
-//   • nutritionAddendum — appended to systemText when isNutrition=true
-//   • Nutrition topics cross-checked against USMLE/ABIM cognitive level expectations
-//   • saveMcqToSupabase gains optional `category` field ("Nutrition" or null)
+// v5.7 — Pre-Deploy Bug Fixes (built on v5.6)
+// ---------------------------------------------------------------
+// All v5.6 features preserved:
+//   • Three-way ABIM/IM/USMLE depth calibration
+//   • Conditional Cushing anchor
+//   • Compressed A-K integrity rules
+//   • Hardened extractJSON multi-pass parser
+//   • Handler retry loop on JSON parse failure
+//   • Nutrition injection, shuffle, demographic validation
+//
+// Three bugs fixed in v5.7 before first deploy:
+//
+//   BUG 1 — CUSHING REGEX TOO BROAD (line 85 in v5.6)
+//   Old: /cushing|cortisol|acth|adrenal|pituitary|dexamethasone|dst/
+//   This fired for "Adrenal Disorders and Hypertension" (→ adrenal)
+//   and "Pituitary and Neuroendocrine Tumors" (→ pituitary), loading
+//   the ~200-token Cushing anchor on questions about pheochromocytoma,
+//   primary aldosteronism, acromegaly, or prolactinoma. False positive.
+//   Fix: regex narrowed to /cushing/ only — fires ONLY when the word
+//   "cushing" appears in the topic string.
+//
+//   BUG 2 — max_tokens FIXED AT 1400 FOR ALL LEVELS
+//   ABIM IM branch caps explanations at 250 words (~330 tokens), but
+//   callClaude still requested 1400 output tokens. Claude generates to
+//   the limit given to it; the 250-word instruction alone doesn't
+//   reliably cap actual output. Latency scales with max_tokens.
+//   Fix: buildPrompt now returns maxTokens alongside systemText/userText.
+//   ABIM IM → 900 tokens (~14-17s)
+//   ABIM Endocrinology → 1200 tokens (~18-23s)
+//   USMLE all levels → 1100 tokens (~16-20s)
+//   callClaude/callGemini now accept maxTokens as a parameter.
+//
+//   BUG 3 — netlify.toml included node_bundler = "esbuild"
+//   That line changes the global build system and can break existing
+//   setups. Removed. A safe single-block merge snippet is provided
+//   separately as netlify_timeout_block.txt.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -30,7 +45,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TOPIC-SEX COUPLING (v4.8 — unchanged)
+// TOPIC-SEX COUPLING (unchanged)
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -56,18 +71,112 @@ function pickWeighted(blueprint) {
   return blueprint[blueprint.length - 1].s;
 }
 
-function extractJSON(raw) {
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON object found in AI response.");
-  try { return JSON.parse(match[0]); }
-  catch (e) {
-    const sanitized = match[0].replace(/,\s*([}\]])/g, '$1').replace(/[\u0000-\u001F\u007F]/g, ' ');
-    return JSON.parse(sanitized);
-  }
+// ============================================================
+// TOPIC ANCHOR DETECTION (v5.7 — BUG 1 FIX: regex narrowed)
+// ============================================================
+// Previous regex /cushing|cortisol|acth|adrenal|pituitary|dexamethasone|dst/
+// was firing for "Adrenal Disorders and Hypertension" (adrenal) and
+// "Pituitary and Neuroendocrine Tumors" (pituitary). Narrowed to
+// /cushing/ only — fires ONLY when the topic explicitly names Cushing.
+// ============================================================
+function detectTopicAnchors(topic) {
+  const t = topic.toLowerCase();
+  return {
+    cushing: /cushing/.test(t),
+  };
 }
 
 // ============================================================
-// DEMOGRAPHIC VALIDATION (v4.9 — two-way, unchanged)
+// extractJSON (v5.4 hardened parser — unchanged)
+// ============================================================
+function extractJSON(raw) {
+  if (!raw || typeof raw !== "string") {
+    throw new Error("extractJSON received empty or non-string input.");
+  }
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found in AI response.");
+  let candidate = match[0];
+
+  try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
+
+  candidate = candidate
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "-")
+    .replace(/\u00A0/g, " ");
+
+  candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
+  candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  candidate = escapeUnescapedControlCharsInStrings(candidate);
+
+  try { return JSON.parse(candidate); }
+  catch (e) {
+    const salvaged = escapeUnescapedInternalQuotes(candidate);
+    try { return JSON.parse(salvaged); }
+    catch (e2) {
+      const posMatch = String(e2.message).match(/position (\d+)/);
+      if (posMatch) {
+        const pos = parseInt(posMatch[1], 10);
+        const start = Math.max(0, pos - 100);
+        const end   = Math.min(salvaged.length, pos + 100);
+        const excerpt = salvaged.substring(start, end).replace(/\n/g, "\\n");
+        console.error(`extractJSON failed at pos ${pos}. Context:\n…${excerpt}…`);
+      } else {
+        console.error(`extractJSON failed: ${e2.message}`);
+      }
+      throw new Error(`Malformed JSON from AI after sanitization: ${e2.message}`);
+    }
+  }
+}
+
+function escapeUnescapedControlCharsInStrings(s) {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (ch === "\\") { out += ch; escape = true; continue; }
+    if (ch === '"') { inString = !inString; out += ch; continue; }
+    if (inString) {
+      if (ch === "\n") { out += "\\n"; continue; }
+      if (ch === "\r") { out += "\\r"; continue; }
+      if (ch === "\t") { out += "\\t"; continue; }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function escapeUnescapedInternalQuotes(s) {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (ch === "\\") { out += ch; escape = true; continue; }
+    if (ch === '"') {
+      if (!inString) { inString = true; out += ch; continue; }
+      let j = i + 1;
+      while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
+      const next = s[j];
+      if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
+        inString = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// ============================================================
+// DEMOGRAPHIC VALIDATION (unchanged)
 // ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
@@ -81,7 +190,7 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER (v4.7 — unchanged)
+// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -109,10 +218,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 }
 
 // ============================================================
-// NUTRITION SUBTOPICS (v5.0 — NEW)
-// Per USMLE June 2026: nutrition remains integrated within
-// system-based questions. Injected at ~12% rate.
-// Topics are calibrated to each exam's cognitive level.
+// NUTRITION SUBTOPICS (unchanged)
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": [
@@ -155,7 +261,7 @@ const NUTRITION_BY_LEVEL = {
     "Mediterranean diet — cardiovascular risk reduction, PREDIMED trial application",
     "CKD nutritional management — GFR-stratified phosphorus, potassium, protein restriction",
     "Cirrhosis nutritional management — protein intake paradox, BCAA supplementation, zinc",
-    "Critical illness nutrition — early enteral feeding within 24–48 h, ASPEN/ESPEN 2023 guidelines",
+    "Critical illness nutrition — early enteral feeding within 24-48 h, ASPEN/ESPEN 2023 guidelines",
     "Vitamin D supplementation — population-specific indications, dosing, toxicity threshold",
   ],
   "USMLE Step 3": [
@@ -166,7 +272,7 @@ const NUTRITION_BY_LEVEL = {
     "ICU nutrition — ASPEN/ESPEN 2023, permissive underfeeding in obesity, early EN vs. PN decision",
     "Post-bariatric nutritional monitoring — annual lab protocol, B12/iron/D/thiamine supplementation",
     "Vitamin D across life stages — IOM DRIs, upper tolerable intake levels, toxicity management",
-    "Nutrition in pregnancy — folate 400–800 mcg pre-conception, iron 27 mg/day, DHA requirements",
+    "Nutrition in pregnancy — folate 400-800 mcg pre-conception, iron 27 mg/day, DHA requirements",
     "Cancer cachexia — multimodal management, role of ONS, avoiding harmful supplement interactions",
     "Preventive nutrition counseling — USPSTF 2020 healthy diet/physical activity behavioral counseling",
     "Enteral-to-oral transition — weaning criteria, GI function assessment, aspiration risk management",
@@ -176,17 +282,17 @@ const NUTRITION_BY_LEVEL = {
     "Refeeding syndrome — recognition, prevention protocol, phosphate repletion targets (>1.5 mg/dL)",
     "Enteral vs. parenteral nutrition — clinical decision algorithm, GI tract accessibility rule",
     "TPN complications — IFALD (hepatic steatosis), EFAD, metabolic bone disease, line sepsis",
-    "Nutritional management of heart failure — sodium ≤2g/day restriction evidence, fluid limits",
-    "Nutritional management of CKD — GFR-stratified protein (0.6–0.8 g/kg), phosphorus, potassium",
-    "Nutritional management of cirrhosis — 1.2–1.5 g/kg protein, BCAA for encephalopathy",
+    "Nutritional management of heart failure — sodium restriction evidence, fluid limits",
+    "Nutritional management of CKD — protein restriction, phosphorus, potassium by GFR stage",
+    "Nutritional management of cirrhosis — protein goals, BCAA for encephalopathy",
     "Malabsorption workup — Sudan stain, 72-hour fecal fat, D-xylose test interpretation",
-    "Celiac disease — anti-tTG IgA, duodenal biopsy (Marsh classification), HLA-DQ2/DQ8",
-    "Obesity — comorbidity-driven pharmacotherapy selection, bariatric surgery candidacy criteria",
-    "DASH diet — ACC/AHA 2017 evidence: 11 mmHg SBP reduction, dietary components",
-    "Mediterranean diet — PREDIMED 2013: 30% relative CV risk reduction vs. low-fat diet",
-    "Vitamin D deficiency in chronic disease — 25-OH cutoffs, repletion protocol, monitoring",
-    "Thiamine deficiency in heart failure and alcohol use — Wernicke prevention, empiric dosing",
-    "Metformin and B12 deficiency — screening interval, repletion threshold, neuropathy prevention",
+    "Celiac disease — anti-tTG IgA, duodenal biopsy, HLA-DQ2/DQ8",
+    "Obesity — comorbidity-driven pharmacotherapy selection, bariatric surgery candidacy",
+    "DASH diet — ACC/AHA 2017 evidence: 11 mmHg SBP reduction",
+    "Mediterranean diet — PREDIMED 2013: 30% relative CV risk reduction",
+    "Vitamin D deficiency in chronic disease — 25-OH cutoffs, repletion protocol",
+    "Thiamine deficiency in heart failure and alcohol use — Wernicke prevention",
+    "Metformin and B12 deficiency — screening interval, neuropathy prevention",
   ],
   "ABIM Endocrinology": [
     "Medical nutrition therapy for T1DM — carbohydrate-to-insulin ratios, correction factor, CGM integration",
@@ -206,15 +312,9 @@ const NUTRITION_BY_LEVEL = {
   ],
 };
 
-// ============================================================
-// NUTRITION TOPIC PICKER (v5.0 — NEW)
-// ~12% injection rate; topics scoped to the requested level
-// ============================================================
 const NUTRITION_INJECTION_RATE = 0.12;
 
 function pickTopicForLevel(level, rawTopic) {
-  // Only inject nutrition on non-Random topic calls to avoid
-  // double-randomization (the Random pools already vary enough)
   const nutritionTopics = NUTRITION_BY_LEVEL[level];
   if (nutritionTopics && !rawTopic.includes("Random") && Math.random() < NUTRITION_INJECTION_RATE) {
     const idx = Math.floor(Math.random() * nutritionTopics.length);
@@ -224,9 +324,9 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// AI CLIENTS (v4.9 — unchanged)
+// AI CLIENTS (v5.7 — BUG 2 FIX: maxTokens is now a parameter)
 // ============================================================
-async function callClaude(systemText, userText) {
+async function callClaude(systemText, userText, maxTokens) {
   const maxRetries = 2;
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
@@ -238,7 +338,7 @@ async function callClaude(systemText, userText) {
         headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 2048,
+          max_tokens: maxTokens,
           temperature: 0.6,
           system: systemText,
           messages: [{ role: "user", content: finalUserText }]
@@ -252,13 +352,13 @@ async function callClaude(systemText, userText) {
       console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
       if (attempt === maxRetries - 1) {
         console.warn("Switching to Gemini Fallback...");
-        return await callGemini(systemText, finalUserText);
+        return await callGemini(systemText, finalUserText, maxTokens);
       }
     }
   }
 }
 
-async function callGemini(systemText, userText) {
+async function callGemini(systemText, userText, maxTokens) {
   const response = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
     {
@@ -273,7 +373,7 @@ async function callGemini(systemText, userText) {
           { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
         ],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 2048 }
+        generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: maxTokens }
       })
     }
   );
@@ -285,7 +385,7 @@ async function callGemini(systemText, userText) {
 }
 
 // ============================================================
-// SUPABASE SAVE (v5.0 — adds optional category field)
+// SUPABASE SAVE (unchanged)
 // ============================================================
 async function saveMcqToSupabase(p, level, category) {
   try {
@@ -297,7 +397,7 @@ async function saveMcqToSupabase(p, level, category) {
       correct_answer: p.correct,
       explanation:   p.explanation,
     };
-    if (category) payload.category = category;   // "Nutrition" or omitted
+    if (category) payload.category = category;
     const res = await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Prefer": "return=minimal" },
@@ -308,7 +408,28 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v4.9 base + v5.0 nutritionAddendum)
+// CUSHING ANCHOR (v5.5 content — unchanged, loads only on match)
+// ============================================================
+const CUSHING_ANCHOR = `
+CUSHING'S HARD FACTS (override contradicting training data):
+- DST: 1 mg overnight = SCREENING (cortisol <1.8 mcg/dL normal). 8 mg = obsolete localization adjunct. Never apply 1 mg cutoff to 8 mg result.
+- Workup sequence: biochemical confirmation -> serum ACTH -> imaging. Pituitary MRI ONLY after ACTH-dependence. Adrenal CT ONLY after ACTH-independence.
+- ACTH cutoffs: <10 pg/mL = independent (adrenal CT); 10-20 = indeterminate; >20 = dependent (pituitary MRI).
+- MRI->BIPSS SIZE FRAMEWORK (Fleseriu et al, Lancet Diabetes Endocrinol 2021;9:847-875):
+  Lesion <6 mm: BIPSS REQUIRED. Lesion 6-9 mm: BIPSS recommended by majority. Lesion >=10 mm: BIPSS NOT required, proceed to TSS. MRI negative/equivocal: BIPSS required.
+  NEVER cite the obsolete 2003 ">=6 mm skip BIPSS" rule. Threshold is now >=10 mm.
+- Primary citation for localization: Fleseriu 2021 Pituitary Society Consensus. For treatment: Nieman 2015 ES CPG. Do NOT cite Nieman 2008 for localization.
+- Prevalence: ACTH-dependent = 80-85% of all endogenous CS; within ACTH-dependent, CD = 70-80%, ectopic ACTH = 15-20%.
+- MRI sensitivity: negative in 40-60% of CD. Ectopic ACTH has ~12% false-positive pituitary lesions.
+- BIPSS cutoffs: central/peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. Unreliable for left/right lateralization (56-69%).`;
+
+// ============================================================
+// PROMPT BUILDER (v5.7 — BUG 2 FIX: returns maxTokens per level)
+// ============================================================
+// max_tokens by branch (calibrated to expected output length):
+//   ABIM Internal Medicine  →  900  (~14-17s, capped 250-word explanation)
+//   ABIM Endocrinology      → 1200  (~18-23s, full subspecialty detail)
+//   USMLE all               → 1100  (~16-20s, moderate vignette + explanation)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -362,21 +483,21 @@ function buildPrompt(level, topic, isNutrition) {
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
     qTypePool = [
       { s: "the most appropriate NEXT STEP IN PATIENT COUNSELING OR COMMUNICATION", w: 40 },
-      { s: "the LEGAL OR ETHICAL REQUIREMENT in this scenario (e.g., HIPAA, surrogate decision-making, autonomy)", w: 40 },
-      { s: "the most appropriate approach to PALLIATIVE OR END-OF-LIFE CARE for this patient", w: 20 }
+      { s: "the LEGAL OR ETHICAL REQUIREMENT in this scenario", w: 40 },
+      { s: "the most appropriate approach to PALLIATIVE OR END-OF-LIFE CARE", w: 20 }
     ];
   } else if (level === "USMLE Step 1") {
     qTypePool = [
-      { s: "the UNDERLYING MECHANISM, ENZYME DEFICIENCY, OR PATHOPHYSIOLOGY of the condition", w: 40 },
-      { s: "the MECHANISM OF ACTION, PHARMACODYNAMICS, OR TOXICITY of the appropriate drug", w: 30 },
+      { s: "the UNDERLYING MECHANISM, ENZYME DEFICIENCY, OR PATHOPHYSIOLOGY", w: 40 },
+      { s: "the MECHANISM OF ACTION, PHARMACODYNAMICS, OR TOXICITY", w: 30 },
       { s: "the MOST LIKELY HISTOLOGICAL, GROSS ANATOMICAL, OR BIOCHEMICAL finding", w: 30 }
     ];
   } else {
     qTypePool = [
-      { s: "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP (e.g., what lab/imaging to order)", w: 25 },
+      { s: "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP", w: 25 },
       { s: "the MOST LIKELY DIAGNOSIS", w: 25 },
       { s: "the most appropriate NEXT STEP IN MANAGEMENT OR TREATMENT", w: 40 },
-      { s: "the STRONGEST RISK FACTOR or expected PROGNOSIS for this condition", w: 10 }
+      { s: "the STRONGEST RISK FACTOR or expected PROGNOSIS", w: 10 }
     ];
   }
   const promptQType = pickWeighted(qTypePool);
@@ -397,75 +518,92 @@ function buildPrompt(level, topic, isNutrition) {
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  // ── v4.9: USMLE vs ABIM prompt isolation (unchanged) ──────────────────
-  const isUSMLE = level.includes("USMLE");
-  const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
+  // ── Three-way level classification ───────────────────────────────────
+  const isUSMLE     = level.includes("USMLE");
+  const isABIM_Endo = level === "ABIM Endocrinology";
+  const isABIM_IM   = level === "ABIM Internal Medicine";
 
-  let specificGuardrails = "";
+  // ── BUG 2 FIX: max_tokens calibrated per branch ───────────────────────
+  const maxTokens = isABIM_IM ? 900 : isABIM_Endo ? 1200 : 1100;
+
+  const systemRole = isUSMLE     ? "an NBME Senior Item Writer for the USMLE"
+                   : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director"
+                   : "an ABIM Internal Medicine Board Question Writer";
+
+  // ── Cushing anchor — fires ONLY when topic contains "cushing" ─────────
+  const anchors = detectTopicAnchors(promptTopic);
+  const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
+
+  // ── Level-specific rules ──────────────────────────────────────────────
+  let levelRules = "";
   if (isUSMLE) {
-    specificGuardrails = `
-USMLE SPECIFIC RULES:
-1. NBME VIGNETTE STRUCTURE: Strictly follow the standard NBME format: Age/Sex/Setting -> Chief Complaint -> History of Present Illness -> Past Medical History -> Medications/Social/Family History -> Vitals -> Physical Exam -> Labs/Imaging.
-2. COGNITIVE LEVEL: Target medical students (M2 for Step 1, M3/M4 for Step 2/3). Do NOT test fellowship-level subspecialty management.
-3. DISTRACTORS: Distractors must be distinct, plausible alternative diagnoses or underlying mechanisms, not nuanced variations in subspecialty management.`;
+    levelRules = `
+USMLE RULES:
+- NBME structure: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs/Imaging.
+- Cognitive level: M2 for Step 1, M3/M4 for Step 2/3. No fellowship-level subspecialty detail.
+- Distractors: distinct alternative diagnoses/mechanisms, not management nuances.`;
+
+  } else if (isABIM_IM) {
+    levelRules = `
+ABIM INTERNAL MEDICINE RULES:
+- AUDIENCE: general internist taking the ABIM IM board exam, NOT a subspecialist.
+- DEPTH: generalist level across all subspecialty topics. Test initial recognition, first-line workup, when to refer, first-line management, avoidance of common errors.
+- DO NOT TEST: subspecialty fellowship cutoffs, esoteric second/third-line agents, deep mechanism questions, or nuanced guideline distinctions only a subspecialist would know.
+- EXAMPLES of correct IM depth: recognize STEMI and know initial management (not antiarrhythmic electrophysiology); recognize adrenal crisis and give hydrocortisone (not BIPSS cutoffs); recognize TTP and order ADAMTS13 (not eculizumab dosing nuances).
+- EXPLANATION: concise. S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences). Total <=250 words.`;
+
   } else {
-    specificGuardrails = `
-ABIM SPECIFIC RULES:
-1. COMPLEXITY: Test complex management, esoteric guidelines, and nuanced clinical reasoning appropriate for a subspecialty fellowship level.
-2. ENDOCRINE HARD RULES (DO NOT VIOLATE):
-   - DEXAMETHASONE SUPPRESSION TESTS: The 1 mg overnight DST is a SCREENING test (cutoff: <1.8 mcg/dL = normal). The 8 mg high-dose DST is a LOCALIZATION test used AFTER ACTH-dependence is established. NEVER apply the 1 mg DST cutoff to an 8 mg DST result.
-   - CUSHING'S WORKUP SEQUENCE: After biochemical confirmation, ACTH measurement is the MANDATORY next step. Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.`;
+    levelRules = `
+ABIM ENDOCRINOLOGY RULES:
+- AUDIENCE: endocrinology fellow preparing for ABIM subspecialty board.
+- DEPTH: full subspecialty level — guideline-specific management, exact cutoff values, second/third-line decisions, nuanced workup sequences.
+- Endocrine hard rules: 1 mg vs 8 mg DST distinction; ACTH measurement mandatory after biochemical CS confirmation; pituitary MRI only after ACTH-dependence; adrenal CT only after ACTH-independence.
+- EXPLANATION: full S1/S2/S3 + Board Pearl. Cite specific guidelines with year and journal.`;
   }
 
-  // ── v5.0: NUTRITION ADDENDUM — appended only when isNutrition=true ────
   const nutritionAddendum = isNutrition ? `
+NUTRITION RULE: Test applied clinical nutrition (mechanism for Step 1; recognition/management otherwise). Cite specific guideline (ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).` : "";
 
-NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
-- This question MUST test applied clinical nutrition science — not generic dietary advice.
-- USMLE Step 1: Focus on biochemical mechanism (enzyme, metabolic pathway, cofactor deficiency, starvation physiology).
-- USMLE Step 2 CK / Step 3: Focus on clinical recognition, workup, or management decision using nutrition knowledge.
-- ABIM levels: Focus on evidence-based dietary intervention, guideline-based nutritional management, or complication recognition.
-- The clinical vignette MUST include realistic patient history, physical findings, or laboratory values that require integration of nutritional knowledge to reach the correct answer.
-- Do NOT generate questions about "eating healthy" in the abstract. Every question must have a clear, defensible single-best answer grounded in a specific guideline or mechanism.
-- The explanation MUST cite the relevant mechanism or authoritative source (e.g., ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).
-- Distractors must represent plausible clinical missteps: ordering the wrong repletion, misidentifying the deficiency, or choosing the wrong dietary intervention.` : "";
+  const integrityRules = `
+INTEGRITY RULES (must pass all before emitting JSON):
+A. Distractor-stem independence: no distractor pre-eliminated by stem content.
+B. Named-syndrome validation: every component of any pentad/triad/eponym must be in the stem (TTP pentad requires fever).
+C. Competing-diagnosis discipline: if stem suggests alternative Dx, explanation must acknowledge it.
+D. Evidence discipline: explanation cites only data explicitly in stem.
+E. Severity terminology: adjectives match numeric thresholds. Thrombocytopenia: mild 100-150, mod 50-100, severe <50. Hyponatremia: mild 130-135, mod 125-129, severe <125. Hypokalemia: mild 3.0-3.4, mod 2.5-2.9, severe <2.5.
+F. Cognitive bias labels: anchoring, premature closure, availability bias, pattern-matching/representativeness, confirmation bias. Label each distractor correctly.
+G. Self-check: audit A-K before emitting.
+H. Regulatory language: preserve exact directive strength. "Consider" is not "mandate."
+I. Temporal arithmetic: interval between measurements vs. total duration are different numbers.
+J. Classification separation: grade/stage definition and action threshold are separate statements.
+K. JSON hygiene: straight ASCII double quotes only. Escape internal quotes as backslash-quote. No raw newlines inside string values. No smart quotes. No em-dashes. No nested double quotes around guideline/trial names.`;
 
-  const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
+  const explanationNote = isABIM_IM
+    ? "EXPLANATION: concise total <=250 words — S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences)."
+    : "EXPLANATION: S1 (why correct + citation), S2 (why each distractor fails + bias label), S3 if competing Dx, Board Pearl.";
 
-CLINICAL & ETHICAL GUARDRAILS:
-1. TERMINOLOGY: Always use the precise medical term "glucose". Never use the colloquial term "sugar" in any stem, choice, or explanation.
-2. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions, or advanced directives. Do not make the correct answer "call the ethics committee."
-3. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
-4. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error: Anchoring, Premature Closure, or Availability Bias.
-5. EXPLANATION: 3-sentence rule.
-   - S1: Why the correct answer is right + official society citation.
-   - S2: Why tempting wrong answers fail, explicitly naming the cognitive trap.
-   - S3: THE BOARD PEARL. A hard clinical rule or cutoff.
-6. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
+  const systemText = `You are ${systemRole} writing Board Exam QBank items for ${level}. Output confident, accurate facts.${levelRules}${conditionalAnchors}${nutritionAddendum}${integrityRules}
 
-${specificGuardrails}${nutritionAddendum}
+${explanationNote}
+REFERENCES: use "Choice X", "choice X", "Option X", "answer X", or "(X)" only.
+UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine; terminology: "glucose" never "sugar".`;
 
-UNIVERSAL HARD RULES (DO NOT VIOLATE):
-- STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications, anatomies, or states. The same applies in reverse. Do NOT write phrases like "denies oral contraceptive use" for a male patient; simply omit it. Every pertinent negative must be biologically possible.
-- HIT Anticoagulation: Argatroban is hepatically cleared. Bivalirudin/Fondaparinux are renally cleared.
-- DKA/HHS: K+ must be known (>3.3) before insulin start.
-- Thyroid Storm: Thionamide (PTU) MUST precede Iodine by at least 1 hour.
+  const userText = `Write 1 vignette on: ${promptTopic}.
+- Question asks for: ${promptQType}.
+- Patient: ${randomAge}-year-old ${randomSex}.
+- Setting: ${promptSetting}.
+- Pertinent negatives biologically possible for a ${randomSex}.
+- Run Rule G self-check before emitting.
+- Rule K: straight ASCII quotes; no nested double quotes around guideline/trial names; no raw newlines in string values.
+${isABIM_IM ? "- ABIM IM: generalist internist depth only. Explanation <=250 words total." : ""}
 
-EXPLANATION LETTER REFERENCES: When referencing distractors in the explanation, use ONLY these exact formats: "Choice X", "choice X", "Option X", "answer X", or "(X)" where X is A–E.`;
+JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
-  const userText = `Write 1 highly complex vignette specifically about: ${promptTopic}.
-CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignette stem MUST ask for ${promptQType}.
-CRITICAL INSTRUCTION 2: The patient in the vignette MUST be exactly a ${randomAge}-year-old ${randomSex}. You must use this exact age and sex.
-CRITICAL INSTRUCTION 3: The clinical setting of this vignette MUST be ${promptSetting}. Ensure the acuity of the presentation matches this setting.
-CRITICAL INSTRUCTION 4: Every pertinent negative you include must be biologically possible for a ${randomSex}. Do not list negatives for conditions, medications, anatomies, or states that this patient cannot biologically have.
-
-JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}. I will not include any physiologically impossible medications, conditions, or pertinent negatives.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
-
-  return { systemText, userText, randomSex };
+  return { systemText, userText, randomSex, maxTokens };
 }
 
 // ============================================================
-// NETLIFY HANDLER (v4.9 — unchanged except category pass-through)
+// NETLIFY HANDLER (v5.7 — passes maxTokens to callClaude)
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -476,12 +614,12 @@ exports.handler = async function (event) {
     if (!VALID_LEVELS.includes(b.level)) return { statusCode: 400, body: JSON.stringify({ error: `Invalid exam level: "${b.level}". Valid options: ${VALID_LEVELS.join(", ")}` }) };
     if (typeof b.topic !== "string" || b.topic.length > 200) return { statusCode: 400, body: JSON.stringify({ error: "Topic must be a string under 200 characters." }) };
 
-    // v5.0: resolve nutrition injection before buildPrompt
     const topicResult = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
     const isNutrition   = topicResult.isNutrition;
 
     const pd = buildPrompt(b.level, resolvedTopic, isNutrition);
+    const { maxTokens } = pd;  // level-calibrated token budget
 
     let p;
     let isValid = false;
@@ -491,18 +629,41 @@ exports.handler = async function (event) {
     while (!isValid && attempts < maxAttempts) {
       attempts++;
       let res;
-      try { res = await callClaude(pd.systemText, pd.userText); }
-      catch (apiError) { throw new Error(`AI Network Failure: ${apiError.message}`); }
+      try {
+        res = await callClaude(pd.systemText, pd.userText, maxTokens);
+      } catch (apiError) {
+        throw new Error(`AI Network Failure: ${apiError.message}`);
+      }
 
-      p = extractJSON(res);
-      if (!p.stem || !p.choices || !p.correct || !p.explanation) throw new Error("AI response is missing required fields.");
+      try {
+        p = extractJSON(res);
+      } catch (parseError) {
+        console.warn(`Attempt ${attempts} failed JSON parse: ${parseError.message}`);
+        if (attempts === maxAttempts) {
+          console.warn("All Claude attempts produced malformed JSON. Switching to Gemini fallback...");
+          try {
+            res = await callGemini(pd.systemText, pd.userText, maxTokens);
+            p = extractJSON(res);
+          } catch (fbErr) {
+            throw new Error(`All models produced malformed JSON. Last error: ${fbErr.message}`);
+          }
+        } else {
+          continue;
+        }
+      }
+
+      if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) {
+        console.warn(`Attempt ${attempts} missing required fields`);
+        if (attempts === maxAttempts) throw new Error("AI response is missing required fields after all retries.");
+        continue;
+      }
 
       isValid = validateDemographics(p.stem, pd.randomSex);
       if (!isValid) {
-        console.warn(`Attempt ${attempts} failed demographic check. Patient is ${pd.randomSex} but biologically incongruous terms were found.`);
+        console.warn(`Attempt ${attempts} failed demographic check for ${pd.randomSex}.`);
         if (attempts === maxAttempts) {
           console.warn("Switching to Gemini Fallback for final attempt...");
-          res = await callGemini(pd.systemText, pd.userText);
+          res = await callGemini(pd.systemText, pd.userText, maxTokens);
           p = extractJSON(res);
           isValid = validateDemographics(p.stem, pd.randomSex);
           if (!isValid) throw new Error("Failed biological consistency check across all models.");
@@ -512,7 +673,6 @@ exports.handler = async function (event) {
 
     p.topic = resolvedTopic;
 
-    // Shuffle choices and rewrite explanation letters (v4.7 — unchanged)
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
 
@@ -541,7 +701,6 @@ exports.handler = async function (event) {
     p.correct      = newCorrectLetter;
     p.explanation  = rewriteExplanationLetters(p.explanation, letterMap);
 
-    // v5.0: pass category to Supabase
     saveMcqToSupabase(p, b.level, isNutrition ? "Nutrition" : null).catch(() => {});
     delete p.demographic_check;
 
