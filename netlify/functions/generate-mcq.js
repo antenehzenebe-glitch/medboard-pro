@@ -1,7 +1,7 @@
 // generate-mcq.js — MedBoard Pro
-// v5.1 — Question Writing Integrity Upgrade (built on v5.0)
+// v5.2 — Explanation Precision Upgrade (built on v5.1)
 // ---------------------------------------------------------------
-// All v5.0 features preserved exactly:
+// All v5.1 features preserved exactly:
 //   • Nutrition subtopics by level + 12% injection via pickTopicForLevel()
 //   • USMLE vs ABIM prompt isolation (isUSMLE branch, systemRole)
 //   • NBME vignette structure + ABIM complexity + DST/Cushing guardrails
@@ -12,43 +12,30 @@
 //   • Gemini BLOCK_NONE safetySettings + responseMimeType
 //   • Supabase /rest/v1/mcqs with exam_level + correct_answer + category
 //   • warmup ping, topic length validation, demographic_check field
-//   • Two-way validateDemographics (female terms block for men, male terms block for women)
+//   • Two-way validateDemographics
 //   • rewriteExplanationLetters with §§LETTER§§ placeholders
 //   • glucose/sugar terminology rule
+//   • v5.1 Integrity Rules A–G (distractor-stem independence, named-syndrome
+//     validation, competing diagnosis discipline, evidence discipline,
+//     quantitative terminology accuracy, precise cognitive bias labels,
+//     pre-output self-check)
 //
-// New in v5.1 — QUESTION WRITING INTEGRITY (addresses six peer-review failure modes):
-//   A. DISTRACTOR-STEM INDEPENDENCE
-//      No distractor may be pre-eliminated by a fact stated in the stem.
-//      (e.g., stem says "no eosinophils" → do NOT offer "urine eosinophils" as a choice.)
+// New in v5.2 — THREE ADDITIONAL INTEGRITY RULES (H, I, J):
 //
-//   B. NAMED-SYNDROME VALIDATION
-//      If the explanation invokes a named pentad/triad/"classic presentation,"
-//      every component of that classic presentation must be explicitly documented
-//      in the stem. (e.g., cannot cite "TTP pentad including fever" if temp is 37.4°C.)
+//   H. REGULATORY LANGUAGE PRECISION
+//      Preserve the exact strength of FDA/guideline directives.
+//      "Consider interruption" ≠ "mandates discontinuation."
+//      Do not upgrade permissive language to mandatory language.
 //
-//   C. COMPETING DIAGNOSIS DISCIPLINE
-//      If the stem contains features that would reasonably suggest an alternative
-//      differential (e.g., muscle tenderness + blood dipstick > RBC microscopy →
-//      rhabdomyolysis), the explanation MUST explicitly acknowledge and address it.
+//   I. TEMPORAL ARITHMETIC ACCURACY
+//      Distinguish "gap between two measurements" from
+//      "total duration of an abnormality." They are not the same number.
+//      Work out the timeline explicitly before writing the explanation.
 //
-//   D. EVIDENCE DISCIPLINE
-//      The explanation may cite only data (labs, vitals, exam findings) that
-//      appear in the stem. Do NOT invent "active coagulopathy" without PT/PTT/INR.
-//
-//   E. QUANTITATIVE TERMINOLOGY ACCURACY
-//      Severity adjectives must match guideline thresholds.
-//      (e.g., platelets 68k = MODERATE thrombocytopenia, not severe.)
-//
-//   F. PRECISE COGNITIVE BIAS LABELS
-//      Use correct bias terms: anchoring, premature closure, availability bias,
-//      pattern-matching/representativeness, confirmation bias. Do not default
-//      to "availability bias" as a catch-all.
-//
-//   G. PRE-OUTPUT SELF-CHECK
-//      Model is instructed to audit its own draft against rules A–F before emitting JSON.
-//
-// NOTE: These rules are injected into systemText for every question. No changes
-// to data flow, Supabase schema, or client-facing JSON shape.
+//   J. CLASSIFICATION CRITERIA SEPARATION
+//      Do not bundle a grade/stage definition (the ALC value threshold)
+//      with the action threshold (the duration criterion). State them
+//      as two separate sentences with separate clinical meanings.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -96,7 +83,7 @@ function extractJSON(raw) {
 }
 
 // ============================================================
-// DEMOGRAPHIC VALIDATION (v4.9 — two-way, unchanged)
+// DEMOGRAPHIC VALIDATION (v4.9 — unchanged)
 // ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
@@ -139,9 +126,6 @@ function rewriteExplanationLetters(explanation, letterMap) {
 
 // ============================================================
 // NUTRITION SUBTOPICS (v5.0 — unchanged)
-// Per USMLE June 2026: nutrition remains integrated within
-// system-based questions. Injected at ~12% rate.
-// Topics are calibrated to each exam's cognitive level.
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": [
@@ -237,7 +221,6 @@ const NUTRITION_BY_LEVEL = {
 
 // ============================================================
 // NUTRITION TOPIC PICKER (v5.0 — unchanged)
-// ~12% injection rate; topics scoped to the requested level
 // ============================================================
 const NUTRITION_INJECTION_RATE = 0.12;
 
@@ -335,7 +318,7 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v5.1 — QUESTION WRITING INTEGRITY added)
+// PROMPT BUILDER (v5.2 — adds Rules H, I, J to integrityRules)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -424,7 +407,6 @@ function buildPrompt(level, topic, isNutrition) {
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  // ── USMLE vs ABIM prompt isolation (unchanged from v4.9) ──────────────
   const isUSMLE = level.includes("USMLE");
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
 
@@ -457,68 +439,97 @@ NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
 - The explanation MUST cite the relevant mechanism or authoritative source (e.g., ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).
 - Distractors must represent plausible clinical missteps: ordering the wrong repletion, misidentifying the deficiency, or choosing the wrong dietary intervention.` : "";
 
-  // ── v5.1: QUESTION WRITING INTEGRITY RULES (NEW) ──────────────────────
-  // These six rules address peer-review failure modes observed in v5.0 output.
-  // They are MANDATORY and checked by the model before emission.
+  // ── v5.1 + v5.2: FULL INTEGRITY RULES BLOCK (A–J) ────────────────────
   const integrityRules = `
 
-QUESTION WRITING INTEGRITY (MANDATORY — violating any of A–F makes the question unusable):
+QUESTION WRITING INTEGRITY (MANDATORY — violating any of A–J makes the question unusable):
 
 A. DISTRACTOR-STEM INDEPENDENCE (most violated rule — audit carefully).
    No distractor may be pre-eliminated by a fact that is already stated in the stem.
    - If you write "urinalysis shows no eosinophils," you MUST NOT offer "urine eosinophils" as a choice.
    - If you state a pathogen by name, you MUST NOT offer "identify the pathogen" as a distractor.
    - If a lab value is already in the stem, you MUST NOT offer "check that same lab" as a distractor.
-   Before finalizing each of the five choices, re-read the stem and confirm that the choice is NOT already answered or ruled out by stem content.
+   Before finalizing each of the five choices, re-read the stem and confirm the choice is NOT already answered or ruled out by stem content.
 
 B. NAMED-SYNDROME VALIDATION.
    If the explanation invokes a named pentad, triad, tetrad, "classic presentation," or eponymous syndrome requiring specific features, EVERY component of that classic set must be explicitly documented in the stem with supporting data.
-   - "Classic TTP pentad" requires ALL FIVE: MAHA + thrombocytopenia + AKI + neurologic signs + fever. If the temperature is normal, you cannot claim the pentad — either include fever ≥38.0°C in the stem, or reframe the explanation as "the TTP spectrum" without invoking the pentad.
-   - "Charcot triad" requires all three of RUQ pain + fever + jaundice. Do not invoke it partially.
+   - "Classic TTP pentad" requires ALL FIVE: MAHA + thrombocytopenia + AKI + neurologic signs + fever. If the temperature is normal, you cannot claim the pentad — either include fever ≥38.0°C in the stem, or reframe as "TTP spectrum" without invoking the pentad.
+   - "Charcot triad" requires all three of RUQ pain + fever + jaundice.
    - Same principle for Reynolds pentad, Virchow triad, Beck triad, Cushing triad, Saint triad, etc.
 
 C. COMPETING DIAGNOSIS DISCIPLINE.
    If the stem contains clinical features that would reasonably suggest an alternative differential beyond the four wrong-answer distractors, the explanation MUST explicitly acknowledge that alternative and state why the chosen answer still takes priority.
-   - Example triggers requiring acknowledgment: muscle tenderness + urine dipstick blood disproportionate to microscopic RBCs → rhabdomyolysis; eosinophilia + new drug + AKI → AIN; new antibiotic + diarrhea → C. difficile.
+   - Example triggers requiring acknowledgment: muscle tenderness + blood dipstick > RBC microscopy → rhabdomyolysis; eosinophilia + new drug + AKI → AIN; new antibiotic + diarrhea → C. difficile.
    - Do NOT bury or ignore a plausible competing diagnosis that a careful reader will notice.
    - Either remove the competing-diagnosis features from the stem, or dedicate at least one sentence of the explanation to why that alternative does not change the next-step answer.
 
 D. EVIDENCE DISCIPLINE.
-   The explanation may cite ONLY data (labs, vitals, exam findings, timelines, imaging) that appear explicitly in the stem.
+   The explanation may cite ONLY data (labs, vitals, exam findings, timelines) that appear explicitly in the stem.
    - Do NOT cite "active coagulopathy" unless PT, PTT, INR, fibrinogen, or D-dimer appear in the stem and are abnormal.
    - Do NOT cite "elevated CK" unless CK appears in the stem.
    - Do NOT cite "positive blood culture" unless cultures appear in the stem.
-   If a rationale requires a data point, that data point must appear in the stem. If you need the data to support your rationale, add it to the stem BEFORE finalizing.
+   If a rationale requires a data point, add it to the stem BEFORE finalizing the question.
 
 E. QUANTITATIVE TERMINOLOGY ACCURACY.
    Severity adjectives must match guideline-accepted numeric thresholds. Do not apply an adjective that contradicts the stem's number.
-   - Thrombocytopenia: mild 100–150 × 10⁹/L, moderate 50–100 × 10⁹/L, severe <50 × 10⁹/L (some sources <20). Platelets of 68,000/µL = MODERATE, not severe.
-   - AKI: use KDIGO staging (Stage 1 ≥1.5× baseline; Stage 2 ≥2×; Stage 3 ≥3× or creatinine ≥4.0 or RRT).
+   - Thrombocytopenia: mild 100–150 × 10⁹/L, moderate 50–100 × 10⁹/L, severe <50 × 10⁹/L.
+   - AKI: KDIGO staging (Stage 1 ≥1.5×; Stage 2 ≥2×; Stage 3 ≥3× or Cr ≥4.0 or RRT).
    - Hyponatremia: mild 130–135, moderate 125–129, severe <125 mEq/L.
    - Hypokalemia: mild 3.0–3.4, moderate 2.5–2.9, severe <2.5 mEq/L.
    - Neutropenia: mild 1.0–1.5, moderate 0.5–1.0, severe <0.5 × 10⁹/L.
    - Anemia (WHO): mild 11.0 to lower-limit-of-normal, moderate 8.0–10.9, severe <8.0 g/dL.
-   When in doubt, state the number and omit the adjective rather than mislabeling severity.
+   When in doubt, state the number and omit the adjective.
 
 F. PRECISE COGNITIVE BIAS LABELS.
-   When attributing a distractor to a cognitive error, use the correct term. Do not default to "availability bias" as a generic label for any wrong answer.
-   - ANCHORING: fixation on the first piece of information encountered (often the presenting complaint or initial diagnosis).
+   When attributing a distractor to a cognitive error, use the correct term:
+   - ANCHORING: fixation on the first piece of information encountered.
    - PREMATURE CLOSURE: accepting a diagnosis before it is fully verified; stopping the workup too early.
    - AVAILABILITY BIAS: overweighting diagnoses that are recently encountered, vivid, or memorable.
-   - PATTERN-MATCHING ERROR / REPRESENTATIVENESS: mistaking surface features for a different syndrome that shares some features but not the pathognomonic ones.
+   - PATTERN-MATCHING ERROR / REPRESENTATIVENESS: mistaking surface features for a different syndrome.
    - CONFIRMATION BIAS: seeking only data that supports a preferred diagnosis, ignoring disconfirming data.
    - FRAMING EFFECT: decisions changed by how information is presented.
-   If no specific bias cleanly applies, describe the reasoning error in plain words (e.g., "this ignores the peripheral smear findings") rather than forcing a bias label.
+   Do not default to "availability bias" as a generic label. If no bias cleanly applies, describe the error in plain words.
 
 G. PRE-OUTPUT SELF-CHECK (mandatory).
-   Before emitting the JSON, silently audit your draft against A–F:
+   Before emitting the JSON, silently audit your draft against A–J:
    1. Re-read each distractor against the stem (Rule A).
-   2. If you used a named syndrome term, confirm every component is in the stem (Rule B).
-   3. Scan the stem for features suggesting a competing diagnosis; if present, confirm the explanation addresses it (Rule C).
-   4. Confirm every data point cited in the explanation appears in the stem (Rule D).
+   2. Confirm every component of any named syndrome is in the stem (Rule B).
+   3. Check stem for competing-diagnosis features; confirm explanation addresses them (Rule C).
+   4. Verify every data point cited in the explanation appears in the stem (Rule D).
    5. Check every severity adjective against the numeric threshold (Rule E).
    6. Verify cognitive bias labels match their definitions (Rule F).
-   If any check fails, revise the stem or the explanation until all six pass. Only then emit the JSON.`;
+   7. Confirm no regulatory language was upgraded beyond its source strength (Rule H).
+   8. Verify all temporal statements are mathematically correct (Rule I).
+   9. Confirm classification definitions and action thresholds are stated separately (Rule J).
+   If any check fails, revise before emitting JSON.
+
+H. REGULATORY LANGUAGE PRECISION (new in v5.2).
+   When citing FDA prescribing information, drug labels, society guidelines, or any regulatory document, you MUST preserve the exact strength of the recommendation. Do NOT upgrade permissive or advisory language into mandatory language.
+   - "Consider interruption" or "consider discontinuation" means the label is advisory — write "the prescribing information advises consideration of discontinuation," NOT "the FDA mandates discontinuation."
+   - "Recommended" ≠ "required." "Should" ≠ "must." "May" ≠ "is indicated."
+   - If you are uncertain of the exact regulatory language, cite the mechanism and clinical rationale without claiming a stronger directive than you can verify.
+   - The strength of a guideline directive (Class I vs. IIa vs. IIb; "mandates" vs. "consider") is itself a testable board fact — misstating it teaches wrong medicine.
+   Correct model: "The Tecfidera prescribing information advises that discontinuation be considered when Grade 3 lymphopenia persists beyond 6 months."
+   Wrong model: "The FDA mandates discontinuation if ALC remains <0.5 × 10⁹/L for more than 6 months."
+
+I. TEMPORAL ARITHMETIC ACCURACY (new in v5.2).
+   When the stem contains multiple dated data points (labs drawn at different timepoints, symptoms of different durations, interval since diagnosis), the explanation must distinguish precisely between two mathematically different concepts:
+   - The INTERVAL BETWEEN TWO MEASUREMENTS: the calendar distance from one test to another.
+   - The TOTAL DURATION OF AN ABNORMALITY: the calendar distance from the first abnormal result to the present encounter.
+   These are not the same number and must not be conflated.
+   Example: If a test drawn "6 months ago" was abnormal, and a second test drawn "4 weeks ago" was also abnormal, then:
+     → The interval between the two measurements is approximately 5 months (NOT 6 months).
+     → The total duration of documented abnormality is approximately 6 months (from the first test to today).
+   Work out the timeline explicitly on paper before writing the explanation. State the correct concept for the clinical decision you are describing.
+
+J. CLASSIFICATION CRITERIA SEPARATION (new in v5.2).
+   When a clinical finding involves a tiered classification system (CTCAE toxicity grades, CKD stages, AKI KDIGO criteria, Child-Pugh class, RECIST, TNM staging, lymphopenia grades), the grade or stage DEFINITION and the ACTION THRESHOLD that triggers a clinical decision are two separate concepts. Do NOT bundle them into a single definition statement.
+   - The grade definition answers: what numeric value places this patient in this grade?
+   - The action threshold answers: what additional criterion (duration, trend, or comorbidity) triggers the clinical response?
+   Wrong: "Grade 3 (severe) lymphopenia, defined as an ALC <0.5 × 10⁹/L persisting for ≥6 months."
+   (This incorrectly makes duration part of the grade definition.)
+   Correct: "This patient has Grade 3 lymphopenia, defined by CTCAE as an ALC <0.5 × 10⁹/L. The Tecfidera prescribing information advises consideration of discontinuation when Grade 3 lymphopenia persists for more than 6 months — a separate duration criterion that triggers clinical action."
+   Apply this separation to any graded or staged system in the explanation.`;
 
   const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
 
@@ -528,7 +539,7 @@ CLINICAL & ETHICAL GUARDRAILS:
 3. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
 4. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error identifiable by the Rule F bias taxonomy below.
 5. EXPLANATION STRUCTURE:
-   - S1: Why the correct answer is right + official society citation.
+   - S1: Why the correct answer is right + official society citation + guideline language quoted at its exact regulatory strength (see Rule H).
    - S2: Why each tempting wrong answer fails, explicitly naming the cognitive trap per Rule F.
    - S3 (if Rule C applies): One sentence acknowledging any competing diagnosis suggested by the stem and why it does not change the answer.
    - Final: THE BOARD PEARL — a hard clinical rule, cutoff, or time-sensitive mandate.
@@ -549,7 +560,7 @@ CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignett
 CRITICAL INSTRUCTION 2: The patient in the vignette MUST be exactly a ${randomAge}-year-old ${randomSex}. You must use this exact age and sex.
 CRITICAL INSTRUCTION 3: The clinical setting of this vignette MUST be ${promptSetting}. Ensure the acuity of the presentation matches this setting.
 CRITICAL INSTRUCTION 4: Every pertinent negative you include must be biologically possible for a ${randomSex}. Do not list negatives for conditions, medications, anatomies, or states that this patient cannot biologically have.
-CRITICAL INSTRUCTION 5: Before emitting the JSON, run the Rule G pre-output self-check against Rules A–F and revise as needed.
+CRITICAL INSTRUCTION 5: Before emitting the JSON, run the Rule G pre-output self-check against Rules A–J and revise as needed.
 
 JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}. I will not include any physiologically impossible medications, conditions, or pertinent negatives.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
@@ -568,7 +579,6 @@ exports.handler = async function (event) {
     if (!VALID_LEVELS.includes(b.level)) return { statusCode: 400, body: JSON.stringify({ error: `Invalid exam level: "${b.level}". Valid options: ${VALID_LEVELS.join(", ")}` }) };
     if (typeof b.topic !== "string" || b.topic.length > 200) return { statusCode: 400, body: JSON.stringify({ error: "Topic must be a string under 200 characters." }) };
 
-    // v5.0: resolve nutrition injection before buildPrompt
     const topicResult = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
     const isNutrition   = topicResult.isNutrition;
@@ -604,7 +614,6 @@ exports.handler = async function (event) {
 
     p.topic = resolvedTopic;
 
-    // Shuffle choices and rewrite explanation letters (v4.7 — unchanged)
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
 
@@ -633,7 +642,6 @@ exports.handler = async function (event) {
     p.correct      = newCorrectLetter;
     p.explanation  = rewriteExplanationLetters(p.explanation, letterMap);
 
-    // v5.0: pass category to Supabase
     saveMcqToSupabase(p, b.level, isNutrition ? "Nutrition" : null).catch(() => {});
     delete p.demographic_check;
 
