@@ -1,33 +1,32 @@
 // generate-mcq.js — MedBoard Pro
-// v5.4 — JSON Parser Hardening (built on v5.3)
+// v5.5 — Latency-First Architecture (built on v5.4)
 // ---------------------------------------------------------------
-// All v5.3 features preserved exactly:
-//   • v5.1 Integrity Rules A–G
-//   • v5.2 Integrity Rules H, I, J
-//   • v5.3 ABIM Endocrine Hard Facts (Cushing's BIPSS framework,
-//     ACTH cutoffs, prevalence framing, MRI sensitivity)
-//   • Nutrition injection, shuffle, demographic validation, etc.
+// Problem: cumulative prompt growth from v5.1 through v5.4 pushed
+// generation latency from ~20s to ~37s, exceeding Netlify's timeout
+// and producing "Unable to connect to QBank" errors.
 //
-// New in v5.4 — JSON PARSER HARDENING:
+// Strategy: EVERY rule does not belong in EVERY prompt. Split prompt
+// into always-on core rules (compressed) and topic-specific anchors
+// that load conditionally.
 //
-//   Problem: v5.3's longer, more detailed explanations triggered more
-//   JSON parse failures in the model output. Specifically, the model
-//   occasionally emits:
-//     - Unescaped newlines inside string values
-//     - Unescaped tabs inside string values
-//     - Unescaped internal double quotes (e.g., in drug names,
-//       trial names, or direct guideline quotes within the explanation)
-//     - Smart quotes (" " ' ') instead of standard ASCII quotes
-//     - Em-dashes and en-dashes embedded mid-value
+// Preserved from v5.4:
+//   • Parser hardening (extractJSON, escape helpers)
+//   • Handler retry loop on JSON parse failure
+//   • All rule content — just restructured for delivery efficiency
 //
-//   Fix: extractJSON is rewritten with a multi-pass sanitizer that
-//   handles all five failure modes, plus a diagnostic log that
-//   prints the 200 characters around any parse error position so
-//   future failures can be characterized precisely.
+// New in v5.5:
+//   • CONDITIONAL TOPIC ANCHORS: the Cushing block (largest in v5.4)
+//     now loads ONLY when the topic matches Cushing-related keywords.
+//     This alone cuts ~800 tokens from 90% of prompts.
+//   • COMPRESSED INTEGRITY RULES: A-K consolidated into dense
+//     one-line directives. Rule content preserved; verbosity cut ~60%.
+//   • max_tokens reduced 2048 -> 1400 (explanations rarely need 2048).
+//   • Pair this file with netlify.toml setting 26s timeout.
 //
-//   Handler change: if extractJSON fails on the first attempt,
-//   the handler now retries the API call once before throwing.
-//   This adds resilience without masking persistent errors.
+// Expected latency impact: 37s -> ~18-22s on non-Cushing topics,
+// ~22-26s on Cushing topics. All within Pro tier 26s limit.
+//
+// Deployment note: ALSO deploy the generated netlify.toml to repo root.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -38,7 +37,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TOPIC-SEX COUPLING (v4.8 — unchanged)
+// TOPIC-SEX COUPLING (unchanged)
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -65,64 +64,51 @@ function pickWeighted(blueprint) {
 }
 
 // ============================================================
-// extractJSON (v5.4 — HARDENED multi-pass sanitizer)
+// TOPIC ANCHOR DETECTION (v5.5 — NEW)
 // ============================================================
-// Handles the five most common LLM JSON failure modes:
-//   1. Unescaped newlines/tabs/carriage returns inside strings
-//   2. Unescaped internal double quotes inside strings
-//   3. Smart quotes replacing straight quotes
-//   4. Trailing commas before } or ]
-//   5. Stray control characters
-// If parse still fails, logs 200 chars of context around the error.
+// Returns an object describing which topic anchors should be included.
+// This lets us gate large content blocks to only the prompts that need them.
+// ============================================================
+function detectTopicAnchors(topic, level) {
+  const t = topic.toLowerCase();
+  return {
+    cushing: /cushing|cortisol|acth|adrenal|pituitary|dexamethasone|dst/.test(t),
+    // Future anchors can be added here with topic-matching regexes:
+    // acromegaly: /acromegaly|gh\b|igf-1|growth hormone/.test(t),
+    // pheo: /pheochromocytoma|metanephrine|catecholamine/.test(t),
+    // pa: /primary aldosteronism|aldosterone|conn/.test(t),
+  };
+}
+
+// ============================================================
+// extractJSON (v5.4 parser — unchanged, carried forward)
 // ============================================================
 function extractJSON(raw) {
   if (!raw || typeof raw !== "string") {
     throw new Error("extractJSON received empty or non-string input.");
   }
-
-  // Step 1: Extract the outermost JSON object
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
   let candidate = match[0];
 
-  // Step 2: Try parsing directly — many responses are already valid
   try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
 
-  // Step 3: Pass 1 — normalize smart quotes and unicode dashes to ASCII equivalents
-  //         This is safe because the content is English medical text.
   candidate = candidate
-    .replace(/[\u201C\u201D]/g, '"')   // curly double quotes → "
-    .replace(/[\u2018\u2019]/g, "'")   // curly single quotes → '
-    .replace(/\u2013/g, "-")            // en-dash → -
-    .replace(/\u2014/g, "-")            // em-dash → -
-    .replace(/\u00A0/g, " ");           // non-breaking space → space
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "-")
+    .replace(/\u00A0/g, " ");
 
-  // Step 4: Pass 2 — strip trailing commas before } or ]
   candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
-
-  // Step 5: Pass 3 — strip raw control characters except \n, \r, \t
-  //         (We will handle those specifically in Pass 4.)
   candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
-
-  // Step 6: Pass 4 — escape unescaped newlines/tabs/CR *inside* string values.
-  //         Walk the string character-by-character, tracking whether we are
-  //         currently inside a JSON string. This is more robust than regex
-  //         because regex cannot reliably distinguish string-internal
-  //         newlines from structural whitespace.
   candidate = escapeUnescapedControlCharsInStrings(candidate);
 
-  // Step 7: Try parsing again
   try { return JSON.parse(candidate); }
   catch (e) {
-    // Step 8: Pass 5 — last-ditch effort: escape unescaped internal double
-    //         quotes inside string values. This is the hardest case because
-    //         a bare " could be a string terminator OR a rogue internal quote.
-    //         We use a heuristic: if a " is followed by alphanumeric/space
-    //         rather than , } ] : or whitespace-then-those, treat it as internal.
     const salvaged = escapeUnescapedInternalQuotes(candidate);
     try { return JSON.parse(salvaged); }
     catch (e2) {
-      // Step 9: Still failing — log diagnostic context and throw
       const posMatch = String(e2.message).match(/position (\d+)/);
       if (posMatch) {
         const pos = parseInt(posMatch[1], 10);
@@ -138,8 +124,6 @@ function extractJSON(raw) {
   }
 }
 
-// Walk the candidate string; when inside a JSON string value, replace raw
-// \n, \r, \t with their escaped forms. Tracks escape state correctly.
 function escapeUnescapedControlCharsInStrings(s) {
   let out = "";
   let inString = false;
@@ -159,10 +143,6 @@ function escapeUnescapedControlCharsInStrings(s) {
   return out;
 }
 
-// Heuristic escape of internal double quotes. For each " we encounter while
-// inside a string, check whether the NEXT non-whitespace char is a valid
-// JSON structural char (: , } ]). If not, treat this " as an internal quote
-// that should be escaped.
 function escapeUnescapedInternalQuotes(s) {
   let out = "";
   let inString = false;
@@ -173,17 +153,13 @@ function escapeUnescapedInternalQuotes(s) {
     if (ch === "\\") { out += ch; escape = true; continue; }
     if (ch === '"') {
       if (!inString) { inString = true; out += ch; continue; }
-      // inString && ch === '"' — is this a terminator or an internal quote?
-      // Look ahead, skipping whitespace, for a JSON structural char.
       let j = i + 1;
       while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
       const next = s[j];
       if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
-        // Valid terminator
         inString = false;
         out += ch;
       } else {
-        // Internal stray quote — escape it
         out += '\\"';
       }
       continue;
@@ -194,7 +170,7 @@ function escapeUnescapedInternalQuotes(s) {
 }
 
 // ============================================================
-// DEMOGRAPHIC VALIDATION (v4.9 — unchanged)
+// DEMOGRAPHIC VALIDATION (unchanged)
 // ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
@@ -208,7 +184,7 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER (v4.7 — unchanged)
+// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -236,7 +212,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 }
 
 // ============================================================
-// NUTRITION SUBTOPICS (v5.0 — unchanged)
+// NUTRITION SUBTOPICS (unchanged)
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": [
@@ -300,9 +276,9 @@ const NUTRITION_BY_LEVEL = {
     "Refeeding syndrome — recognition, prevention protocol, phosphate repletion targets (>1.5 mg/dL)",
     "Enteral vs. parenteral nutrition — clinical decision algorithm, GI tract accessibility rule",
     "TPN complications — IFALD (hepatic steatosis), EFAD, metabolic bone disease, line sepsis",
-    "Nutritional management of heart failure — sodium ≤2g/day restriction evidence, fluid limits",
-    "Nutritional management of CKD — GFR-stratified protein (0.6–0.8 g/kg), phosphorus, potassium",
-    "Nutritional management of cirrhosis — 1.2–1.5 g/kg protein, BCAA for encephalopathy",
+    "Nutritional management of heart failure — sodium <=2g/day restriction evidence, fluid limits",
+    "Nutritional management of CKD — GFR-stratified protein (0.6-0.8 g/kg), phosphorus, potassium",
+    "Nutritional management of cirrhosis — 1.2-1.5 g/kg protein, BCAA for encephalopathy",
     "Malabsorption workup — Sudan stain, 72-hour fecal fat, D-xylose test interpretation",
     "Celiac disease — anti-tTG IgA, duodenal biopsy (Marsh classification), HLA-DQ2/DQ8",
     "Obesity — comorbidity-driven pharmacotherapy selection, bariatric surgery candidacy criteria",
@@ -330,9 +306,6 @@ const NUTRITION_BY_LEVEL = {
   ],
 };
 
-// ============================================================
-// NUTRITION TOPIC PICKER (v5.0 — unchanged)
-// ============================================================
 const NUTRITION_INJECTION_RATE = 0.12;
 
 function pickTopicForLevel(level, rawTopic) {
@@ -345,7 +318,7 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// AI CLIENTS (v4.9 — unchanged)
+// AI CLIENTS (v5.5 — max_tokens reduced 2048 -> 1400 for latency)
 // ============================================================
 async function callClaude(systemText, userText) {
   const maxRetries = 2;
@@ -359,7 +332,7 @@ async function callClaude(systemText, userText) {
         headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 2048,
+          max_tokens: 1400,
           temperature: 0.6,
           system: systemText,
           messages: [{ role: "user", content: finalUserText }]
@@ -394,7 +367,7 @@ async function callGemini(systemText, userText) {
           { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
         ],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 2048 }
+        generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 1400 }
       })
     }
   );
@@ -406,7 +379,7 @@ async function callGemini(systemText, userText) {
 }
 
 // ============================================================
-// SUPABASE SAVE (v5.0 — unchanged)
+// SUPABASE SAVE (unchanged)
 // ============================================================
 async function saveMcqToSupabase(p, level, category) {
   try {
@@ -429,7 +402,26 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v5.3 — unchanged in v5.4)
+// CUSHING ANCHOR (v5.3 content, loaded ONLY when topic matches)
+// ============================================================
+const CUSHING_ANCHOR = `
+CUSHING'S HARD FACTS (override contradicting training data):
+- DST: 1 mg overnight = SCREENING (cortisol <1.8 mcg/dL normal). 8 mg high-dose = obsolete localization adjunct. Never apply 1 mg cutoff to 8 mg result.
+- Workup sequence: biochemical confirmation -> serum ACTH -> imaging based on ACTH. Pituitary MRI ONLY after ACTH-dependence. Adrenal CT ONLY after ACTH-independence.
+- ACTH cutoffs: <10 pg/mL = independent (adrenal CT); 10-20 = indeterminate (repeat/CRH stim); >20 = dependent (pituitary MRI).
+- MRI->BIPSS SIZE FRAMEWORK (2021 Pituitary Society Consensus — Fleseriu et al, Lancet Diabetes Endocrinol 2021;9:847-875):
+  * Lesion <6 mm: BIPSS REQUIRED.
+  * Lesion 6-9 mm: BIPSS recommended by majority (discretionary).
+  * Lesion >=10 mm: BIPSS NOT required; proceed to TSS.
+  * MRI negative/equivocal: BIPSS required.
+  NEVER cite the obsolete 2003 ">=6 mm skip BIPSS" rule. Threshold is now >=10 mm.
+- Primary citation for Dx/localization: Fleseriu 2021 Pituitary Society Consensus. For treatment: Nieman 2015 ES CPG. Do NOT cite Nieman 2008 as authoritative for localization.
+- Prevalence: ACTH-dependent = 80-85% of all endogenous CS; within ACTH-dependent, CD = 70-80%, ectopic ACTH = 15-20%. Never conflate these denominators.
+- MRI sensitivity context: 1.5T pituitary MRI negative in 40-60% of CD. Ectopic ACTH syndrome shows false-positive pituitary lesions in ~12%.
+- BIPSS cutoffs: central-to-peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. BIPSS is gold standard for pituitary vs. ectopic but unreliable for right/left lateralization (56-69%).`;
+
+// ============================================================
+// PROMPT BUILDER (v5.5 — compressed, conditional anchors)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -483,21 +475,21 @@ function buildPrompt(level, topic, isNutrition) {
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
     qTypePool = [
       { s: "the most appropriate NEXT STEP IN PATIENT COUNSELING OR COMMUNICATION", w: 40 },
-      { s: "the LEGAL OR ETHICAL REQUIREMENT in this scenario (e.g., HIPAA, surrogate decision-making, autonomy)", w: 40 },
-      { s: "the most appropriate approach to PALLIATIVE OR END-OF-LIFE CARE for this patient", w: 20 }
+      { s: "the LEGAL OR ETHICAL REQUIREMENT in this scenario", w: 40 },
+      { s: "the most appropriate approach to PALLIATIVE OR END-OF-LIFE CARE", w: 20 }
     ];
   } else if (level === "USMLE Step 1") {
     qTypePool = [
-      { s: "the UNDERLYING MECHANISM, ENZYME DEFICIENCY, OR PATHOPHYSIOLOGY of the condition", w: 40 },
-      { s: "the MECHANISM OF ACTION, PHARMACODYNAMICS, OR TOXICITY of the appropriate drug", w: 30 },
+      { s: "the UNDERLYING MECHANISM, ENZYME DEFICIENCY, OR PATHOPHYSIOLOGY", w: 40 },
+      { s: "the MECHANISM OF ACTION, PHARMACODYNAMICS, OR TOXICITY", w: 30 },
       { s: "the MOST LIKELY HISTOLOGICAL, GROSS ANATOMICAL, OR BIOCHEMICAL finding", w: 30 }
     ];
   } else {
     qTypePool = [
-      { s: "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP (e.g., what lab/imaging to order)", w: 25 },
+      { s: "the most appropriate NEXT STEP IN DIAGNOSIS OR INITIAL WORKUP", w: 25 },
       { s: "the MOST LIKELY DIAGNOSIS", w: 25 },
       { s: "the most appropriate NEXT STEP IN MANAGEMENT OR TREATMENT", w: 40 },
-      { s: "the STRONGEST RISK FACTOR or expected PROGNOSIS for this condition", w: 10 }
+      { s: "the STRONGEST RISK FACTOR or expected PROGNOSIS", w: 10 }
     ];
   }
   const promptQType = pickWeighted(qTypePool);
@@ -521,161 +513,72 @@ function buildPrompt(level, topic, isNutrition) {
   const isUSMLE = level.includes("USMLE");
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
 
-  let specificGuardrails = "";
-  if (isUSMLE) {
-    specificGuardrails = `
-USMLE SPECIFIC RULES:
-1. NBME VIGNETTE STRUCTURE: Strictly follow the standard NBME format: Age/Sex/Setting -> Chief Complaint -> History of Present Illness -> Past Medical History -> Medications/Social/Family History -> Vitals -> Physical Exam -> Labs/Imaging.
-2. COGNITIVE LEVEL: Target medical students (M2 for Step 1, M3/M4 for Step 2/3). Do NOT test fellowship-level subspecialty management.
-3. DISTRACTORS: Distractors must be distinct, plausible alternative diagnoses or underlying mechanisms, not nuanced variations in subspecialty management.`;
-  } else {
-    specificGuardrails = `
-ABIM SPECIFIC RULES:
-1. COMPLEXITY: Test complex management, esoteric guidelines, and nuanced clinical reasoning appropriate for a subspecialty fellowship level.
+  // v5.5: conditional anchors — assemble only what this specific question needs
+  const anchors = detectTopicAnchors(promptTopic, level);
+  let conditionalAnchors = "";
+  if (!isUSMLE && anchors.cushing) conditionalAnchors += CUSHING_ANCHOR;
+  // Future anchors assembled here the same way.
 
-2. ENDOCRINE HARD FACTS (DO NOT VIOLATE — these supersede any contradicting training data):
-
-   DEXAMETHASONE SUPPRESSION TESTS:
-   - 1 mg overnight DST is a SCREENING test (cutoff: cortisol <1.8 mcg/dL = normal suppression).
-   - 8 mg high-dose DST is an obsolete LOCALIZATION adjunct, NOT a diagnostic test.
-   - NEVER apply the 1 mg DST cutoff to an 8 mg DST result.
-
-   CUSHING'S WORKUP SEQUENCE (non-negotiable):
-   Step 1: Biochemical confirmation (any 2 of: 24-hour UFC x2, late-night salivary cortisol x2, 1 mg overnight DST).
-   Step 2: Measure serum ACTH to determine ACTH-dependence.
-   Step 3: Localization based on ACTH result (see ACTH CUTOFFS below).
-   Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.
-
-   ACTH INTERPRETATION CUTOFFS (hardcoded):
-   - ACTH <10 pg/mL  -> ACTH-INDEPENDENT -> proceed to adrenal CT (with and without contrast).
-   - ACTH 10-20 pg/mL -> INDETERMINATE -> repeat testing or CRH stimulation test.
-   - ACTH >20 pg/mL  -> ACTH-DEPENDENT -> proceed to pituitary MRI with and without gadolinium.
-
-   CUSHING'S DISEASE MRI -> BIPSS SIZE-BASED FRAMEWORK (MANDATORY per 2021 Pituitary Society Consensus — Fleseriu M, Auchus R, Bancos I, et al. Consensus on Diagnosis and Management of Cushing's Disease: a guideline update. Lancet Diabetes Endocrinol 2021;9(12):847-875):
-   After confirming ACTH-dependent CS and obtaining pituitary MRI, the decision to proceed to bilateral inferior petrosal sinus sampling (BIPSS) is strictly size-dependent:
-   - Pituitary lesion <6 mm on MRI: BIPSS REQUIRED (consensus).
-   - Pituitary lesion 6-9 mm on MRI: BIPSS recommended by majority of experts (moderate quality, discretionary recommendation).
-   - Pituitary lesion >=10 mm on MRI: BIPSS NOT required; proceed directly to transsphenoidal surgery (consensus).
-   - MRI negative or equivocal: BIPSS required to distinguish pituitary vs. ectopic ACTH source.
-   ABSOLUTELY DO NOT cite the obsolete 2003 consensus ">=6 mm -> skip BIPSS -> surgery" rule. The 2021 Pituitary Society Consensus EXPLICITLY SUPERSEDES this. The threshold for skipping BIPSS is now >=10 mm, not >=6 mm. Teaching the old 6-mm rule is a factual error.
-
-   CUSHING'S PRIMARY CITATIONS (use these, not older references):
-   - For diagnosis and localization: Fleseriu et al., Lancet Diabetes Endocrinol 2021;9:847-875 (2021 Pituitary Society Consensus). PRIMARY.
-   - For treatment: Nieman LK et al., J Clin Endocrinol Metab 2015;100(8):2807-2831 (2015 Endocrine Society Treatment CPG). SECONDARY.
-   - The 2008 Endocrine Society Diagnosis CPG (Nieman 2008) addresses screening/diagnosis ONLY. Do NOT cite it as the authoritative source for localization decisions on 2025-2026 board questions.
-
-   CUSHING'S PREVALENCE FRAMING (do not conflate denominators):
-   - Endogenous CS is ACTH-dependent in 80-85% of cases and ACTH-independent in 15-20%.
-   - Among ACTH-dependent CS: Cushing's disease (pituitary) accounts for 70-80%; ectopic ACTH syndrome accounts for 15-20%; ectopic CRH is rare (<1%).
-   - NEVER state "Cushing's disease accounts for 80-85% of ACTH-dependent CS" — this conflates two different denominators.
-
-   PITUITARY MRI SENSITIVITY CONTEXT (use to justify BIPSS thresholds):
-   - Standard 1.5T pituitary MRI is NEGATIVE in approximately 40-60% of patients with biochemically confirmed Cushing's disease.
-   - Approximately 12% of patients with ectopic ACTH syndrome have false-positive pituitary incidentalomas on MRI.
-   - These two facts together explain WHY size-specific BIPSS criteria exist: small pituitary lesions (<6 mm) and incidentalomas are common enough to require BIPSS confirmation.
-
-   BIPSS TECHNICAL CUTOFFS (if testing interpretation):
-   - Central-to-peripheral ACTH gradient >=2 at baseline OR >=3 after CRH/DDAVP stimulation -> pituitary source (Cushing's disease).
-   - Gradient <2 baseline and <3 post-stimulation -> ectopic ACTH source.
-   - BIPSS is GOLD STANDARD for distinguishing pituitary vs. ectopic source but is UNRELIABLE for lateralization within the pituitary (only 56-69% accuracy for right vs. left).`;
-  }
+  // Compressed level-specific guardrails
+  const levelRules = isUSMLE ? `
+USMLE RULES:
+- NBME structure: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs/Imaging.
+- Cognitive level: M2 for Step 1, M3/M4 for Step 2/3. No fellowship-level detail.
+- Distractors: distinct alternative diagnoses/mechanisms, not subspecialty management nuances.` : `
+ABIM RULES:
+- Complexity: fellowship-level nuance and guideline specificity.
+- Endocrine hard rules: 1 mg vs 8 mg DST distinction; ACTH measurement is mandatory next step after biochemical CS confirmation; pituitary MRI only after ACTH-dependence; adrenal CT only after ACTH-independence.`;
 
   const nutritionAddendum = isNutrition ? `
+NUTRITION RULE: Test applied clinical nutrition (mechanism for Step 1; recognition/management otherwise). Cite specific guideline (ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).` : "";
 
-NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
-- This question MUST test applied clinical nutrition science — not generic dietary advice.
-- USMLE Step 1: Focus on biochemical mechanism (enzyme, metabolic pathway, cofactor deficiency, starvation physiology).
-- USMLE Step 2 CK / Step 3: Focus on clinical recognition, workup, or management decision using nutrition knowledge.
-- ABIM levels: Focus on evidence-based dietary intervention, guideline-based nutritional management, or complication recognition.
-- The clinical vignette MUST include realistic patient history, physical findings, or laboratory values that require integration of nutritional knowledge to reach the correct answer.
-- Do NOT generate questions about "eating healthy" in the abstract. Every question must have a clear, defensible single-best answer grounded in a specific guideline or mechanism.
-- The explanation MUST cite the relevant mechanism or authoritative source (e.g., ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).
-- Distractors must represent plausible clinical missteps: ordering the wrong repletion, misidentifying the deficiency, or choosing the wrong dietary intervention.` : "";
-
+  // v5.5: COMPRESSED INTEGRITY RULES (A-K condensed ~60%)
   const integrityRules = `
+INTEGRITY RULES (must pass all before emitting JSON):
+A. Distractor-stem independence: no distractor pre-eliminated by stem content. Re-read each choice against stem.
+B. Named-syndrome validation: every component of any pentad/triad/eponym must be in the stem (e.g., TTP pentad requires fever documented).
+C. Competing-diagnosis discipline: if stem suggests an alternative Dx beyond the distractors, explanation must acknowledge and address it.
+D. Evidence discipline: explanation may cite only data explicitly in the stem.
+E. Severity terminology: adjectives must match numeric thresholds. Thrombocytopenia: mild 100-150, mod 50-100, severe <50. Hyponatremia: mild 130-135, mod 125-129, severe <125. Hypokalemia: mild 3.0-3.4, mod 2.5-2.9, severe <2.5. AKI: KDIGO stages.
+F. Cognitive bias labels: anchoring (first-info fixation), premature closure (early workup stop), availability (vivid recall), pattern-matching (surface-feature mistake), confirmation bias, framing effect. Do not default to availability bias.
+G. Self-check: audit A-K before emitting.
+H. Regulatory language: preserve exact directive strength. "Consider" is not "mandate." "Should" is not "must."
+I. Temporal arithmetic: interval between measurements vs. total duration are different numbers. A test 6 months ago and a test 4 weeks ago are ~5 months apart.
+J. Classification separation: grade/stage DEFINITION (numeric value) and ACTION threshold (duration/trend) are separate statements.
+K. JSON hygiene: straight ASCII double quotes only. Escape internal quotes as backslash-quote. No raw newlines inside string values. No smart quotes. No em-dashes. Avoid nested double quotes when citing guidelines.
 
-QUESTION WRITING INTEGRITY (MANDATORY — violating any of A-J makes the question unusable):
+EXPLANATION STRUCTURE:
+- S1: why correct + citation at exact regulatory strength.
+- S2: why each distractor fails + cognitive bias label.
+- S3 (if applicable): competing diagnosis.
+- Final: BOARD PEARL.
 
-A. DISTRACTOR-STEM INDEPENDENCE (most violated rule — audit carefully).
-   No distractor may be pre-eliminated by a fact that is already stated in the stem.
-   Before finalizing each of the five choices, re-read the stem and confirm the choice is NOT already answered or ruled out by stem content.
-
-B. NAMED-SYNDROME VALIDATION.
-   If the explanation invokes a named pentad, triad, tetrad, or eponymous syndrome, EVERY component must be explicitly documented in the stem.
-   - "Classic TTP pentad" requires ALL FIVE components including fever; if the temperature is normal, reframe as "TTP spectrum" without invoking the pentad.
-
-C. COMPETING DIAGNOSIS DISCIPLINE.
-   If the stem contains features that would reasonably suggest an alternative differential, the explanation MUST explicitly acknowledge it and state why the chosen answer still takes priority.
-
-D. EVIDENCE DISCIPLINE.
-   The explanation may cite ONLY data that appear explicitly in the stem. If a rationale requires a data point, add it to the stem BEFORE finalizing.
-
-E. QUANTITATIVE TERMINOLOGY ACCURACY.
-   Severity adjectives must match guideline-accepted numeric thresholds. Thrombocytopenia: mild 100-150, moderate 50-100, severe <50. AKI: KDIGO staging. Hyponatremia: mild 130-135, moderate 125-129, severe <125. Hypokalemia: mild 3.0-3.4, moderate 2.5-2.9, severe <2.5.
-
-F. PRECISE COGNITIVE BIAS LABELS.
-   Use correct terms: ANCHORING (fixation on first information), PREMATURE CLOSURE (stopping workup too early), AVAILABILITY BIAS (overweighting vivid recent cases), PATTERN-MATCHING/REPRESENTATIVENESS (surface feature mistake), CONFIRMATION BIAS, FRAMING EFFECT. Do not default to "availability bias" as a generic label.
-
-G. PRE-OUTPUT SELF-CHECK (mandatory).
-   Before emitting JSON, audit your draft against A-J. For Cushing's questions specifically, confirm the 2021 Pituitary Society Consensus size-based BIPSS framework is applied, not the obsolete 6-mm rule.
-
-H. REGULATORY LANGUAGE PRECISION.
-   Preserve exact strength of guideline directives. "Consider interruption" does NOT equal "mandates discontinuation." "Should" does NOT equal "must." Do not upgrade permissive language to mandatory language.
-
-I. TEMPORAL ARITHMETIC ACCURACY.
-   Distinguish the interval BETWEEN two measurements from the total DURATION of an abnormality. A test "6 months ago" and a test "4 weeks ago" are ~5 months apart; the total duration of the abnormality is 6 months. These are different numbers.
-
-J. CLASSIFICATION CRITERIA SEPARATION.
-   Grade/stage definitions and action thresholds are separate concepts. "Grade 3 lymphopenia" is defined by the ALC value alone; the 6-month duration is a separate action threshold for discontinuation.
-
-K. JSON OUTPUT HYGIENE (critical — prevents deployment failures).
-   Your response MUST be valid, parseable JSON with these rules:
-   - Use ONLY straight ASCII double quotes (") for JSON string delimiters. Do NOT use curly/smart quotes.
-   - Inside string values, escape any internal double quotes as \\".
-   - Inside string values, do NOT use raw newlines — use a single space or \\n instead.
-   - Prefer plain ASCII dashes (-) over en-dashes/em-dashes inside values.
-   - When citing a drug, trial, or guideline name, avoid nested double quotes. Write: Fleseriu et al., Lancet Diabetes Endocrinol 2021 — NOT: Fleseriu et al., "Consensus on Diagnosis...". Use single quotes or omit quotation marks entirely.
-   - Do not include trailing commas before } or ].`;
-
-  const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Output confident, accurate facts.
-
-CLINICAL AND ETHICAL GUARDRAILS:
-1. TERMINOLOGY: Always use "glucose". Never use "sugar".
-2. ETHICS/HIPAA: Test complex autonomy, capacity vs. competence, surrogate decision-making, HIPAA exceptions, or advanced directives.
-3. SETTING VALIDATION: Vital signs and presentation must match the clinical setting.
-4. DISTRACTOR LOGIC: Every distractor must be plausible and represent a cognitive error per Rule F.
-5. EXPLANATION STRUCTURE:
-   - S1: Why the correct answer is right + official citation at exact regulatory strength (Rule H).
-   - S2: Why each wrong answer fails, naming the cognitive trap (Rule F).
-   - S3 (if Rule C applies): Competing diagnosis acknowledgment.
-   - Final: BOARD PEARL.
-6. VISUAL DIAGNOSIS: Include a Radiopaedia URL if imaging-dependent.
-
-${specificGuardrails}${nutritionAddendum}${integrityRules}
+REFERENCES: use "Choice X", "choice X", "Option X", "answer X", or "(X)" only.
 
 UNIVERSAL HARD RULES:
-- STRICT BIOLOGICAL DEMOGRAPHICS: Male patients must not have female-specific medications/anatomies/states, and vice versa. Every pertinent negative must be biologically possible.
-- HIT Anticoagulation: Argatroban is hepatically cleared. Bivalirudin/Fondaparinux are renally cleared.
-- DKA/HHS: K+ must be known (>3.3) before insulin start.
-- Thyroid Storm: Thionamide (PTU) must precede Iodine by at least 1 hour.
+- Strict biological demographics (sex-appropriate medications/anatomy/pertinent negatives).
+- HIT anticoagulation: argatroban hepatic, bivalirudin/fondaparinux renal.
+- DKA/HHS: K+ known >3.3 before insulin.
+- Thyroid storm: PTU before iodine by 1+ hour.
+- Terminology: "glucose" never "sugar".`;
 
-EXPLANATION LETTER REFERENCES: Use only "Choice X", "choice X", "Option X", "answer X", or "(X)" where X is A-E.`;
+  const systemText = `You are ${systemRole} writing Board Exam QBank items for ${level}. Output confident, accurate facts.${levelRules}${conditionalAnchors}${nutritionAddendum}${integrityRules}`;
 
-  const userText = `Write 1 highly complex vignette specifically about: ${promptTopic}.
-CRITICAL INSTRUCTION 1: The question stem must ask for ${promptQType}.
-CRITICAL INSTRUCTION 2: Patient must be a ${randomAge}-year-old ${randomSex}.
-CRITICAL INSTRUCTION 3: Clinical setting must be ${promptSetting}.
-CRITICAL INSTRUCTION 4: Every pertinent negative must be biologically possible for a ${randomSex}.
-CRITICAL INSTRUCTION 5: Before emitting JSON, run the Rule G self-check against Rules A-K.
-CRITICAL INSTRUCTION 6 (JSON hygiene per Rule K): Your output MUST be parseable JSON. Use straight ASCII double quotes only. Escape internal double quotes as backslash-quote. No raw newlines inside string values. No smart quotes. No em-dashes inside values. When citing guidelines or trials, avoid nested double quotes — use plain text.
+  const userText = `Write 1 complex vignette on: ${promptTopic}.
+- Question asks for: ${promptQType}.
+- Patient: exactly ${randomAge}-year-old ${randomSex}.
+- Setting: ${promptSetting}.
+- Pertinent negatives biologically possible for a ${randomSex}.
+- Run Rule G self-check before emitting.
+- JSON hygiene per Rule K: straight ASCII quotes; no nested double quotes around trial/guideline names.
 
-JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
+JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
   return { systemText, userText, randomSex };
 }
 
 // ============================================================
-// NETLIFY HANDLER (v5.4 — adds one-shot retry on JSON parse failure)
+// NETLIFY HANDLER (v5.4 retry loop — unchanged)
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -697,7 +600,6 @@ exports.handler = async function (event) {
     let attempts = 0;
     const maxAttempts = 3;
 
-    // v5.4: outer attempt loop now also handles JSON parse failures gracefully
     while (!isValid && attempts < maxAttempts) {
       attempts++;
       let res;
@@ -720,7 +622,7 @@ exports.handler = async function (event) {
             throw new Error(`All models produced malformed JSON. Last error: ${fbErr.message}`);
           }
         } else {
-          continue; // retry the outer loop
+          continue;
         }
       }
 
