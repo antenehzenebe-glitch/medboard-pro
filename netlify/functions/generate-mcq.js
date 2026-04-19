@@ -1,7 +1,7 @@
 // generate-mcq.js — MedBoard Pro
-// v5.2 — Explanation Precision Upgrade (built on v5.1)
+// v5.3 — Cushing's Disease Localization Guardrail Upgrade (built on v5.2)
 // ---------------------------------------------------------------
-// All v5.1 features preserved exactly:
+// All v5.2 features preserved exactly:
 //   • Nutrition subtopics by level + 12% injection via pickTopicForLevel()
 //   • USMLE vs ABIM prompt isolation (isUSMLE branch, systemRole)
 //   • NBME vignette structure + ABIM complexity + DST/Cushing guardrails
@@ -15,27 +15,42 @@
 //   • Two-way validateDemographics
 //   • rewriteExplanationLetters with §§LETTER§§ placeholders
 //   • glucose/sugar terminology rule
-//   • v5.1 Integrity Rules A–G (distractor-stem independence, named-syndrome
-//     validation, competing diagnosis discipline, evidence discipline,
-//     quantitative terminology accuracy, precise cognitive bias labels,
-//     pre-output self-check)
+//   • v5.1 Integrity Rules A–G
+//   • v5.2 Integrity Rules H (regulatory language), I (temporal arithmetic),
+//     J (classification criteria separation)
 //
-// New in v5.2 — THREE ADDITIONAL INTEGRITY RULES (H, I, J):
+// New in v5.3 — ENDOCRINE HARD FACTS UPGRADE:
 //
-//   H. REGULATORY LANGUAGE PRECISION
-//      Preserve the exact strength of FDA/guideline directives.
-//      "Consider interruption" ≠ "mandates discontinuation."
-//      Do not upgrade permissive language to mandatory language.
+//   The v5.1/v5.2 integrity rules are structural (how to write a question).
+//   v5.3 adds CONTENT-LEVEL factual anchors for high-yield endocrine topics
+//   where the underlying model's training data is known to be outdated.
 //
-//   I. TEMPORAL ARITHMETIC ACCURACY
-//      Distinguish "gap between two measurements" from
-//      "total duration of an abnormality." They are not the same number.
-//      Work out the timeline explicitly before writing the explanation.
+//   1. CUSHING'S DISEASE MRI/BIPSS SIZE-BASED FRAMEWORK (2021 Pituitary
+//      Society Consensus — Fleseriu et al., Lancet Diabetes Endocrinol
+//      2021;9:847–875) supersedes the obsolete 2003 ≥6 mm rule:
+//        • <6 mm   → BIPSS required
+//        • 6–9 mm  → BIPSS recommended by majority (discretionary)
+//        • ≥10 mm  → BIPSS not required; proceed to TSS
 //
-//   J. CLASSIFICATION CRITERIA SEPARATION
-//      Do not bundle a grade/stage definition (the ALC value threshold)
-//      with the action threshold (the duration criterion). State them
-//      as two separate sentences with separate clinical meanings.
+//   2. ACTH INTERPRETATION CUTOFFS (hardcoded):
+//        • ACTH <10 pg/mL  → ACTH-independent → adrenal CT
+//        • ACTH 10–20 pg/mL → indeterminate
+//        • ACTH >20 pg/mL  → ACTH-dependent → pituitary MRI first
+//
+//   3. CUSHING'S PREVALENCE FRAMING: CD = 70–80% of ACTH-dependent CS
+//      (NOT 80–85%). ACTH-dependent CS = 80–85% of ALL endogenous CS.
+//      Do not conflate the two denominators.
+//
+//   4. PRIMARY CITATION POLICY: For Cushing's disease localization, the
+//      primary citation must be Fleseriu 2021 Pituitary Society Consensus,
+//      NOT the 2008 Endocrine Society Diagnosis CPG.
+//
+//   5. MRI SENSITIVITY: Standard 1.5T pituitary MRI is negative in 40–60%
+//      of CD patients. Ectopic ACTH syndrome shows false-positive pituitary
+//      lesions on MRI in ~12% of cases. These facts justify the size-based
+//      BIPSS criteria.
+//
+//   These rules are injected into specificGuardrails for ABIM exams only.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -318,7 +333,7 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v5.2 — adds Rules H, I, J to integrityRules)
+// PROMPT BUILDER (v5.3 — expanded ABIM endocrine hard facts for Cushing)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -418,12 +433,60 @@ USMLE SPECIFIC RULES:
 2. COGNITIVE LEVEL: Target medical students (M2 for Step 1, M3/M4 for Step 2/3). Do NOT test fellowship-level subspecialty management.
 3. DISTRACTORS: Distractors must be distinct, plausible alternative diagnoses or underlying mechanisms, not nuanced variations in subspecialty management.`;
   } else {
+    // ═══════════════════════════════════════════════════════════════════
+    // ABIM ENDOCRINE HARD FACTS (v5.3 — expanded Cushing's section)
+    // These are content-level factual anchors, not structural rules.
+    // They override any training-data claims that contradict them.
+    // ═══════════════════════════════════════════════════════════════════
     specificGuardrails = `
 ABIM SPECIFIC RULES:
 1. COMPLEXITY: Test complex management, esoteric guidelines, and nuanced clinical reasoning appropriate for a subspecialty fellowship level.
-2. ENDOCRINE HARD RULES (DO NOT VIOLATE):
-   - DEXAMETHASONE SUPPRESSION TESTS: The 1 mg overnight DST is a SCREENING test (cutoff: <1.8 mcg/dL = normal). The 8 mg high-dose DST is a LOCALIZATION test used AFTER ACTH-dependence is established. NEVER apply the 1 mg DST cutoff to an 8 mg DST result.
-   - CUSHING'S WORKUP SEQUENCE: After biochemical confirmation, ACTH measurement is the MANDATORY next step. Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.`;
+
+2. ENDOCRINE HARD FACTS (DO NOT VIOLATE — these supersede any contradicting training data):
+
+   DEXAMETHASONE SUPPRESSION TESTS:
+   - 1 mg overnight DST is a SCREENING test (cutoff: cortisol <1.8 mcg/dL = normal suppression).
+   - 8 mg high-dose DST is an obsolete LOCALIZATION adjunct, NOT a diagnostic test.
+   - NEVER apply the 1 mg DST cutoff to an 8 mg DST result.
+
+   CUSHING'S WORKUP SEQUENCE (non-negotiable):
+   Step 1: Biochemical confirmation (any 2 of: 24-hour UFC ×2, late-night salivary cortisol ×2, 1 mg overnight DST).
+   Step 2: Measure serum ACTH to determine ACTH-dependence.
+   Step 3: Localization based on ACTH result (see ACTH CUTOFFS below).
+   Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.
+
+   ACTH INTERPRETATION CUTOFFS (hardcoded):
+   - ACTH <10 pg/mL  → ACTH-INDEPENDENT → proceed to adrenal CT (with and without contrast).
+   - ACTH 10–20 pg/mL → INDETERMINATE → repeat testing or CRH stimulation test.
+   - ACTH >20 pg/mL  → ACTH-DEPENDENT → proceed to pituitary MRI with and without gadolinium.
+
+   CUSHING'S DISEASE MRI → BIPSS SIZE-BASED FRAMEWORK (MANDATORY per 2021 Pituitary Society Consensus — Fleseriu M, Auchus R, Bancos I, et al. Consensus on Diagnosis and Management of Cushing's Disease: a guideline update. Lancet Diabetes Endocrinol 2021;9(12):847–875):
+   After confirming ACTH-dependent CS and obtaining pituitary MRI, the decision to proceed to bilateral inferior petrosal sinus sampling (BIPSS) is strictly size-dependent:
+   • Pituitary lesion <6 mm on MRI: BIPSS REQUIRED (consensus).
+   • Pituitary lesion 6–9 mm on MRI: BIPSS recommended by majority of experts (moderate quality, discretionary recommendation).
+   • Pituitary lesion ≥10 mm on MRI: BIPSS NOT required; proceed directly to transsphenoidal surgery (consensus).
+   • MRI negative or equivocal: BIPSS required to distinguish pituitary vs. ectopic ACTH source.
+   ABSOLUTELY DO NOT cite the obsolete 2003 consensus "≥6 mm → skip BIPSS → surgery" rule. The 2021 Pituitary Society Consensus EXPLICITLY SUPERSEDES this. The threshold for skipping BIPSS is now ≥10 mm, not ≥6 mm. Teaching the old 6-mm rule is a factual error.
+
+   CUSHING'S PRIMARY CITATIONS (use these, not older references):
+   - For diagnosis & localization: Fleseriu et al., Lancet Diabetes Endocrinol 2021;9:847–875 (2021 Pituitary Society Consensus). PRIMARY.
+   - For treatment: Nieman LK et al., J Clin Endocrinol Metab 2015;100(8):2807–2831 (2015 Endocrine Society Treatment CPG). SECONDARY.
+   - The 2008 Endocrine Society Diagnosis CPG (Nieman 2008) addresses screening/diagnosis ONLY. Do NOT cite it as the authoritative source for localization decisions on 2025–2026 board questions.
+
+   CUSHING'S PREVALENCE FRAMING (do not conflate denominators):
+   - Endogenous CS is ACTH-dependent in 80–85% of cases and ACTH-independent in 15–20%.
+   - Among ACTH-dependent CS: Cushing's disease (pituitary) accounts for 70–80%; ectopic ACTH syndrome accounts for 15–20%; ectopic CRH is rare (<1%).
+   - NEVER state "Cushing's disease accounts for 80–85% of ACTH-dependent CS" — this conflates two different denominators.
+
+   PITUITARY MRI SENSITIVITY CONTEXT (use to justify BIPSS thresholds):
+   - Standard 1.5T pituitary MRI is NEGATIVE in approximately 40–60% of patients with biochemically confirmed Cushing's disease.
+   - Approximately 12% of patients with ectopic ACTH syndrome have false-positive pituitary incidentalomas on MRI.
+   - These two facts together explain WHY size-specific BIPSS criteria exist: small pituitary lesions (<6 mm) and incidentalomas are common enough to require BIPSS confirmation.
+
+   BIPSS TECHNICAL CUTOFFS (if testing interpretation):
+   - Central-to-peripheral ACTH gradient ≥2 at baseline OR ≥3 after CRH/DDAVP stimulation → pituitary source (Cushing's disease).
+   - Gradient <2 baseline and <3 post-stimulation → ectopic ACTH source.
+   - BIPSS is GOLD STANDARD for distinguishing pituitary vs. ectopic source but is UNRELIABLE for lateralization within the pituitary (only 56–69% accuracy for right vs. left).`;
   }
 
   // ── v5.0: NUTRITION ADDENDUM (unchanged) ──────────────────────────────
@@ -501,9 +564,10 @@ G. PRE-OUTPUT SELF-CHECK (mandatory).
    7. Confirm no regulatory language was upgraded beyond its source strength (Rule H).
    8. Verify all temporal statements are mathematically correct (Rule I).
    9. Confirm classification definitions and action thresholds are stated separately (Rule J).
+   10. For Cushing's disease questions: confirm the 2021 Pituitary Society Consensus size-based BIPSS framework is applied, NOT the obsolete 6-mm rule.
    If any check fails, revise before emitting JSON.
 
-H. REGULATORY LANGUAGE PRECISION (new in v5.2).
+H. REGULATORY LANGUAGE PRECISION.
    When citing FDA prescribing information, drug labels, society guidelines, or any regulatory document, you MUST preserve the exact strength of the recommendation. Do NOT upgrade permissive or advisory language into mandatory language.
    - "Consider interruption" or "consider discontinuation" means the label is advisory — write "the prescribing information advises consideration of discontinuation," NOT "the FDA mandates discontinuation."
    - "Recommended" ≠ "required." "Should" ≠ "must." "May" ≠ "is indicated."
@@ -512,7 +576,7 @@ H. REGULATORY LANGUAGE PRECISION (new in v5.2).
    Correct model: "The Tecfidera prescribing information advises that discontinuation be considered when Grade 3 lymphopenia persists beyond 6 months."
    Wrong model: "The FDA mandates discontinuation if ALC remains <0.5 × 10⁹/L for more than 6 months."
 
-I. TEMPORAL ARITHMETIC ACCURACY (new in v5.2).
+I. TEMPORAL ARITHMETIC ACCURACY.
    When the stem contains multiple dated data points (labs drawn at different timepoints, symptoms of different durations, interval since diagnosis), the explanation must distinguish precisely between two mathematically different concepts:
    - The INTERVAL BETWEEN TWO MEASUREMENTS: the calendar distance from one test to another.
    - The TOTAL DURATION OF AN ABNORMALITY: the calendar distance from the first abnormal result to the present encounter.
@@ -522,7 +586,7 @@ I. TEMPORAL ARITHMETIC ACCURACY (new in v5.2).
      → The total duration of documented abnormality is approximately 6 months (from the first test to today).
    Work out the timeline explicitly on paper before writing the explanation. State the correct concept for the clinical decision you are describing.
 
-J. CLASSIFICATION CRITERIA SEPARATION (new in v5.2).
+J. CLASSIFICATION CRITERIA SEPARATION.
    When a clinical finding involves a tiered classification system (CTCAE toxicity grades, CKD stages, AKI KDIGO criteria, Child-Pugh class, RECIST, TNM staging, lymphopenia grades), the grade or stage DEFINITION and the ACTION THRESHOLD that triggers a clinical decision are two separate concepts. Do NOT bundle them into a single definition statement.
    - The grade definition answers: what numeric value places this patient in this grade?
    - The action threshold answers: what additional criterion (duration, trend, or comorbidity) triggers the clinical response?
