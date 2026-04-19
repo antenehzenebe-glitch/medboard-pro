@@ -1,20 +1,6 @@
-# netlify.toml — MedBoard Pro
-# Place this file at the ROOT of your repository (same folder as package.json).
-# Do NOT place it inside netlify/functions/.
-#
-# This configuration sets the synchronous function timeout to 26 seconds,
-# which is the maximum allowed on the Netlify Pro tier.
-# Without this, functions default to 10 seconds and time out before
-# Claude Sonnet 4.6 can return a response.
 
 [build]
   publish = "public"
 
-[functions]
-  # Raise synchronous function timeout to Pro tier max (26 seconds)
-  node_bundler = "esbuild"
-  included_files = []
-
 [functions."generate-mcq"]
-  # Function-specific timeout (26s = Pro max for synchronous functions)
   timeout = 26
