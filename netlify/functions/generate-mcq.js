@@ -1,25 +1,54 @@
 // generate-mcq.js — MedBoard Pro
-// v5.0 — Nutrition Enhancement (USMLE June 2026) built on real v4.9
-// All v4.9 features preserved exactly:
+// v5.1 — Question Writing Integrity Upgrade (built on v5.0)
+// ---------------------------------------------------------------
+// All v5.0 features preserved exactly:
+//   • Nutrition subtopics by level + 12% injection via pickTopicForLevel()
 //   • USMLE vs ABIM prompt isolation (isUSMLE branch, systemRole)
 //   • NBME vignette structure + ABIM complexity + DST/Cushing guardrails
-//   • 3-sentence explanation rule (S1/S2/S3) + Board Pearl
-//   • Ethics/HIPAA qTypePool, Step1 mechanism qTypePool
-//   • Setting blueprint with ICU/telemedicine for ABIM/Step3
+//   • Ethics/HIPAA qTypePool, Step 1 mechanism qTypePool
+//   • Setting blueprint with ICU/telemedicine for ABIM/Step 3
 //   • Random topic weighted pools per level
 //   • Entropy seed, temperature 0.6, max_tokens 2048
 //   • Gemini BLOCK_NONE safetySettings + responseMimeType
-//   • Supabase /rest/v1/mcqs with exam_level + correct_answer fields
+//   • Supabase /rest/v1/mcqs with exam_level + correct_answer + category
 //   • warmup ping, topic length validation, demographic_check field
 //   • Two-way validateDemographics (female terms block for men, male terms block for women)
 //   • rewriteExplanationLetters with §§LETTER§§ placeholders
 //   • glucose/sugar terminology rule
-// New in v5.0:
-//   • NUTRITION_BY_LEVEL constant — 5 level-specific subtopic lists
-//   • pickTopicForLevel() — injects nutrition at ~12% rate via weighted coin flip
-//   • nutritionAddendum — appended to systemText when isNutrition=true
-//   • Nutrition topics cross-checked against USMLE/ABIM cognitive level expectations
-//   • saveMcqToSupabase gains optional `category` field ("Nutrition" or null)
+//
+// New in v5.1 — QUESTION WRITING INTEGRITY (addresses six peer-review failure modes):
+//   A. DISTRACTOR-STEM INDEPENDENCE
+//      No distractor may be pre-eliminated by a fact stated in the stem.
+//      (e.g., stem says "no eosinophils" → do NOT offer "urine eosinophils" as a choice.)
+//
+//   B. NAMED-SYNDROME VALIDATION
+//      If the explanation invokes a named pentad/triad/"classic presentation,"
+//      every component of that classic presentation must be explicitly documented
+//      in the stem. (e.g., cannot cite "TTP pentad including fever" if temp is 37.4°C.)
+//
+//   C. COMPETING DIAGNOSIS DISCIPLINE
+//      If the stem contains features that would reasonably suggest an alternative
+//      differential (e.g., muscle tenderness + blood dipstick > RBC microscopy →
+//      rhabdomyolysis), the explanation MUST explicitly acknowledge and address it.
+//
+//   D. EVIDENCE DISCIPLINE
+//      The explanation may cite only data (labs, vitals, exam findings) that
+//      appear in the stem. Do NOT invent "active coagulopathy" without PT/PTT/INR.
+//
+//   E. QUANTITATIVE TERMINOLOGY ACCURACY
+//      Severity adjectives must match guideline thresholds.
+//      (e.g., platelets 68k = MODERATE thrombocytopenia, not severe.)
+//
+//   F. PRECISE COGNITIVE BIAS LABELS
+//      Use correct bias terms: anchoring, premature closure, availability bias,
+//      pattern-matching/representativeness, confirmation bias. Do not default
+//      to "availability bias" as a catch-all.
+//
+//   G. PRE-OUTPUT SELF-CHECK
+//      Model is instructed to audit its own draft against rules A–F before emitting JSON.
+//
+// NOTE: These rules are injected into systemText for every question. No changes
+// to data flow, Supabase schema, or client-facing JSON shape.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -109,7 +138,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 }
 
 // ============================================================
-// NUTRITION SUBTOPICS (v5.0 — NEW)
+// NUTRITION SUBTOPICS (v5.0 — unchanged)
 // Per USMLE June 2026: nutrition remains integrated within
 // system-based questions. Injected at ~12% rate.
 // Topics are calibrated to each exam's cognitive level.
@@ -207,14 +236,12 @@ const NUTRITION_BY_LEVEL = {
 };
 
 // ============================================================
-// NUTRITION TOPIC PICKER (v5.0 — NEW)
+// NUTRITION TOPIC PICKER (v5.0 — unchanged)
 // ~12% injection rate; topics scoped to the requested level
 // ============================================================
 const NUTRITION_INJECTION_RATE = 0.12;
 
 function pickTopicForLevel(level, rawTopic) {
-  // Only inject nutrition on non-Random topic calls to avoid
-  // double-randomization (the Random pools already vary enough)
   const nutritionTopics = NUTRITION_BY_LEVEL[level];
   if (nutritionTopics && !rawTopic.includes("Random") && Math.random() < NUTRITION_INJECTION_RATE) {
     const idx = Math.floor(Math.random() * nutritionTopics.length);
@@ -285,7 +312,7 @@ async function callGemini(systemText, userText) {
 }
 
 // ============================================================
-// SUPABASE SAVE (v5.0 — adds optional category field)
+// SUPABASE SAVE (v5.0 — unchanged)
 // ============================================================
 async function saveMcqToSupabase(p, level, category) {
   try {
@@ -297,7 +324,7 @@ async function saveMcqToSupabase(p, level, category) {
       correct_answer: p.correct,
       explanation:   p.explanation,
     };
-    if (category) payload.category = category;   // "Nutrition" or omitted
+    if (category) payload.category = category;
     const res = await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Prefer": "return=minimal" },
@@ -308,7 +335,7 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v4.9 base + v5.0 nutritionAddendum)
+// PROMPT BUILDER (v5.1 — QUESTION WRITING INTEGRITY added)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -397,7 +424,7 @@ function buildPrompt(level, topic, isNutrition) {
   }
   const promptSetting = pickWeighted(settingBlueprint);
 
-  // ── v4.9: USMLE vs ABIM prompt isolation (unchanged) ──────────────────
+  // ── USMLE vs ABIM prompt isolation (unchanged from v4.9) ──────────────
   const isUSMLE = level.includes("USMLE");
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
 
@@ -417,7 +444,7 @@ ABIM SPECIFIC RULES:
    - CUSHING'S WORKUP SEQUENCE: After biochemical confirmation, ACTH measurement is the MANDATORY next step. Pituitary MRI is ONLY after ACTH-dependence is established. Adrenal CT is ONLY after ACTH-independence is established.`;
   }
 
-  // ── v5.0: NUTRITION ADDENDUM — appended only when isNutrition=true ────
+  // ── v5.0: NUTRITION ADDENDUM (unchanged) ──────────────────────────────
   const nutritionAddendum = isNutrition ? `
 
 NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
@@ -430,20 +457,84 @@ NUTRITION QUESTION REQUIREMENTS (USMLE June 2026 Standard):
 - The explanation MUST cite the relevant mechanism or authoritative source (e.g., ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).
 - Distractors must represent plausible clinical missteps: ordering the wrong repletion, misidentifying the deficiency, or choosing the wrong dietary intervention.` : "";
 
+  // ── v5.1: QUESTION WRITING INTEGRITY RULES (NEW) ──────────────────────
+  // These six rules address peer-review failure modes observed in v5.0 output.
+  // They are MANDATORY and checked by the model before emission.
+  const integrityRules = `
+
+QUESTION WRITING INTEGRITY (MANDATORY — violating any of A–F makes the question unusable):
+
+A. DISTRACTOR-STEM INDEPENDENCE (most violated rule — audit carefully).
+   No distractor may be pre-eliminated by a fact that is already stated in the stem.
+   - If you write "urinalysis shows no eosinophils," you MUST NOT offer "urine eosinophils" as a choice.
+   - If you state a pathogen by name, you MUST NOT offer "identify the pathogen" as a distractor.
+   - If a lab value is already in the stem, you MUST NOT offer "check that same lab" as a distractor.
+   Before finalizing each of the five choices, re-read the stem and confirm that the choice is NOT already answered or ruled out by stem content.
+
+B. NAMED-SYNDROME VALIDATION.
+   If the explanation invokes a named pentad, triad, tetrad, "classic presentation," or eponymous syndrome requiring specific features, EVERY component of that classic set must be explicitly documented in the stem with supporting data.
+   - "Classic TTP pentad" requires ALL FIVE: MAHA + thrombocytopenia + AKI + neurologic signs + fever. If the temperature is normal, you cannot claim the pentad — either include fever ≥38.0°C in the stem, or reframe the explanation as "the TTP spectrum" without invoking the pentad.
+   - "Charcot triad" requires all three of RUQ pain + fever + jaundice. Do not invoke it partially.
+   - Same principle for Reynolds pentad, Virchow triad, Beck triad, Cushing triad, Saint triad, etc.
+
+C. COMPETING DIAGNOSIS DISCIPLINE.
+   If the stem contains clinical features that would reasonably suggest an alternative differential beyond the four wrong-answer distractors, the explanation MUST explicitly acknowledge that alternative and state why the chosen answer still takes priority.
+   - Example triggers requiring acknowledgment: muscle tenderness + urine dipstick blood disproportionate to microscopic RBCs → rhabdomyolysis; eosinophilia + new drug + AKI → AIN; new antibiotic + diarrhea → C. difficile.
+   - Do NOT bury or ignore a plausible competing diagnosis that a careful reader will notice.
+   - Either remove the competing-diagnosis features from the stem, or dedicate at least one sentence of the explanation to why that alternative does not change the next-step answer.
+
+D. EVIDENCE DISCIPLINE.
+   The explanation may cite ONLY data (labs, vitals, exam findings, timelines, imaging) that appear explicitly in the stem.
+   - Do NOT cite "active coagulopathy" unless PT, PTT, INR, fibrinogen, or D-dimer appear in the stem and are abnormal.
+   - Do NOT cite "elevated CK" unless CK appears in the stem.
+   - Do NOT cite "positive blood culture" unless cultures appear in the stem.
+   If a rationale requires a data point, that data point must appear in the stem. If you need the data to support your rationale, add it to the stem BEFORE finalizing.
+
+E. QUANTITATIVE TERMINOLOGY ACCURACY.
+   Severity adjectives must match guideline-accepted numeric thresholds. Do not apply an adjective that contradicts the stem's number.
+   - Thrombocytopenia: mild 100–150 × 10⁹/L, moderate 50–100 × 10⁹/L, severe <50 × 10⁹/L (some sources <20). Platelets of 68,000/µL = MODERATE, not severe.
+   - AKI: use KDIGO staging (Stage 1 ≥1.5× baseline; Stage 2 ≥2×; Stage 3 ≥3× or creatinine ≥4.0 or RRT).
+   - Hyponatremia: mild 130–135, moderate 125–129, severe <125 mEq/L.
+   - Hypokalemia: mild 3.0–3.4, moderate 2.5–2.9, severe <2.5 mEq/L.
+   - Neutropenia: mild 1.0–1.5, moderate 0.5–1.0, severe <0.5 × 10⁹/L.
+   - Anemia (WHO): mild 11.0 to lower-limit-of-normal, moderate 8.0–10.9, severe <8.0 g/dL.
+   When in doubt, state the number and omit the adjective rather than mislabeling severity.
+
+F. PRECISE COGNITIVE BIAS LABELS.
+   When attributing a distractor to a cognitive error, use the correct term. Do not default to "availability bias" as a generic label for any wrong answer.
+   - ANCHORING: fixation on the first piece of information encountered (often the presenting complaint or initial diagnosis).
+   - PREMATURE CLOSURE: accepting a diagnosis before it is fully verified; stopping the workup too early.
+   - AVAILABILITY BIAS: overweighting diagnoses that are recently encountered, vivid, or memorable.
+   - PATTERN-MATCHING ERROR / REPRESENTATIVENESS: mistaking surface features for a different syndrome that shares some features but not the pathognomonic ones.
+   - CONFIRMATION BIAS: seeking only data that supports a preferred diagnosis, ignoring disconfirming data.
+   - FRAMING EFFECT: decisions changed by how information is presented.
+   If no specific bias cleanly applies, describe the reasoning error in plain words (e.g., "this ignores the peripheral smear findings") rather than forcing a bias label.
+
+G. PRE-OUTPUT SELF-CHECK (mandatory).
+   Before emitting the JSON, silently audit your draft against A–F:
+   1. Re-read each distractor against the stem (Rule A).
+   2. If you used a named syndrome term, confirm every component is in the stem (Rule B).
+   3. Scan the stem for features suggesting a competing diagnosis; if present, confirm the explanation addresses it (Rule C).
+   4. Confirm every data point cited in the explanation appears in the stem (Rule D).
+   5. Check every severity adjective against the numeric threshold (Rule E).
+   6. Verify cognitive bias labels match their definitions (Rule F).
+   If any check fails, revise the stem or the explanation until all six pass. Only then emit the JSON.`;
+
   const systemText = `You are ${systemRole} writing high-yield Board Exam QBank items for ${level}. Do NOT argue with yourself in the explanation. Output confident, accurate facts.
 
 CLINICAL & ETHICAL GUARDRAILS:
 1. TERMINOLOGY: Always use the precise medical term "glucose". Never use the colloquial term "sugar" in any stem, choice, or explanation.
 2. ETHICS/HIPAA: If testing ethics, test complex autonomy, capacity vs. competence, surrogate decision-making ladders, strict HIPAA exceptions, or advanced directives. Do not make the correct answer "call the ethics committee."
 3. SETTING VALIDATION: Ensure the patient's vital signs and presentation perfectly match their clinical setting.
-4. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error: Anchoring, Premature Closure, or Availability Bias.
-5. EXPLANATION: 3-sentence rule.
+4. DISTRACTOR LOGIC: Every distractor (wrong answer) must be plausible and represent a cognitive error identifiable by the Rule F bias taxonomy below.
+5. EXPLANATION STRUCTURE:
    - S1: Why the correct answer is right + official society citation.
-   - S2: Why tempting wrong answers fail, explicitly naming the cognitive trap.
-   - S3: THE BOARD PEARL. A hard clinical rule or cutoff.
+   - S2: Why each tempting wrong answer fails, explicitly naming the cognitive trap per Rule F.
+   - S3 (if Rule C applies): One sentence acknowledging any competing diagnosis suggested by the stem and why it does not change the answer.
+   - Final: THE BOARD PEARL — a hard clinical rule, cutoff, or time-sensitive mandate.
 6. VISUAL DIAGNOSIS: If the vignette relies on imaging/exam, direct the user to review classic examples and explicitly include a URL (e.g., Radiopaedia at https://radiopaedia.org).
 
-${specificGuardrails}${nutritionAddendum}
+${specificGuardrails}${nutritionAddendum}${integrityRules}
 
 UNIVERSAL HARD RULES (DO NOT VIOLATE):
 - STRICT BIOLOGICAL DEMOGRAPHICS: You must rigidly adhere to the patient's assigned sex. Male patients MUST NOT have female-specific medications, anatomies, or states. The same applies in reverse. Do NOT write phrases like "denies oral contraceptive use" for a male patient; simply omit it. Every pertinent negative must be biologically possible.
@@ -458,6 +549,7 @@ CRITICAL INSTRUCTION 1: The actual question posed at the very end of the vignett
 CRITICAL INSTRUCTION 2: The patient in the vignette MUST be exactly a ${randomAge}-year-old ${randomSex}. You must use this exact age and sex.
 CRITICAL INSTRUCTION 3: The clinical setting of this vignette MUST be ${promptSetting}. Ensure the acuity of the presentation matches this setting.
 CRITICAL INSTRUCTION 4: Every pertinent negative you include must be biologically possible for a ${randomSex}. Do not list negatives for conditions, medications, anatomies, or states that this patient cannot biologically have.
+CRITICAL INSTRUCTION 5: Before emitting the JSON, run the Rule G pre-output self-check against Rules A–F and revise as needed.
 
 JSON Format: {"demographic_check":"I confirm the patient is a ${randomSex}. I will not include any physiologically impossible medications, conditions, or pertinent negatives.","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
