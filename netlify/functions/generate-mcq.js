@@ -310,7 +310,7 @@ async function callGemini(systemText, userText) {
           responseMimeType: "application/json", 
           responseSchema: mcqSchema, 
           temperature: 0.6, 
-          maxOutputTokens: 1400 
+          maxOutputTokens: 2500 
         }
       })
     }
