@@ -1,25 +1,32 @@
 // generate-mcq.js — MedBoard Pro
-// v5.6 — Strict API Schema Enforcement Architecture
+// v5.5 — Latency-First Architecture (built on v5.4)
 // ---------------------------------------------------------------
 // Problem: cumulative prompt growth from v5.1 through v5.4 pushed
-// generation latency from ~20s to ~37s, exceeding Netlify's timeout.
-// Furthermore, string manipulation to fix LLM JSON outputs caused 
-// API cascades and hard 60s limit failures.
+// generation latency from ~20s to ~37s, exceeding Netlify's timeout
+// and producing "Unable to connect to QBank" errors.
 //
-// Strategy: Eradicate the manual extractJSON function. Force the LLM 
-// providers to validate the JSON schema BEFORE returning the payload.
+// Strategy: EVERY rule does not belong in EVERY prompt. Split prompt
+// into always-on core rules (compressed) and topic-specific anchors
+// that load conditionally.
 //
-// Preserved from v5.5:
-//   • CONDITIONAL TOPIC ANCHORS: the Cushing block loads ONLY when needed.
-//   • COMPRESSED INTEGRITY RULES: Verbosity cut ~60%.
-//   • All probability weights, nutrition topics, and prompt engineering.
-//   • max_tokens reduced to 1400.
+// Preserved from v5.4:
+//   • Parser hardening (extractJSON, escape helpers)
+//   • Handler retry loop on JSON parse failure
+//   • All rule content — just restructured for delivery efficiency
 //
-// New in v5.6:
-//   • mcqSchema defined at the top level.
-//   • Claude now uses "Tool Calling" to guarantee schema matching.
-//   • Gemini now uses "responseSchema" to guarantee schema matching.
-//   • Manual extractJSON and escaping logic completely removed.
+// New in v5.5:
+//   • CONDITIONAL TOPIC ANCHORS: the Cushing block (largest in v5.4)
+//     now loads ONLY when the topic matches Cushing-related keywords.
+//     This alone cuts ~800 tokens from 90% of prompts.
+//   • COMPRESSED INTEGRITY RULES: A-K consolidated into dense
+//     one-line directives. Rule content preserved; verbosity cut ~60%.
+//   • max_tokens reduced 2048 -> 1400 (explanations rarely need 2048).
+//   • Pair this file with netlify.toml setting 26s timeout.
+//
+// Expected latency impact: 37s -> ~18-22s on non-Cushing topics,
+// ~22-26s on Cushing topics. All within Pro tier 26s limit.
+//
+// Deployment note: ALSO deploy the generated netlify.toml to repo root.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -28,31 +35,6 @@ const SUPABASE_URL      = process.env.SUPABASE_URL      || "https://vhzeeskhvkuj
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
 
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
-
-// ============================================================
-// JSON SCHEMA (v5.6 — Strict API Enforcement)
-// ============================================================
-const mcqSchema = {
-  type: "object",
-  properties: {
-    demographic_check: { type: "string", description: "Confirmation of age and sex" },
-    stem: { type: "string", description: "The clinical vignette" },
-    choices: {
-      type: "object",
-      properties: {
-        A: { type: "string" },
-        B: { type: "string" },
-        C: { type: "string" },
-        D: { type: "string" },
-        E: { type: "string" }
-      },
-      required: ["A", "B", "C", "D", "E"]
-    },
-    correct: { type: "string", enum: ["A", "B", "C", "D", "E"] },
-    explanation: { type: "string", description: "The attending explanation with S1, S2, S3, and Board Pearl" }
-  },
-  required: ["demographic_check", "stem", "choices", "correct", "explanation"]
-};
 
 // ============================================================
 // TOPIC-SEX COUPLING (unchanged)
@@ -82,13 +64,109 @@ function pickWeighted(blueprint) {
 }
 
 // ============================================================
-// TOPIC ANCHOR DETECTION (unchanged)
+// TOPIC ANCHOR DETECTION (v5.5 — NEW)
+// ============================================================
+// Returns an object describing which topic anchors should be included.
+// This lets us gate large content blocks to only the prompts that need them.
 // ============================================================
 function detectTopicAnchors(topic, level) {
   const t = topic.toLowerCase();
   return {
     cushing: /cushing|cortisol|acth|adrenal|pituitary|dexamethasone|dst/.test(t),
+    // Future anchors can be added here with topic-matching regexes:
+    // acromegaly: /acromegaly|gh\b|igf-1|growth hormone/.test(t),
+    // pheo: /pheochromocytoma|metanephrine|catecholamine/.test(t),
+    // pa: /primary aldosteronism|aldosterone|conn/.test(t),
   };
+}
+
+// ============================================================
+// extractJSON (v5.4 parser — unchanged, carried forward)
+// ============================================================
+function extractJSON(raw) {
+  if (!raw || typeof raw !== "string") {
+    throw new Error("extractJSON received empty or non-string input.");
+  }
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found in AI response.");
+  let candidate = match[0];
+
+  try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
+
+  candidate = candidate
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "-")
+    .replace(/\u00A0/g, " ");
+
+  candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
+  candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  candidate = escapeUnescapedControlCharsInStrings(candidate);
+
+  try { return JSON.parse(candidate); }
+  catch (e) {
+    const salvaged = escapeUnescapedInternalQuotes(candidate);
+    try { return JSON.parse(salvaged); }
+    catch (e2) {
+      const posMatch = String(e2.message).match(/position (\d+)/);
+      if (posMatch) {
+        const pos = parseInt(posMatch[1], 10);
+        const start = Math.max(0, pos - 100);
+        const end   = Math.min(salvaged.length, pos + 100);
+        const excerpt = salvaged.substring(start, end).replace(/\n/g, "\\n");
+        console.error(`extractJSON failed at pos ${pos}. Context:\n…${excerpt}…`);
+      } else {
+        console.error(`extractJSON failed: ${e2.message}`);
+      }
+      throw new Error(`Malformed JSON from AI after sanitization: ${e2.message}`);
+    }
+  }
+}
+
+function escapeUnescapedControlCharsInStrings(s) {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (ch === "\\") { out += ch; escape = true; continue; }
+    if (ch === '"') { inString = !inString; out += ch; continue; }
+    if (inString) {
+      if (ch === "\n") { out += "\\n"; continue; }
+      if (ch === "\r") { out += "\\r"; continue; }
+      if (ch === "\t") { out += "\\t"; continue; }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function escapeUnescapedInternalQuotes(s) {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (ch === "\\") { out += ch; escape = true; continue; }
+    if (ch === '"') {
+      if (!inString) { inString = true; out += ch; continue; }
+      let j = i + 1;
+      while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
+      const next = s[j];
+      if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
+        inString = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 // ============================================================
@@ -240,47 +318,30 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// AI CLIENTS (v5.6 — Strict Schema Enforcement)
+// AI CLIENTS (v5.5 — max_tokens reduced 2048 -> 1400 for latency)
 // ============================================================
 async function callClaude(systemText, userText) {
   const maxRetries = 2;
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
-  
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) await sleep(1000);
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "x-api-key": ANTHROPIC_API_KEY, 
-          "anthropic-version": "2023-06-01" 
-        },
+        headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 2500,
+          max_tokens: 1400,
           temperature: 0.6,
           system: systemText,
-          messages: [{ role: "user", content: finalUserText }],
-          tools: [{
-            name: "generate_mcq_json",
-            description: "Output the final MCQ in strict JSON format.",
-            input_schema: mcqSchema
-          }],
-          tool_choice: { type: "tool", name: "generate_mcq_json" }
+          messages: [{ role: "user", content: finalUserText }]
         })
       });
-      
       if (response.status === 429) { await sleep(2000); continue; }
       if (!response.ok) throw new Error(`Claude HTTP Error: ${response.status}`);
-      
       const data = await response.json();
-      const toolCall = data.content.find(block => block.type === "tool_use");
-      if (!toolCall || !toolCall.input) throw new Error("Claude failed to use the JSON tool.");
-      
-      return JSON.stringify(toolCall.input); 
-
+      return data.content.find(b => b.type === "text").text;
     } catch (e) {
       console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
       if (attempt === maxRetries - 1) {
@@ -306,12 +367,7 @@ async function callGemini(systemText, userText) {
           { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
         ],
-        generationConfig: { 
-          responseMimeType: "application/json", 
-          responseSchema: mcqSchema, 
-          temperature: 0.6, 
-          maxOutputTokens: 2500 
-        }
+        generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 1400 }
       })
     }
   );
@@ -346,7 +402,7 @@ async function saveMcqToSupabase(p, level, category) {
 }
 
 // ============================================================
-// CUSHING ANCHOR (unchanged)
+// CUSHING ANCHOR (v5.3 content, loaded ONLY when topic matches)
 // ============================================================
 const CUSHING_ANCHOR = `
 CUSHING'S HARD FACTS (override contradicting training data):
@@ -365,7 +421,7 @@ CUSHING'S HARD FACTS (override contradicting training data):
 - BIPSS cutoffs: central-to-peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. BIPSS is gold standard for pituitary vs. ectopic but unreliable for right/left lateralization (56-69%).`;
 
 // ============================================================
-// PROMPT BUILDER (unchanged weights, topics, and rules)
+// PROMPT BUILDER (v5.5 — compressed, conditional anchors)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -457,10 +513,13 @@ function buildPrompt(level, topic, isNutrition) {
   const isUSMLE = level.includes("USMLE");
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : "an ABIM Fellowship Program Director";
 
+  // v5.5: conditional anchors — assemble only what this specific question needs
   const anchors = detectTopicAnchors(promptTopic, level);
   let conditionalAnchors = "";
   if (!isUSMLE && anchors.cushing) conditionalAnchors += CUSHING_ANCHOR;
+  // Future anchors assembled here the same way.
 
+  // Compressed level-specific guardrails
   const levelRules = isUSMLE ? `
 USMLE RULES:
 - NBME structure: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs/Imaging.
@@ -473,6 +532,7 @@ ABIM RULES:
   const nutritionAddendum = isNutrition ? `
 NUTRITION RULE: Test applied clinical nutrition (mechanism for Step 1; recognition/management otherwise). Cite specific guideline (ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).` : "";
 
+  // v5.5: COMPRESSED INTEGRITY RULES (A-K condensed ~60%)
   const integrityRules = `
 INTEGRITY RULES (must pass all before emitting JSON):
 A. Distractor-stem independence: no distractor pre-eliminated by stem content. Re-read each choice against stem.
@@ -509,13 +569,16 @@ UNIVERSAL HARD RULES:
 - Patient: exactly ${randomAge}-year-old ${randomSex}.
 - Setting: ${promptSetting}.
 - Pertinent negatives biologically possible for a ${randomSex}.
-- Run Rule G self-check before emitting.`;
+- Run Rule G self-check before emitting.
+- JSON hygiene per Rule K: straight ASCII quotes; no nested double quotes around trial/guideline names.
+
+JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
 
   return { systemText, userText, randomSex };
 }
 
 // ============================================================
-// NETLIFY HANDLER (v5.6 - Cleaned of Regex parsing)
+// NETLIFY HANDLER (v5.4 retry loop — unchanged)
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -547,15 +610,14 @@ exports.handler = async function (event) {
       }
 
       try {
-        // Direct parse. LLM is strictly enforcing the schema.
-        p = JSON.parse(res);
+        p = extractJSON(res);
       } catch (parseError) {
         console.warn(`Attempt ${attempts} failed JSON parse: ${parseError.message}`);
         if (attempts === maxAttempts) {
-          console.warn("All Claude attempts failed schema. Switching to Gemini fallback...");
+          console.warn("All Claude attempts produced malformed JSON. Switching to Gemini fallback...");
           try {
             res = await callGemini(pd.systemText, pd.userText);
-            p = JSON.parse(res);
+            p = extractJSON(res);
           } catch (fbErr) {
             throw new Error(`All models produced malformed JSON. Last error: ${fbErr.message}`);
           }
@@ -576,7 +638,7 @@ exports.handler = async function (event) {
         if (attempts === maxAttempts) {
           console.warn("Switching to Gemini Fallback for final attempt...");
           res = await callGemini(pd.systemText, pd.userText);
-          p = JSON.parse(res);
+          p = extractJSON(res);
           isValid = validateDemographics(p.stem, pd.randomSex);
           if (!isValid) throw new Error("Failed biological consistency check across all models.");
         }
