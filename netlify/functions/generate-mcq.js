@@ -1,45 +1,56 @@
 // generate-mcq.js — MedBoard Pro
-// v5.8 — extractJSON Pass-Order Fix (built on v5.7)
+// v5.9 — Phase 1 Write-Through Cache Enrichment (built on v5.8)
 // ---------------------------------------------------------------
-// All v5.7 features preserved exactly:
-//   • Three-way ABIM IM / ABIM Endo / USMLE depth calibration
-//   • Level-calibrated max_tokens (IM:900, Endo:1200, USMLE:1100)
-//   • Cushing anchor fires only on /cushing/ keyword match
-//   • Compressed A-K integrity rules
-//   • Handler retry loop on JSON parse failure
-//   • Nutrition injection, shuffle, demographic validation
+// All v5.8 logic preserved byte-for-byte except the 6 targeted changes below.
+// The v5.8 extractJSON pass-order fix is preserved exactly.
 //
-// One surgical fix in v5.8 — ROOT CAUSE OF JSON PARSE FAILURES:
+// v5.9 changes (Phase 1, Step 2 of the UWorld-style bank migration):
 //
-//   Bug: extractJSON ran escapeUnescapedControlCharsInStrings (newline
-//   escaper) BEFORE escapeUnescapedInternalQuotes (quote fixer).
+//   1. Added `crypto` import + `hashStem()` helper.
+//      Produces SHA-256 of normalized stem for content_hash field.
+//      Lets future cron batches and admin review detect duplicates.
 //
-//   When the model emitted an ODD number of unescaped internal double
-//   quotes inside a choice value, the newline escaper's inString toggle
-//   became permanently inverted for the rest of the document. It then
-//   treated a structural newline (e.g., the \n between the choices }
-//   and "correct":) as if it were inside a string, converting it from
-//   a real newline (valid structural whitespace) to the literal chars
-//   \n (invalid outside a string). JSON.parse then failed at that
-//   position with "Expected ',' or '}' after property value."
+//   2. Added `deriveSpecialtyGroup()` helper.
+//      Coarse keyword mapping from resolvedTopic -> specialty bucket
+//      (Cardiology, Endocrinology, Nephrology, etc.). Used by Phase 3
+//      fetch-block endpoint for filtered bank retrieval.
 //
-//   Fix: swap the order. escapeUnescapedInternalQuotes uses look-ahead
-//   (not a naive toggle) to identify string boundaries correctly even
-//   in the presence of unescaped internal quotes. Running it first
-//   ensures all string boundaries are correct before the newline
-//   escaper runs, eliminating the structural corruption.
+//   3. callClaude now returns `{ text, model }` instead of a raw string.
+//      Needed because callClaude can internally cascade to callGemini;
+//      the caller previously could not tell which model actually produced
+//      the output. generation_model field requires knowing this.
 //
-//   New order inside extractJSON:
-//     Pass 1: normalize smart quotes / unicode dashes
-//     Pass 2: strip trailing commas
-//     Pass 3: strip stray control chars
-//     Pass 4: escapeUnescapedInternalQuotes   ← FIX: now runs FIRST
-//     Pass 5: escapeUnescapedControlCharsInStrings ← runs SECOND
-//     Parse attempt → diagnostic log if still failing
+//   4. callGemini now returns `{ text, model }` instead of a raw string.
+//      Same reason — explicit provenance tracking.
 //
-//   Impact: first Claude attempt now succeeds, eliminating the chain
-//   of 3 × 15s retries + Gemini 429 that produced 50s duration and
-//   triggered the Netlify timeout.
+//   5. Handler updated to destructure the new return shape everywhere
+//      callClaude/callGemini is invoked (main call + JSON parse fallback
+//      + demographic fallback). `generationModel` threads through to save.
+//
+//   6. saveMcqToSupabase rewritten:
+//      a. Populates 4 new schema fields: specialty_group, blueprint_tag,
+//         generation_model, content_hash.
+//      b. Removes broken `category` field (no such column exists in the
+//         mcqs table — prior INSERTs containing it were silently rejected
+//         by PostgREST, explaining why nutrition questions never landed
+//         in the bank).
+//      c. `status` intentionally omitted — DB default 'pending_review'
+//         applies automatically per Phase 1 schema migration.
+//      d. `generation_source` intentionally omitted — DB default
+//         'user_triggered' applies automatically.
+//      e. Failure logging now reads the response body so the reason for
+//         any 4xx/5xx is visible in Netlify logs (previously silent).
+//
+// What is NOT changed:
+//   - extractJSON (v5.8 fix preserved exactly)
+//   - All prompts, clinical rules, CUSHING_ANCHOR, integrityRules
+//   - Nutrition subtopics and 12% injection rate
+//   - Demographic validation, shuffle, explanation letter rewriter
+//   - Level-calibrated max_tokens (IM:1100, Endo:1500, USMLE:1300)
+//   - Gemini fallback cascade and handler retry loop
+//   - Warmup handler, input validation, 405 method check
+
+const crypto = require("crypto");
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
@@ -50,7 +61,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TOPIC-SEX COUPLING (unchanged)
+// TOPIC-SEX COUPLING (unchanged from v5.8)
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -77,7 +88,52 @@ function pickWeighted(blueprint) {
 }
 
 // ============================================================
-// TOPIC ANCHOR DETECTION (v5.7 — tight /cushing/ regex)
+// v5.9 — CONTENT HASH + SPECIALTY BUCKET HELPERS
+// ============================================================
+// hashStem: SHA-256 of trimmed + lowercased stem.
+// Consistent hash means the same question generated twice produces the
+// same hash, enabling dedup detection in the bank.
+function hashStem(stem) {
+  if (!stem || typeof stem !== "string") return null;
+  return crypto.createHash("sha256").update(stem.trim().toLowerCase()).digest("hex");
+}
+
+// deriveSpecialtyGroup: coarse keyword mapping for filtered bank queries.
+// Returns a broad specialty bucket so Phase 3 can do `WHERE specialty_group = 'Cardiology'`
+// without parsing the long blueprint_tag string.
+function deriveSpecialtyGroup(level, resolvedTopic) {
+  if (level === "ABIM Endocrinology") return "Endocrinology";
+  const t = (resolvedTopic || "").toLowerCase();
+  if (t.includes("cardio"))                               return "Cardiology";
+  if (t.includes("endocrin") || t.includes("diabetes") ||
+      t.includes("thyroid")  || t.includes("pituitary") ||
+      t.includes("adrenal")  || t.includes("bone, calcium"))  return "Endocrinology";
+  if (t.includes("nephro") || t.includes("renal"))        return "Nephrology";
+  if (t.includes("pulm"))                                 return "Pulmonology";
+  if (t.includes("gastro") || t.includes("hepat"))        return "Gastroenterology";
+  if (t.includes("hematol") || t.includes("oncolog"))     return "Hematology/Oncology";
+  if (t.includes("rheumatol"))                            return "Rheumatology";
+  if (t.includes("infectious"))                           return "Infectious Disease";
+  if (t.includes("neurolog"))                             return "Neurology";
+  if (t.includes("ethics") || t.includes("hipaa") ||
+      t.includes("palliative") || t.includes("end-of-life")) return "Ethics/Communication";
+  if (t.includes("psychi"))                               return "Psychiatry";
+  if (t.includes("pediat"))                               return "Pediatrics";
+  if (t.includes("obstet") || t.includes("gynec"))        return "OB/GYN";
+  if (t.includes("surg") || t.includes("trauma"))         return "Surgery";
+  if (t.includes("pharmac"))                              return "Pharmacology";
+  if (t.includes("patholog"))                             return "Pathology";
+  if (t.includes("microbiol") || t.includes("virol") ||
+      t.includes("immunolog"))                            return "Microbiology/Immunology";
+  if (t.includes("anatom") || t.includes("embryol"))      return "Anatomy";
+  if (t.includes("physiolog") || t.includes("biochem"))   return "Physiology/Biochemistry";
+  if (t.includes("behav") || t.includes("biostat"))       return "Behavioral/Biostatistics";
+  if (t.includes("nutrition"))                            return "Nutrition";
+  return "General Internal Medicine";
+}
+
+// ============================================================
+// TOPIC ANCHOR DETECTION (v5.7 — tight /cushing/ regex, unchanged)
 // ============================================================
 function detectTopicAnchors(topic) {
   const t = topic.toLowerCase();
@@ -87,62 +143,36 @@ function detectTopicAnchors(topic) {
 }
 
 // ============================================================
-// extractJSON (v5.8 — PASS ORDER FIXED)
-// ============================================================
-// Previous order (broken):
-//   escapeUnescapedControlCharsInStrings → parse → escapeUnescapedInternalQuotes → parse
-//
-// Fixed order:
-//   escapeUnescapedInternalQuotes → escapeUnescapedControlCharsInStrings → parse
-//
-// Rationale: escapeUnescapedInternalQuotes uses look-ahead so it correctly
-// identifies string boundaries even when internal quotes are unescaped.
-// Running it first guarantees correct string boundaries for the newline
-// escaper's simpler toggle-based tracker, preventing structural corruption.
+// extractJSON (v5.8 — PASS ORDER FIXED — unchanged in v5.9)
 // ============================================================
 function extractJSON(raw) {
   if (!raw || typeof raw !== "string") {
     throw new Error("extractJSON received empty or non-string input.");
   }
 
-  // Step 1: extract outermost JSON object
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
   let candidate = match[0];
 
-  // Step 2: try direct parse (fast path — clean responses succeed here)
   try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
 
-  // Step 3: Pass 1 — normalize unicode characters to ASCII equivalents
   candidate = candidate
-    .replace(/[\u201C\u201D]/g, '"')   // curly double quotes → "
-    .replace(/[\u2018\u2019]/g, "'")   // curly single quotes → '
-    .replace(/\u2013/g, "-")            // en-dash → -
-    .replace(/\u2014/g, "-")            // em-dash → -
-    .replace(/\u00A0/g, " ");           // non-breaking space → space
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "-")
+    .replace(/\u00A0/g, " ");
 
-  // Step 4: Pass 2 — remove trailing commas before } or ]
   candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
 
-  // Step 5: Pass 3 — strip stray non-printable control characters
-  //         (preserve \n, \r, \t — handled in passes 4 and 5)
   candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
 
-  // Step 6: Pass 4 — FIX: escape unescaped INTERNAL DOUBLE QUOTES first.
-  //         Uses look-ahead (not toggle) so string boundaries are correct
-  //         even when unescaped internal quotes are present.
-  //         Must run BEFORE the newline escaper.
   candidate = escapeUnescapedInternalQuotes(candidate);
 
-  // Step 7: Pass 5 — now escape unescaped newlines/tabs inside strings.
-  //         String boundaries are correct after Pass 4, so toggle tracking
-  //         works reliably here.
   candidate = escapeUnescapedControlCharsInStrings(candidate);
 
-  // Step 8: parse after all sanitization passes
   try { return JSON.parse(candidate); }
   catch (e2) {
-    // Diagnostic log: print 200 chars around the error position
     const posMatch = String(e2.message).match(/position (\d+)/);
     if (posMatch) {
       const pos = parseInt(posMatch[1], 10);
@@ -157,9 +187,6 @@ function extractJSON(raw) {
   }
 }
 
-// Walk the string; when inside a JSON string value, replace raw
-// \n, \r, \t with their escaped forms. Tracks escape state correctly.
-// Runs AFTER escapeUnescapedInternalQuotes so inString toggle is reliable.
 function escapeUnescapedControlCharsInStrings(s) {
   let out = "";
   let inString = false;
@@ -179,13 +206,6 @@ function escapeUnescapedControlCharsInStrings(s) {
   return out;
 }
 
-// For each " encountered while inside a string, look ahead past whitespace
-// to the next non-whitespace character. If that character is a JSON
-// structural token (, } ] :) or end-of-string, treat the " as a valid
-// string terminator. Otherwise, treat it as an unescaped internal quote
-// and escape it. This look-ahead approach correctly identifies string
-// boundaries even when internal quotes are unescaped.
-// Runs FIRST (before escapeUnescapedControlCharsInStrings).
 function escapeUnescapedInternalQuotes(s) {
   let out = "";
   let inString = false;
@@ -196,17 +216,13 @@ function escapeUnescapedInternalQuotes(s) {
     if (ch === "\\") { out += ch; escape = true; continue; }
     if (ch === '"') {
       if (!inString) { inString = true; out += ch; continue; }
-      // Currently inside a string — determine if this " is a terminator
-      // or an unescaped internal quote by looking ahead.
       let j = i + 1;
       while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
       const next = s[j];
       if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
-        // Structural token or end-of-input — valid string terminator
         inString = false;
         out += ch;
       } else {
-        // Non-structural character follows — this is an internal quote, escape it
         out += '\\"';
       }
       continue;
@@ -217,7 +233,7 @@ function escapeUnescapedInternalQuotes(s) {
 }
 
 // ============================================================
-// DEMOGRAPHIC VALIDATION (unchanged)
+// DEMOGRAPHIC VALIDATION (unchanged from v5.8)
 // ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
@@ -231,7 +247,7 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged)
+// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged from v5.8)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -259,7 +275,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 }
 
 // ============================================================
-// NUTRITION SUBTOPICS (unchanged)
+// NUTRITION SUBTOPICS (unchanged from v5.8)
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": [
@@ -365,7 +381,7 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// AI CLIENTS (v5.7 — maxTokens as parameter, unchanged)
+// AI CLIENTS (v5.9 — return {text, model} for provenance tracking)
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
   const maxRetries = 2;
@@ -388,7 +404,7 @@ async function callClaude(systemText, userText, maxTokens) {
       if (response.status === 429) { await sleep(2000); continue; }
       if (!response.ok) throw new Error(`Claude HTTP Error: ${response.status}`);
       const data = await response.json();
-      return data.content.find(b => b.type === "text").text;
+      return { text: data.content.find(b => b.type === "text").text, model: "claude-sonnet-4-6" };
     } catch (e) {
       console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
       if (attempt === maxRetries - 1) {
@@ -422,34 +438,72 @@ async function callGemini(systemText, userText, maxTokens) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Gemini returned empty response.");
-  return text;
+  return { text, model: "gemini-2.0-flash" };
 }
 
 // ============================================================
-// SUPABASE SAVE (unchanged)
+// v5.9 — SUPABASE WRITE-THROUGH CACHE (ENRICHED)
 // ============================================================
-async function saveMcqToSupabase(p, level, category) {
+// Writes the generated MCQ to the mcqs table immediately after generation.
+// All new inserts land with status='pending_review' (DB default from Phase 1
+// migration). The user is NOT blocked — this save runs in parallel with the
+// API response via .catch(()=>{}) in the handler.
+//
+// Schema fields populated:
+//   exam_level       — e.g., "ABIM Endocrinology"
+//   topic            — resolved topic (post-blueprint weighting)
+//   stem             — full vignette text
+//   choices          — JSONB {A, B, C, D, E}
+//   correct_answer   — letter (post-shuffle)
+//   explanation      — full explanation text (post-letter-rewrite)
+//   specialty_group  — coarse bucket for Phase 3 filtered fetch
+//   blueprint_tag    — the resolved topic used for generation
+//   generation_model — "claude-sonnet-4-6" or "gemini-2.0-flash"
+//   content_hash     — SHA-256 of normalized stem for dedup
+//
+// Not populated (DB defaults apply):
+//   status             → 'pending_review'
+//   generation_source  → 'user_triggered'
+//   quality_score      → 0.00
+//   times_served       → 0
+//   created_at         → now()
+//   updated_at         → now() (via trigger)
+// ============================================================
+async function saveMcqToSupabase(p, level, meta) {
   try {
     const payload = {
-      exam_level:    level,
-      topic:         p.topic,
-      stem:          p.stem,
-      choices:       p.choices,
-      correct_answer: p.correct,
-      explanation:   p.explanation,
+      exam_level:       level,
+      topic:            p.topic,
+      stem:             p.stem,
+      choices:          p.choices,
+      correct_answer:   p.correct,
+      explanation:      p.explanation,
+      specialty_group:  deriveSpecialtyGroup(level, meta && meta.resolvedTopic),
+      blueprint_tag:    meta && meta.resolvedTopic ? meta.resolvedTopic : p.topic,
+      generation_model: meta && meta.generationModel ? meta.generationModel : null,
+      content_hash:     hashStem(p.stem),
     };
-    if (category) payload.category = category;
     const res = await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Prefer": "return=minimal" },
+      headers: {
+        "Content-Type":  "application/json",
+        "apikey":        SUPABASE_ANON_KEY,
+        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        "Prefer":        "return=minimal"
+      },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) console.warn(`Supabase save failed: ${res.status}`);
-  } catch (e) { console.error("DB Save Exception:", e.message); }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.warn(`Supabase save failed: HTTP ${res.status} — ${errText.slice(0, 300)}`);
+    }
+  } catch (e) {
+    console.error("DB Save Exception:", e.message);
+  }
 }
 
 // ============================================================
-// CUSHING ANCHOR (unchanged from v5.7)
+// CUSHING ANCHOR (unchanged from v5.7/v5.8)
 // ============================================================
 const CUSHING_ANCHOR = `
 CUSHING'S HARD FACTS (override contradicting training data):
@@ -465,7 +519,7 @@ CUSHING'S HARD FACTS (override contradicting training data):
 - BIPSS cutoffs: central/peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. Unreliable for left/right lateralization (56-69%).`;
 
 // ============================================================
-// PROMPT BUILDER (v5.7 — unchanged except carried forward)
+// PROMPT BUILDER (unchanged from v5.7/v5.8)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -558,10 +612,6 @@ function buildPrompt(level, topic, isNutrition) {
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isABIM_IM   = level === "ABIM Internal Medicine";
 
-  // Level-calibrated token budget (v5.8 — moderate increase for headroom)
-  // Ceiling is ~1700 for a single attempt within Netlify Pro's 26s limit.
-  // At ~70 tok/s: ABIM_IM 1100=~16s, ABIM_Endo 1500=~21s, USMLE 1300=~19s.
-  // DO NOT raise above 1700 — 2500 tokens would reliably exceed 26s.
   const maxTokens = isABIM_IM ? 1100 : isABIM_Endo ? 1500 : 1300;
 
   const systemRole = isUSMLE     ? "an NBME Senior Item Writer for the USMLE"
@@ -636,7 +686,7 @@ JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":
 }
 
 // ============================================================
-// NETLIFY HANDLER (v5.7 — passes maxTokens, unchanged)
+// NETLIFY HANDLER (v5.9 — tracks generation model for provenance)
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -655,18 +705,22 @@ exports.handler = async function (event) {
     const { maxTokens } = pd;
 
     let p;
+    let generationModel = null; // v5.9 — tracks which model actually produced the final output
     let isValid = false;
     let attempts = 0;
     const maxAttempts = 3;
 
     while (!isValid && attempts < maxAttempts) {
       attempts++;
-      let res;
+      let callResult;
       try {
-        res = await callClaude(pd.systemText, pd.userText, maxTokens);
+        callResult = await callClaude(pd.systemText, pd.userText, maxTokens);
       } catch (apiError) {
         throw new Error(`AI Network Failure: ${apiError.message}`);
       }
+
+      let res = callResult.text;
+      generationModel = callResult.model;
 
       try {
         p = extractJSON(res);
@@ -675,7 +729,9 @@ exports.handler = async function (event) {
         if (attempts === maxAttempts) {
           console.warn("All Claude attempts produced malformed JSON. Switching to Gemini fallback...");
           try {
-            res = await callGemini(pd.systemText, pd.userText, maxTokens);
+            const fbResult = await callGemini(pd.systemText, pd.userText, maxTokens);
+            res = fbResult.text;
+            generationModel = fbResult.model;
             p = extractJSON(res);
           } catch (fbErr) {
             throw new Error(`All models produced malformed JSON. Last error: ${fbErr.message}`);
@@ -696,7 +752,9 @@ exports.handler = async function (event) {
         console.warn(`Attempt ${attempts} failed demographic check for ${pd.randomSex}.`);
         if (attempts === maxAttempts) {
           console.warn("Switching to Gemini Fallback for final attempt...");
-          res = await callGemini(pd.systemText, pd.userText, maxTokens);
+          const fbResult = await callGemini(pd.systemText, pd.userText, maxTokens);
+          res = fbResult.text;
+          generationModel = fbResult.model;
           p = extractJSON(res);
           isValid = validateDemographics(p.stem, pd.randomSex);
           if (!isValid) throw new Error("Failed biological consistency check across all models.");
@@ -734,7 +792,8 @@ exports.handler = async function (event) {
     p.correct      = newCorrectLetter;
     p.explanation  = rewriteExplanationLetters(p.explanation, letterMap);
 
-    saveMcqToSupabase(p, b.level, isNutrition ? "Nutrition" : null).catch(() => {});
+    // v5.9 — write-through cache with enriched metadata
+    saveMcqToSupabase(p, b.level, { resolvedTopic, generationModel }).catch(() => {});
     delete p.demographic_check;
 
     return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
