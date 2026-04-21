@@ -1,56 +1,54 @@
 // generate-mcq.js — MedBoard Pro
-// v6.1 — Claude Tool-Use Structured Output (built on v5.9)
+// v6.2 — Token Ceiling Bump (built on v6.1)
 // ---------------------------------------------------------------
-// EMERGENCY FIX for April 21, 2026 production outage.
+// One-line change from v6.1: token budgets raised to prevent tool_use
+// truncation on verbose subspecialty content. Everything else preserved
+// byte-for-byte (including the v6.1 Claude tool-use structured output).
 //
-// Root cause of outage:
-//   v5.8's extractJSON pass-order fix (escapeUnescapedInternalQuotes,
-//   escapeUnescapedControlCharsInStrings) is a regex-based heuristic
-//   that tries to repair malformed JSON emitted by the LLM. The
-//   look-ahead heuristic for identifying string boundaries proved
-//   unreliable with certain emission patterns (parenthetical content,
-//   drug names with commas, multi-clause distractors). When the
-//   heuristic mis-escapes a legitimate string terminator, the parser
-//   reaches the closing } of the choices object while still in
-//   string-mode, produces "Expected ',' or '}' after property value"
-//   at line 10 column 4, and the 3-attempt retry loop + Gemini fallback
-//   consumes the full 26s Netlify timeout, returning 504 to users.
+// Why this was needed:
+//   After v6.1 shipped (April 21, 2026), ABIM IM and USMLE generation
+//   worked cleanly. ABIM Endocrinology generation failed with
+//   "Attempt 1 missing required fields" x2, then 60000ms timeout.
+//   Root cause: Endo's verbose subspecialty content (Fleseriu 2021
+//   citations, Endocrine Society guideline detail, integrity rules
+//   A-J, and level-specific rules) pushed the tool_use emission past
+//   the 1500-token ceiling. Anthropic documents this behavior
+//   explicitly: "If Claude's response is cut off due to hitting the
+//   max_tokens limit, and the truncated response contains an
+//   incomplete tool use block, you'll need to retry the request with
+//   a higher max_tokens value." The retry loop consumed the rest of
+//   the Netlify 26s budget, browser saw 504.
 //
-// The fix:
-//   Eliminate the parsing step entirely by using Anthropic's tool-use
-//   feature with forced tool_choice. The API validates the tool call
-//   arguments against our JSON schema BEFORE returning, so by
-//   construction the response cannot be malformed JSON.
+//   ABIM IM at 1100 was also caught truncating mid-stem (April 20
+//   endocarditis vignette). Already flagged; fixing in the same
+//   one-line edit since we're editing the line anyway.
 //
-//   Primary path (callClaude):
-//     - Define tool 'emit_mcq' with strict input_schema
-//     - Force tool_choice: {type: "tool", name: "emit_mcq"}
-//     - Extract response from tool_use content block's 'input' field
-//     - No JSON.parse, no regex repair, no extractJSON at all
+// The fix (ONE LINE):
+//   OLD: const maxTokens = isABIM_IM ? 1100 : isABIM_Endo ? 1500 : 1300;
+//   NEW: const maxTokens = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
 //
-//   Fallback path (callGemini):
-//     - Kept as-is with responseMimeType: "application/json"
-//     - Simplified extractJSON used ONLY for Gemini's text response
-//     - Helpers escapeUnescapedInternalQuotes and
-//       escapeUnescapedControlCharsInStrings REMOVED as they are the
-//       source of the bug and are no longer needed by Claude path
+//   Latency math at ~70 tokens/sec:
+//     ABIM IM at 1300 = max ~18.6s (well inside Netlify 26s)
+//     ABIM Endo at 1700 = max ~24.3s (1.7s headroom to Netlify 26s)
+//     USMLE at 1300 = max ~18.6s (unchanged)
+//   In practice output rarely fills max; typical real-world latency
+//   remains 15-20s as observed with IM post-v6.1.
 //
-// Preserved byte-for-byte from v5.9:
-//   - All prompts (systemText, userText) including clinical rules,
-//     CUSHING_ANCHOR, integrity rules A-K, level-specific rules
-//   - Nutrition subtopics and 12% injection rate
-//   - Topic-sex coupling and demographic validators
-//   - Shuffle logic and explanation letter rewriter
-//   - Level-calibrated max_tokens (IM:1100, Endo:1500, USMLE:1300)
-//   - Write-through cache with all 4 enriched Supabase fields
-//   - hashStem, deriveSpecialtyGroup
-//   - Warmup handler, input validation
+// Known followup (deferred to planned session later this week):
+//   - ABIM Endo prompt audit (exemplar review, rule consolidation,
+//     item-writer voice calibration)
+//   - Phase 3 bank-first serving (flip fetch logic to read from
+//     approved mcqs table with live generation as fallback only)
+//   If 1700 is not enough headroom on some Endo topics, the right
+//   answer is prompt tightening and/or Phase 3 — not further raising
+//   max_tokens, which eventually collides with Netlify 26s timeout.
 //
-// What this fix does NOT touch (deferred to later session):
-//   - ABIM Endocrinology exemplar audit
-//   - NBME / ABIM IM / ABIM Endo item-writer voice calibration
-//   - Prompt architecture refactor
-//   - Token budget retuning beyond what v5.9 had
+// Preserved byte-for-byte from v6.1:
+//   - Claude tool-use structured output (MCQ_TOOL schema, forced tool_choice)
+//   - All prompts, CUSHING_ANCHOR, integrity rules A-J
+//   - Write-through cache with 4 enriched Supabase fields
+//   - extractJSONSimple (Gemini fallback path only)
+//   - Demographic validators, shuffle, letter rewriter, warmup handler
 
 const crypto = require("crypto");
 
@@ -612,7 +610,13 @@ function buildPrompt(level, topic, isNutrition) {
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isABIM_IM   = level === "ABIM Internal Medicine";
 
-  const maxTokens = isABIM_IM ? 1100 : isABIM_Endo ? 1500 : 1300;
+  // v6.2 — ABIM IM 1100->1300 (prevents IM stem truncation caught April 20).
+  // v6.2 — ABIM Endo 1500->1700 (prevents tool_use truncation seen in v6.1).
+  // USMLE 1300 unchanged. Do NOT raise further: 1700 already leaves only
+  // ~1.7s of headroom before Netlify 26s timeout at full max-fill. If Endo
+  // still truncates, the fix is prompt tightening (Phase 2 audit) and/or
+  // bank-first serving (Phase 3), not a further token bump.
+  const maxTokens = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
 
   const systemRole = isUSMLE     ? "an NBME Senior Item Writer for the USMLE"
                    : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director"
