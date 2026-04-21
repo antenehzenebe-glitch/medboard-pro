@@ -1,54 +1,45 @@
 // generate-mcq.js — MedBoard Pro
-// v6.2 — Token Ceiling Bump (built on v6.1)
+// v6.3 — CUSHING_ANCHOR Disabled for Stability Testing (built on v6.2)
 // ---------------------------------------------------------------
-// One-line change from v6.1: token budgets raised to prevent tool_use
-// truncation on verbose subspecialty content. Everything else preserved
-// byte-for-byte (including the v6.1 Claude tool-use structured output).
+// TEMPORARY CHANGE per Dr. Zenebe's request on April 21, 2026.
 //
-// Why this was needed:
-//   After v6.1 shipped (April 21, 2026), ABIM IM and USMLE generation
-//   worked cleanly. ABIM Endocrinology generation failed with
-//   "Attempt 1 missing required fields" x2, then 60000ms timeout.
-//   Root cause: Endo's verbose subspecialty content (Fleseriu 2021
-//   citations, Endocrine Society guideline detail, integrity rules
-//   A-J, and level-specific rules) pushed the tool_use emission past
-//   the 1500-token ceiling. Anthropic documents this behavior
-//   explicitly: "If Claude's response is cut off due to hitting the
-//   max_tokens limit, and the truncated response contains an
-//   incomplete tool use block, you'll need to retry the request with
-//   a higher max_tokens value." The retry loop consumed the rest of
-//   the Netlify 26s budget, browser saw 504.
+// Dr. Zenebe reports that ABIM Endocrinology generation was working
+// reliably before the CUSHING_ANCHOR block was introduced, and that
+// post-anchor latency and failure rates are meaningfully worse than
+// pre-anchor. Static code analysis of the anchor's conditional
+// activation (only fires on /cushing/ topic match + non-USMLE level)
+// suggests it should not affect non-Cushing generations, but Dr.
+// Zenebe's lived experience of the product is diagnostic information
+// worth testing directly.
 //
-//   ABIM IM at 1100 was also caught truncating mid-stem (April 20
-//   endocarditis vignette). Already flagged; fixing in the same
-//   one-line edit since we're editing the line anyway.
+// This version disables the anchor entirely to test the hypothesis.
+// If Endo generation is reliable with it disabled, the anchor was
+// involved (directly or by cumulative prompt bloat) and needs to be
+// restructured in the planned prompt audit later this week.
+// If Endo generation still fails with it disabled, the anchor is
+// not the cause and we look elsewhere.
 //
-// The fix (ONE LINE):
-//   OLD: const maxTokens = isABIM_IM ? 1100 : isABIM_Endo ? 1500 : 1300;
-//   NEW: const maxTokens = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
+// Clinical regression while disabled:
+//   Without CUSHING_ANCHOR, Claude defaults to obsolete 2003 Nieman
+//   guideline (BIPSS skipped at >=6mm pituitary lesion) instead of
+//   current Fleseriu 2021 Pituitary Society Consensus (BIPSS required
+//   at <10mm). Also confuses 1mg vs 8mg dexamethasone suppression
+//   test cutoffs. Cushing-specific questions may contain outdated
+//   management guidance until the anchor is restored.
 //
-//   Latency math at ~70 tokens/sec:
-//     ABIM IM at 1300 = max ~18.6s (well inside Netlify 26s)
-//     ABIM Endo at 1700 = max ~24.3s (1.7s headroom to Netlify 26s)
-//     USMLE at 1300 = max ~18.6s (unchanged)
-//   In practice output rarely fills max; typical real-world latency
-//   remains 15-20s as observed with IM post-v6.1.
+// The fix (minimal):
+//   OLD: const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
+//   NEW: const conditionalAnchors = ""; // v6.3: CUSHING_ANCHOR temporarily disabled
+//   The CUSHING_ANCHOR constant is retained in the file (unused) for
+//   easy restoration after the audit.
 //
-// Known followup (deferred to planned session later this week):
-//   - ABIM Endo prompt audit (exemplar review, rule consolidation,
-//     item-writer voice calibration)
-//   - Phase 3 bank-first serving (flip fetch logic to read from
-//     approved mcqs table with live generation as fallback only)
-//   If 1700 is not enough headroom on some Endo topics, the right
-//   answer is prompt tightening and/or Phase 3 — not further raising
-//   max_tokens, which eventually collides with Netlify 26s timeout.
-//
-// Preserved byte-for-byte from v6.1:
-//   - Claude tool-use structured output (MCQ_TOOL schema, forced tool_choice)
-//   - All prompts, CUSHING_ANCHOR, integrity rules A-J
+// Preserved byte-for-byte from v6.2:
+//   - Token budgets (IM 1300, Endo 1700, USMLE 1300)
+//   - Claude tool-use structured output (MCQ_TOOL, forced tool_choice)
+//   - All non-Cushing prompt content, integrity rules A-J
 //   - Write-through cache with 4 enriched Supabase fields
-//   - extractJSONSimple (Gemini fallback path only)
 //   - Demographic validators, shuffle, letter rewriter, warmup handler
+//   - Gemini fallback path with extractJSONSimple
 
 const crypto = require("crypto");
 
@@ -623,7 +614,13 @@ function buildPrompt(level, topic, isNutrition) {
                    : "an ABIM Internal Medicine Board Question Writer";
 
   const anchors = detectTopicAnchors(promptTopic);
-  const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
+  // v6.3 — CUSHING_ANCHOR temporarily disabled for stability testing.
+  // Dr. Zenebe's hypothesis: Endo generation latency/failures began after
+  // this anchor was introduced. Testing with it off. Restore after the
+  // prompt audit planned for later this week. Anchor constant retained
+  // above for easy restoration (change "" back to the original line).
+  const conditionalAnchors = "";
+  // ORIGINAL: const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
 
   let levelRules = "";
   if (isUSMLE) {
