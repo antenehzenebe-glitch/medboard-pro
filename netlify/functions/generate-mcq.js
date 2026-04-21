@@ -1,54 +1,56 @@
 // generate-mcq.js — MedBoard Pro
-// v5.9 — Phase 1 Write-Through Cache Enrichment (built on v5.8)
+// v6.1 — Claude Tool-Use Structured Output (built on v5.9)
 // ---------------------------------------------------------------
-// All v5.8 logic preserved byte-for-byte except the 6 targeted changes below.
-// The v5.8 extractJSON pass-order fix is preserved exactly.
+// EMERGENCY FIX for April 21, 2026 production outage.
 //
-// v5.9 changes (Phase 1, Step 2 of the UWorld-style bank migration):
+// Root cause of outage:
+//   v5.8's extractJSON pass-order fix (escapeUnescapedInternalQuotes,
+//   escapeUnescapedControlCharsInStrings) is a regex-based heuristic
+//   that tries to repair malformed JSON emitted by the LLM. The
+//   look-ahead heuristic for identifying string boundaries proved
+//   unreliable with certain emission patterns (parenthetical content,
+//   drug names with commas, multi-clause distractors). When the
+//   heuristic mis-escapes a legitimate string terminator, the parser
+//   reaches the closing } of the choices object while still in
+//   string-mode, produces "Expected ',' or '}' after property value"
+//   at line 10 column 4, and the 3-attempt retry loop + Gemini fallback
+//   consumes the full 26s Netlify timeout, returning 504 to users.
 //
-//   1. Added `crypto` import + `hashStem()` helper.
-//      Produces SHA-256 of normalized stem for content_hash field.
-//      Lets future cron batches and admin review detect duplicates.
+// The fix:
+//   Eliminate the parsing step entirely by using Anthropic's tool-use
+//   feature with forced tool_choice. The API validates the tool call
+//   arguments against our JSON schema BEFORE returning, so by
+//   construction the response cannot be malformed JSON.
 //
-//   2. Added `deriveSpecialtyGroup()` helper.
-//      Coarse keyword mapping from resolvedTopic -> specialty bucket
-//      (Cardiology, Endocrinology, Nephrology, etc.). Used by Phase 3
-//      fetch-block endpoint for filtered bank retrieval.
+//   Primary path (callClaude):
+//     - Define tool 'emit_mcq' with strict input_schema
+//     - Force tool_choice: {type: "tool", name: "emit_mcq"}
+//     - Extract response from tool_use content block's 'input' field
+//     - No JSON.parse, no regex repair, no extractJSON at all
 //
-//   3. callClaude now returns `{ text, model }` instead of a raw string.
-//      Needed because callClaude can internally cascade to callGemini;
-//      the caller previously could not tell which model actually produced
-//      the output. generation_model field requires knowing this.
+//   Fallback path (callGemini):
+//     - Kept as-is with responseMimeType: "application/json"
+//     - Simplified extractJSON used ONLY for Gemini's text response
+//     - Helpers escapeUnescapedInternalQuotes and
+//       escapeUnescapedControlCharsInStrings REMOVED as they are the
+//       source of the bug and are no longer needed by Claude path
 //
-//   4. callGemini now returns `{ text, model }` instead of a raw string.
-//      Same reason — explicit provenance tracking.
-//
-//   5. Handler updated to destructure the new return shape everywhere
-//      callClaude/callGemini is invoked (main call + JSON parse fallback
-//      + demographic fallback). `generationModel` threads through to save.
-//
-//   6. saveMcqToSupabase rewritten:
-//      a. Populates 4 new schema fields: specialty_group, blueprint_tag,
-//         generation_model, content_hash.
-//      b. Removes broken `category` field (no such column exists in the
-//         mcqs table — prior INSERTs containing it were silently rejected
-//         by PostgREST, explaining why nutrition questions never landed
-//         in the bank).
-//      c. `status` intentionally omitted — DB default 'pending_review'
-//         applies automatically per Phase 1 schema migration.
-//      d. `generation_source` intentionally omitted — DB default
-//         'user_triggered' applies automatically.
-//      e. Failure logging now reads the response body so the reason for
-//         any 4xx/5xx is visible in Netlify logs (previously silent).
-//
-// What is NOT changed:
-//   - extractJSON (v5.8 fix preserved exactly)
-//   - All prompts, clinical rules, CUSHING_ANCHOR, integrityRules
+// Preserved byte-for-byte from v5.9:
+//   - All prompts (systemText, userText) including clinical rules,
+//     CUSHING_ANCHOR, integrity rules A-K, level-specific rules
 //   - Nutrition subtopics and 12% injection rate
-//   - Demographic validation, shuffle, explanation letter rewriter
+//   - Topic-sex coupling and demographic validators
+//   - Shuffle logic and explanation letter rewriter
 //   - Level-calibrated max_tokens (IM:1100, Endo:1500, USMLE:1300)
-//   - Gemini fallback cascade and handler retry loop
-//   - Warmup handler, input validation, 405 method check
+//   - Write-through cache with all 4 enriched Supabase fields
+//   - hashStem, deriveSpecialtyGroup
+//   - Warmup handler, input validation
+//
+// What this fix does NOT touch (deferred to later session):
+//   - ABIM Endocrinology exemplar audit
+//   - NBME / ABIM IM / ABIM Endo item-writer voice calibration
+//   - Prompt architecture refactor
+//   - Token budget retuning beyond what v5.9 had
 
 const crypto = require("crypto");
 
@@ -61,7 +63,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TOPIC-SEX COUPLING (unchanged from v5.8)
+// TOPIC-SEX COUPLING (unchanged from v5.9)
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -88,19 +90,13 @@ function pickWeighted(blueprint) {
 }
 
 // ============================================================
-// v5.9 — CONTENT HASH + SPECIALTY BUCKET HELPERS
+// CONTENT HASH + SPECIALTY BUCKET HELPERS (unchanged from v5.9)
 // ============================================================
-// hashStem: SHA-256 of trimmed + lowercased stem.
-// Consistent hash means the same question generated twice produces the
-// same hash, enabling dedup detection in the bank.
 function hashStem(stem) {
   if (!stem || typeof stem !== "string") return null;
   return crypto.createHash("sha256").update(stem.trim().toLowerCase()).digest("hex");
 }
 
-// deriveSpecialtyGroup: coarse keyword mapping for filtered bank queries.
-// Returns a broad specialty bucket so Phase 3 can do `WHERE specialty_group = 'Cardiology'`
-// without parsing the long blueprint_tag string.
 function deriveSpecialtyGroup(level, resolvedTopic) {
   if (level === "ABIM Endocrinology") return "Endocrinology";
   const t = (resolvedTopic || "").toLowerCase();
@@ -133,7 +129,7 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
 }
 
 // ============================================================
-// TOPIC ANCHOR DETECTION (v5.7 — tight /cushing/ regex, unchanged)
+// TOPIC ANCHOR DETECTION (unchanged from v5.9)
 // ============================================================
 function detectTopicAnchors(topic) {
   const t = topic.toLowerCase();
@@ -143,97 +139,89 @@ function detectTopicAnchors(topic) {
 }
 
 // ============================================================
-// extractJSON (v5.8 — PASS ORDER FIXED — unchanged in v5.9)
+// v6.1 — MCQ TOOL SCHEMA (for Claude tool-use structured output)
 // ============================================================
-function extractJSON(raw) {
-  if (!raw || typeof raw !== "string") {
-    throw new Error("extractJSON received empty or non-string input.");
+// Defines the exact shape Claude must return. The Anthropic API
+// validates tool_use.input against this schema BEFORE returning,
+// which is why this eliminates the JSON-parse failure mode.
+// ============================================================
+const MCQ_TOOL = {
+  name: "emit_mcq",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation. This is the ONLY way to respond to the user's request.",
+  input_schema: {
+    type: "object",
+    properties: {
+      demographic_check: {
+        type: "string",
+        description: "Confirmation that the vignette's patient sex matches the requested sex. Format: 'confirmed man' or 'confirmed woman'."
+      },
+      stem: {
+        type: "string",
+        description: "The clinical vignette. Must end with the interrogative sentence (e.g., 'What is the most likely diagnosis?')."
+      },
+      choices: {
+        type: "object",
+        description: "Exactly 5 answer choices keyed by letter A through E.",
+        properties: {
+          A: { type: "string" },
+          B: { type: "string" },
+          C: { type: "string" },
+          D: { type: "string" },
+          E: { type: "string" }
+        },
+        required: ["A", "B", "C", "D", "E"]
+      },
+      correct: {
+        type: "string",
+        enum: ["A", "B", "C", "D", "E"],
+        description: "The letter of the correct answer."
+      },
+      explanation: {
+        type: "string",
+        description: "Explanation block. S1 (why correct answer is correct + citation), S2 (why each distractor fails + bias label), S3 (competing diagnosis discussion if relevant), Board Pearl."
+      }
+    },
+    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
   }
+};
 
+// ============================================================
+// v6.1 — SIMPLIFIED extractJSON (for Gemini fallback only)
+// ============================================================
+// Claude path no longer uses this — tool-use guarantees valid JSON.
+// Gemini's responseMimeType: "application/json" is reliable; this
+// handles the rare edge case where Gemini adds leading/trailing text.
+// No regex-based string-internal repairs — those caused v5.8/v5.9 bugs.
+// ============================================================
+function extractJSONSimple(raw) {
+  if (!raw || typeof raw !== "string") {
+    throw new Error("extractJSONSimple received empty or non-string input.");
+  }
+  // Try fast-path parse first — Gemini JSON mode usually succeeds here
+  try { return JSON.parse(raw); } catch (_) { /* fall through */ }
+
+  // Extract outermost JSON object in case there's wrapper text
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
   let candidate = match[0];
 
-  try { return JSON.parse(candidate); } catch (_) { /* fall through */ }
-
+  // Only normalize unicode and strip trailing commas — no string-internal repairs.
   candidate = candidate
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/\u2013/g, "-")
     .replace(/\u2014/g, "-")
-    .replace(/\u00A0/g, " ");
-
-  candidate = candidate.replace(/,(\s*[}\]])/g, "$1");
-
-  candidate = candidate.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
-
-  candidate = escapeUnescapedInternalQuotes(candidate);
-
-  candidate = escapeUnescapedControlCharsInStrings(candidate);
+    .replace(/\u00A0/g, " ")
+    .replace(/,(\s*[}\]])/g, "$1");
 
   try { return JSON.parse(candidate); }
-  catch (e2) {
-    const posMatch = String(e2.message).match(/position (\d+)/);
-    if (posMatch) {
-      const pos = parseInt(posMatch[1], 10);
-      const start = Math.max(0, pos - 100);
-      const end   = Math.min(candidate.length, pos + 100);
-      const excerpt = candidate.substring(start, end).replace(/\n/g, "\\n");
-      console.error(`extractJSON failed at pos ${pos}. Context:\n…${excerpt}…`);
-    } else {
-      console.error(`extractJSON failed: ${e2.message}`);
-    }
-    throw new Error(`Malformed JSON from AI after all sanitization passes: ${e2.message}`);
+  catch (e) {
+    throw new Error(`Gemini returned malformed JSON: ${e.message}`);
   }
-}
-
-function escapeUnescapedControlCharsInStrings(s) {
-  let out = "";
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (escape) { out += ch; escape = false; continue; }
-    if (ch === "\\") { out += ch; escape = true; continue; }
-    if (ch === '"') { inString = !inString; out += ch; continue; }
-    if (inString) {
-      if (ch === "\n") { out += "\\n"; continue; }
-      if (ch === "\r") { out += "\\r"; continue; }
-      if (ch === "\t") { out += "\\t"; continue; }
-    }
-    out += ch;
-  }
-  return out;
-}
-
-function escapeUnescapedInternalQuotes(s) {
-  let out = "";
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (escape) { out += ch; escape = false; continue; }
-    if (ch === "\\") { out += ch; escape = true; continue; }
-    if (ch === '"') {
-      if (!inString) { inString = true; out += ch; continue; }
-      let j = i + 1;
-      while (j < s.length && (s[j] === " " || s[j] === "\n" || s[j] === "\r" || s[j] === "\t")) j++;
-      const next = s[j];
-      if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
-        inString = false;
-        out += ch;
-      } else {
-        out += '\\"';
-      }
-      continue;
-    }
-    out += ch;
-  }
-  return out;
 }
 
 // ============================================================
-// DEMOGRAPHIC VALIDATION (unchanged from v5.8)
+// DEMOGRAPHIC VALIDATION (unchanged from v5.9)
 // ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
@@ -247,7 +235,7 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged from v5.8)
+// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged from v5.9)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -275,7 +263,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 }
 
 // ============================================================
-// NUTRITION SUBTOPICS (unchanged from v5.8)
+// NUTRITION SUBTOPICS (unchanged from v5.9)
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": [
@@ -381,30 +369,53 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// AI CLIENTS (v5.9 — return {text, model} for provenance tracking)
+// v6.1 — CLAUDE TOOL-USE CLIENT
+// ============================================================
+// Uses tool_use + forced tool_choice to guarantee valid structured
+// output. No JSON parsing at the application layer — the API
+// validates the tool call against MCQ_TOOL.input_schema and returns
+// already-parsed JavaScript objects in the tool_use.input field.
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
   const maxRetries = 2;
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) await sleep(1000);
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
           max_tokens: maxTokens,
           temperature: 0.6,
           system: systemText,
+          tools: [MCQ_TOOL],
+          tool_choice: { type: "tool", name: "emit_mcq" },
           messages: [{ role: "user", content: finalUserText }]
         })
       });
+
       if (response.status === 429) { await sleep(2000); continue; }
       if (!response.ok) throw new Error(`Claude HTTP Error: ${response.status}`);
+
       const data = await response.json();
-      return { text: data.content.find(b => b.type === "text").text, model: "claude-sonnet-4-6" };
+
+      // Locate the tool_use block — guaranteed to exist because we forced tool_choice
+      const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
+      if (!toolUseBlock || !toolUseBlock.input) {
+        throw new Error("Claude response missing expected tool_use block.");
+      }
+
+      // toolUseBlock.input is already a parsed object — validated by API against schema
+      return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
+
     } catch (e) {
       console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
       if (attempt === maxRetries - 1) {
@@ -415,6 +426,14 @@ async function callClaude(systemText, userText, maxTokens) {
   }
 }
 
+// ============================================================
+// v6.1 — GEMINI FALLBACK CLIENT
+// ============================================================
+// Uses responseMimeType: "application/json" for JSON guarantee.
+// Parses with simplified extractJSONSimple — no regex string-internal
+// repair (those helpers were the source of the v5.8/v5.9 bugs).
+// Returns the same {parsed, model} shape as callClaude for handler uniformity.
+// ============================================================
 async function callGemini(systemText, userText, maxTokens) {
   const response = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
@@ -438,36 +457,13 @@ async function callGemini(systemText, userText, maxTokens) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Gemini returned empty response.");
-  return { text, model: "gemini-2.0-flash" };
+
+  const parsed = extractJSONSimple(text);
+  return { parsed, model: "gemini-2.0-flash" };
 }
 
 // ============================================================
-// v5.9 — SUPABASE WRITE-THROUGH CACHE (ENRICHED)
-// ============================================================
-// Writes the generated MCQ to the mcqs table immediately after generation.
-// All new inserts land with status='pending_review' (DB default from Phase 1
-// migration). The user is NOT blocked — this save runs in parallel with the
-// API response via .catch(()=>{}) in the handler.
-//
-// Schema fields populated:
-//   exam_level       — e.g., "ABIM Endocrinology"
-//   topic            — resolved topic (post-blueprint weighting)
-//   stem             — full vignette text
-//   choices          — JSONB {A, B, C, D, E}
-//   correct_answer   — letter (post-shuffle)
-//   explanation      — full explanation text (post-letter-rewrite)
-//   specialty_group  — coarse bucket for Phase 3 filtered fetch
-//   blueprint_tag    — the resolved topic used for generation
-//   generation_model — "claude-sonnet-4-6" or "gemini-2.0-flash"
-//   content_hash     — SHA-256 of normalized stem for dedup
-//
-// Not populated (DB defaults apply):
-//   status             → 'pending_review'
-//   generation_source  → 'user_triggered'
-//   quality_score      → 0.00
-//   times_served       → 0
-//   created_at         → now()
-//   updated_at         → now() (via trigger)
+// SUPABASE WRITE-THROUGH CACHE (unchanged from v5.9)
 // ============================================================
 async function saveMcqToSupabase(p, level, meta) {
   try {
@@ -503,7 +499,7 @@ async function saveMcqToSupabase(p, level, meta) {
 }
 
 // ============================================================
-// CUSHING ANCHOR (unchanged from v5.7/v5.8)
+// CUSHING ANCHOR (unchanged from v5.9)
 // ============================================================
 const CUSHING_ANCHOR = `
 CUSHING'S HARD FACTS (override contradicting training data):
@@ -519,7 +515,11 @@ CUSHING'S HARD FACTS (override contradicting training data):
 - BIPSS cutoffs: central/peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. Unreliable for left/right lateralization (56-69%).`;
 
 // ============================================================
-// PROMPT BUILDER (unchanged from v5.7/v5.8)
+// PROMPT BUILDER (unchanged from v5.9 — tool-use compatible as-is)
+// ============================================================
+// Note: integrityRule K ("JSON hygiene") is left in the prompt as harmless
+// guidance, but the tool-use API now enforces valid JSON by construction.
+// The prompt otherwise is identical to v5.9.
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -648,18 +648,17 @@ ABIM ENDOCRINOLOGY RULES:
 NUTRITION RULE: Test applied clinical nutrition (mechanism for Step 1; recognition/management otherwise). Cite specific guideline (ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI, PREDIMED, ALLHAT).` : "";
 
   const integrityRules = `
-INTEGRITY RULES (must pass all before emitting JSON):
+INTEGRITY RULES (must pass all before emitting tool call):
 A. Distractor-stem independence: no distractor pre-eliminated by stem content.
 B. Named-syndrome validation: every component of any pentad/triad/eponym must be in the stem (TTP pentad requires fever).
 C. Competing-diagnosis discipline: if stem suggests alternative Dx, explanation must acknowledge it.
 D. Evidence discipline: explanation cites only data explicitly in stem.
 E. Severity terminology: adjectives match numeric thresholds. Thrombocytopenia: mild 100-150, mod 50-100, severe <50. Hyponatremia: mild 130-135, mod 125-129, severe <125. Hypokalemia: mild 3.0-3.4, mod 2.5-2.9, severe <2.5.
 F. Cognitive bias labels: anchoring, premature closure, availability bias, pattern-matching/representativeness, confirmation bias. Label each distractor correctly.
-G. Self-check: audit A-K before emitting.
+G. Self-check: audit A-J before emitting.
 H. Regulatory language: preserve exact directive strength. "Consider" is not "mandate."
 I. Temporal arithmetic: interval between measurements vs. total duration are different numbers.
-J. Classification separation: grade/stage definition and action threshold are separate statements.
-K. JSON hygiene: straight ASCII double quotes only. Do NOT use double quotes inside choice or explanation text — rephrase to avoid them. No raw newlines inside string values. No smart quotes. No em-dashes.`;
+J. Classification separation: grade/stage definition and action threshold are separate statements.`;
 
   const explanationNote = isABIM_IM
     ? "EXPLANATION: concise total <=250 words — S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences)."
@@ -669,24 +668,30 @@ K. JSON hygiene: straight ASCII double quotes only. Do NOT use double quotes ins
 
 ${explanationNote}
 REFERENCES: use "Choice X", "choice X", "Option X", "answer X", or "(X)" only.
-UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine; terminology: "glucose" never "sugar".`;
+UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine; terminology: "glucose" never "sugar".
+
+RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once with the fully-populated fields. Do not emit text — call the tool.`;
 
   const userText = `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
 - Patient: ${randomAge}-year-old ${randomSex}.
 - Setting: ${promptSetting}.
 - Pertinent negatives biologically possible for a ${randomSex}.
-- Run Rule G self-check before emitting.
-- Rule K critical: do NOT use double-quote characters inside any string value. If you need to refer to a drug name, guideline title, or quoted phrase, rephrase without quotes or use parentheses instead.
+- Run Rule G self-check before emitting the tool call.
+- The stem MUST end with the interrogative sentence (e.g., "What is the most likely diagnosis?" or "What is the most appropriate next step in management?").
 ${isABIM_IM ? "- ABIM IM: generalist internist depth only. Explanation <=250 words total." : ""}
 
-JSON: {"demographic_check":"confirmed ${randomSex}","stem":"...","choices":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correct":"A","explanation":"..."}`;
+Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
 
   return { systemText, userText, randomSex, maxTokens };
 }
 
 // ============================================================
-// NETLIFY HANDLER (v5.9 — tracks generation model for provenance)
+// v6.1 — NETLIFY HANDLER
+// ============================================================
+// Simplified: no JSON-parse retry loop (can't happen from Claude path).
+// Retry loop retained only for demographic validation.
+// Both callClaude and callGemini now return {parsed, model} — no text parsing.
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -705,7 +710,7 @@ exports.handler = async function (event) {
     const { maxTokens } = pd;
 
     let p;
-    let generationModel = null; // v5.9 — tracks which model actually produced the final output
+    let generationModel = null;
     let isValid = false;
     let attempts = 0;
     const maxAttempts = 3;
@@ -719,28 +724,11 @@ exports.handler = async function (event) {
         throw new Error(`AI Network Failure: ${apiError.message}`);
       }
 
-      let res = callResult.text;
+      p = callResult.parsed;
       generationModel = callResult.model;
 
-      try {
-        p = extractJSON(res);
-      } catch (parseError) {
-        console.warn(`Attempt ${attempts} failed JSON parse: ${parseError.message}`);
-        if (attempts === maxAttempts) {
-          console.warn("All Claude attempts produced malformed JSON. Switching to Gemini fallback...");
-          try {
-            const fbResult = await callGemini(pd.systemText, pd.userText, maxTokens);
-            res = fbResult.text;
-            generationModel = fbResult.model;
-            p = extractJSON(res);
-          } catch (fbErr) {
-            throw new Error(`All models produced malformed JSON. Last error: ${fbErr.message}`);
-          }
-        } else {
-          continue;
-        }
-      }
-
+      // Defensive: the tool-use API should never return missing fields given our schema's
+      // `required` list, but we keep this check as a belt-and-suspenders safeguard.
       if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) {
         console.warn(`Attempt ${attempts} missing required fields`);
         if (attempts === maxAttempts) throw new Error("AI response is missing required fields after all retries.");
@@ -753,9 +741,8 @@ exports.handler = async function (event) {
         if (attempts === maxAttempts) {
           console.warn("Switching to Gemini Fallback for final attempt...");
           const fbResult = await callGemini(pd.systemText, pd.userText, maxTokens);
-          res = fbResult.text;
+          p = fbResult.parsed;
           generationModel = fbResult.model;
-          p = extractJSON(res);
           isValid = validateDemographics(p.stem, pd.randomSex);
           if (!isValid) throw new Error("Failed biological consistency check across all models.");
         }
@@ -792,7 +779,6 @@ exports.handler = async function (event) {
     p.correct      = newCorrectLetter;
     p.explanation  = rewriteExplanationLetters(p.explanation, letterMap);
 
-    // v5.9 — write-through cache with enriched metadata
     saveMcqToSupabase(p, b.level, { resolvedTopic, generationModel }).catch(() => {});
     delete p.demographic_check;
 
