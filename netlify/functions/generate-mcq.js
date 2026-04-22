@@ -1,14 +1,13 @@
 // generate-mcq.js — MedBoard Pro
-// v6.4 — Truncation Fix Applied & CUSHING_ANCHOR Restored
+// v6.5 — Dynamic Clinical Triage Fix
 // ---------------------------------------------------------------
 // CHANGELOG:
-// - Added strict length limits (<= 350 words) to USMLE and Endo explanation 
-//   prompts to prevent Claude from exceeding the 1300/1700 token maxTokens 
-//   limit and causing silent JSON validation failures due to truncation.
-// - Restored CUSHING_ANCHOR as it was determined not to be the root cause 
-//   of the latency/failure rates.
+// - Removed hardcoded 'settingBlueprint' array that randomly forced 
+//   inpatient/ED admissions 50% of the time.
+// - Replaced with dynamic triage instruction in the prompt payload 
+//   to enforce ABIM/NBME standards for clinical realism based on topic acuity.
 //
-// Preserved byte-for-byte from v6.2/v6.3:
+// Preserved byte-for-byte from v6.4:
 //   - Token budgets (IM 1300, Endo 1700, USMLE 1300)
 //   - Claude tool-use structured output (MCQ_TOOL, forced tool_choice)
 //   - All non-Cushing prompt content, integrity rules A-J
@@ -531,19 +530,6 @@ function buildPrompt(level, topic, isNutrition) {
   const randomAge = Math.floor(Math.random() * 66) + 20;
   const randomSex = pickSexForTopic(promptTopic);
 
-  let settingBlueprint = [
-    { s: "a routine chronic outpatient clinic follow-up", w: 40 },
-    { s: "an inpatient hospital ward admission", w: 30 },
-    { s: "an acute emergency department presentation", w: 20 }
-  ];
-  if (level === "USMLE Step 3" || level.includes("ABIM")) {
-    settingBlueprint.push(
-      { s: "an intensive care unit (ICU) transfer", w: 5 },
-      { s: "a telephone consult or telemedicine follow-up", w: 5 }
-    );
-  }
-  const promptSetting = pickWeighted(settingBlueprint);
-
   const isUSMLE     = level.includes("USMLE");
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isABIM_IM   = level === "ABIM Internal Medicine";
@@ -611,11 +597,11 @@ UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: arg
 
 RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once with the fully-populated fields. Do not emit text — call the tool.`;
 
-  // v6.4 Fix: Enforced output token protection directly in userText
+  // v6.5 Fix: Replaced hardcoded randomizer array with direct triage instruction
   const userText = `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
 - Patient: ${randomAge}-year-old ${randomSex}.
-- Setting: ${promptSetting}.
+- Setting: Determine clinically appropriate setting (Outpatient Clinic, ER, Inpatient Ward, or ICU) based on standard triage for the target diagnosis. DO NOT place a patient in an inpatient/ED setting for a chronic, stable outpatient workup.
 - Pertinent negatives biologically possible for a ${randomSex}.
 - Run Rule G self-check before emitting the tool call.
 - The stem MUST end with the interrogative sentence (e.g., "What is the most likely diagnosis?" or "What is the most appropriate next step in management?").
