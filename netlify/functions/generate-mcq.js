@@ -1,19 +1,18 @@
 // generate-mcq.js — MedBoard Pro
-// v6.5 — Dynamic Clinical Triage Fix
+// v6.6 — Holistic Clinical Profiling (Age & Setting Dynamic Fix)
 // ---------------------------------------------------------------
 // CHANGELOG:
-// - Removed hardcoded 'settingBlueprint' array that randomly forced 
-//   inpatient/ED admissions 50% of the time.
-// - Replaced with dynamic triage instruction in the prompt payload 
-//   to enforce ABIM/NBME standards for clinical realism based on topic acuity.
+// - Removed 'randomAge' blind math generator to prevent epidemiological hallucinations 
+//   (e.g., 83-year-olds with PCOS).
+// - Unified Age and Setting into a single dynamic prompt instruction, forcing the LLM 
+//   to strictly align demographics and acuity with the medical topic.
 //
-// Preserved byte-for-byte from v6.4:
+// Preserved byte-for-byte from v6.4/v6.5:
 //   - Token budgets (IM 1300, Endo 1700, USMLE 1300)
 //   - Claude tool-use structured output (MCQ_TOOL, forced tool_choice)
-//   - All non-Cushing prompt content, integrity rules A-J
+//   - All prompt content, integrity rules A-J, and the Cushing anchor
 //   - Write-through cache with 4 enriched Supabase fields
-//   - Demographic validators, shuffle, letter rewriter, warmup handler
-//   - Gemini fallback path with extractJSONSimple
+//   - Demographic validators (sex remains deterministic for validation), shuffle, fallback.
 
 const crypto = require("crypto");
 
@@ -183,34 +182,6 @@ function validateDemographics(stem, sex) {
     const maleTerms = ["prostate","bph","psa level","testicle","testicular","scrotal","scrotum","sildenafil","tadalafil","finasteride","dutasteride","erectile dysfunction"];
     return !maleTerms.some(term => lowerText.includes(term));
   }
-}
-
-// ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER
-// ============================================================
-function rewriteExplanationLetters(explanation, letterMap) {
-  if (!explanation || typeof explanation !== "string") return explanation;
-  let out = explanation;
-  const placeholders = {};
-  Object.keys(letterMap).forEach((oldLetter, idx) => {
-    const placeholder = `§§LETTER_${idx}§§`;
-    placeholders[placeholder] = letterMap[oldLetter];
-    const patterns = [
-      { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "g"),  wrap: false },
-      { re: new RegExp(`(\\bchoice\\s+)${oldLetter}\\b`, "g"),  wrap: false },
-      { re: new RegExp(`(\\banswer\\s+)${oldLetter}\\b`, "gi"), wrap: false },
-      { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "gi"), wrap: false },
-      { re: new RegExp(`\\(${oldLetter}\\)`, "g"),              wrap: true  }
-    ];
-    patterns.forEach(({ re, wrap }) => {
-      if (wrap) out = out.replace(re, `(${placeholder})`);
-      else out = out.replace(re, `$1${placeholder}`);
-    });
-  });
-  Object.keys(placeholders).forEach(placeholder => {
-    out = out.split(placeholder).join(placeholders[placeholder]);
-  });
-  return out;
 }
 
 // ============================================================
@@ -402,6 +373,34 @@ async function callGemini(systemText, userText, maxTokens) {
 }
 
 // ============================================================
+// SHUFFLE-AWARE EXPLANATION REWRITER
+// ============================================================
+function rewriteExplanationLetters(explanation, letterMap) {
+  if (!explanation || typeof explanation !== "string") return explanation;
+  let out = explanation;
+  const placeholders = {};
+  Object.keys(letterMap).forEach((oldLetter, idx) => {
+    const placeholder = `§§LETTER_${idx}§§`;
+    placeholders[placeholder] = letterMap[oldLetter];
+    const patterns = [
+      { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "g"),  wrap: false },
+      { re: new RegExp(`(\\bchoice\\s+)${oldLetter}\\b`, "g"),  wrap: false },
+      { re: new RegExp(`(\\banswer\\s+)${oldLetter}\\b`, "gi"), wrap: false },
+      { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "gi"), wrap: false },
+      { re: new RegExp(`\\(${oldLetter}\\)`, "g"),              wrap: true  }
+    ];
+    patterns.forEach(({ re, wrap }) => {
+      if (wrap) out = out.replace(re, `(${placeholder})`);
+      else out = out.replace(re, `$1${placeholder}`);
+    });
+  });
+  Object.keys(placeholders).forEach(placeholder => {
+    out = out.split(placeholder).join(placeholders[placeholder]);
+  });
+  return out;
+}
+
+// ============================================================
 // SUPABASE WRITE-THROUGH CACHE
 // ============================================================
 async function saveMcqToSupabase(p, level, meta) {
@@ -526,8 +525,6 @@ function buildPrompt(level, topic, isNutrition) {
     ];
   }
   const promptQType = pickWeighted(qTypePool);
-
-  const randomAge = Math.floor(Math.random() * 66) + 20;
   const randomSex = pickSexForTopic(promptTopic);
 
   const isUSMLE     = level.includes("USMLE");
@@ -541,8 +538,6 @@ function buildPrompt(level, topic, isNutrition) {
                    : "an ABIM Internal Medicine Board Question Writer";
 
   const anchors = detectTopicAnchors(promptTopic);
-  
-  // v6.4 — CUSHING_ANCHOR restored.
   const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
 
   let levelRules = "";
@@ -584,7 +579,6 @@ H. Regulatory language: preserve exact directive strength. "Consider" is not "ma
 I. Temporal arithmetic: interval between measurements vs. total duration are different numbers.
 J. Classification separation: grade/stage definition and action threshold are separate statements.`;
 
-  // v6.4 Fix: Added STRICT LENGTH LIMIT to Endo and USMLE pathways
   const explanationNote = isABIM_IM
     ? "EXPLANATION: concise total <=250 words — S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences)."
     : "EXPLANATION: S1 (why correct + citation), S2 (why each distractor fails + bias label), S3 if competing Dx, Board Pearl. STRICT LENGTH LIMIT: <= 350 words total.";
@@ -597,11 +591,10 @@ UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: arg
 
 RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once with the fully-populated fields. Do not emit text — call the tool.`;
 
-  // v6.5 Fix: Replaced hardcoded randomizer array with direct triage instruction
+  // v6.6 Fix: Holistic demographic and setting logic.
   const userText = `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
-- Patient: ${randomAge}-year-old ${randomSex}.
-- Setting: Determine clinically appropriate setting (Outpatient Clinic, ER, Inpatient Ward, or ICU) based on standard triage for the target diagnosis. DO NOT place a patient in an inpatient/ED setting for a chronic, stable outpatient workup.
+- Patient Demographics & Setting: Patient is a ${randomSex}. You MUST select a clinically appropriate age and care setting (Clinic, ED, Inpatient, ICU) that matches the typical epidemiological presentation of the target diagnosis. DO NOT force an elderly patient into a pediatric/young adult disease, and DO NOT place a stable outpatient in the hospital.
 - Pertinent negatives biologically possible for a ${randomSex}.
 - Run Rule G self-check before emitting the tool call.
 - The stem MUST end with the interrogative sentence (e.g., "What is the most likely diagnosis?" or "What is the most appropriate next step in management?").
