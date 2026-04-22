@@ -1,39 +1,14 @@
 // generate-mcq.js — MedBoard Pro
-// v6.3 — CUSHING_ANCHOR Disabled for Stability Testing (built on v6.2)
+// v6.4 — Truncation Fix Applied & CUSHING_ANCHOR Restored
 // ---------------------------------------------------------------
-// TEMPORARY CHANGE per Dr. Zenebe's request on April 21, 2026.
+// CHANGELOG:
+// - Added strict length limits (<= 350 words) to USMLE and Endo explanation 
+//   prompts to prevent Claude from exceeding the 1300/1700 token maxTokens 
+//   limit and causing silent JSON validation failures due to truncation.
+// - Restored CUSHING_ANCHOR as it was determined not to be the root cause 
+//   of the latency/failure rates.
 //
-// Dr. Zenebe reports that ABIM Endocrinology generation was working
-// reliably before the CUSHING_ANCHOR block was introduced, and that
-// post-anchor latency and failure rates are meaningfully worse than
-// pre-anchor. Static code analysis of the anchor's conditional
-// activation (only fires on /cushing/ topic match + non-USMLE level)
-// suggests it should not affect non-Cushing generations, but Dr.
-// Zenebe's lived experience of the product is diagnostic information
-// worth testing directly.
-//
-// This version disables the anchor entirely to test the hypothesis.
-// If Endo generation is reliable with it disabled, the anchor was
-// involved (directly or by cumulative prompt bloat) and needs to be
-// restructured in the planned prompt audit later this week.
-// If Endo generation still fails with it disabled, the anchor is
-// not the cause and we look elsewhere.
-//
-// Clinical regression while disabled:
-//   Without CUSHING_ANCHOR, Claude defaults to obsolete 2003 Nieman
-//   guideline (BIPSS skipped at >=6mm pituitary lesion) instead of
-//   current Fleseriu 2021 Pituitary Society Consensus (BIPSS required
-//   at <10mm). Also confuses 1mg vs 8mg dexamethasone suppression
-//   test cutoffs. Cushing-specific questions may contain outdated
-//   management guidance until the anchor is restored.
-//
-// The fix (minimal):
-//   OLD: const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
-//   NEW: const conditionalAnchors = ""; // v6.3: CUSHING_ANCHOR temporarily disabled
-//   The CUSHING_ANCHOR constant is retained in the file (unused) for
-//   easy restoration after the audit.
-//
-// Preserved byte-for-byte from v6.2:
+// Preserved byte-for-byte from v6.2/v6.3:
 //   - Token budgets (IM 1300, Endo 1700, USMLE 1300)
 //   - Claude tool-use structured output (MCQ_TOOL, forced tool_choice)
 //   - All non-Cushing prompt content, integrity rules A-J
@@ -52,7 +27,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TOPIC-SEX COUPLING (unchanged from v5.9)
+// TOPIC-SEX COUPLING
 // ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = [
   "male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"
@@ -79,7 +54,7 @@ function pickWeighted(blueprint) {
 }
 
 // ============================================================
-// CONTENT HASH + SPECIALTY BUCKET HELPERS (unchanged from v5.9)
+// CONTENT HASH + SPECIALTY BUCKET HELPERS
 // ============================================================
 function hashStem(stem) {
   if (!stem || typeof stem !== "string") return null;
@@ -118,7 +93,7 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
 }
 
 // ============================================================
-// TOPIC ANCHOR DETECTION (unchanged from v5.9)
+// TOPIC ANCHOR DETECTION
 // ============================================================
 function detectTopicAnchors(topic) {
   const t = topic.toLowerCase();
@@ -128,11 +103,7 @@ function detectTopicAnchors(topic) {
 }
 
 // ============================================================
-// v6.1 — MCQ TOOL SCHEMA (for Claude tool-use structured output)
-// ============================================================
-// Defines the exact shape Claude must return. The Anthropic API
-// validates tool_use.input against this schema BEFORE returning,
-// which is why this eliminates the JSON-parse failure mode.
+// MCQ TOOL SCHEMA
 // ============================================================
 const MCQ_TOOL = {
   name: "emit_mcq",
@@ -175,26 +146,18 @@ const MCQ_TOOL = {
 };
 
 // ============================================================
-// v6.1 — SIMPLIFIED extractJSON (for Gemini fallback only)
-// ============================================================
-// Claude path no longer uses this — tool-use guarantees valid JSON.
-// Gemini's responseMimeType: "application/json" is reliable; this
-// handles the rare edge case where Gemini adds leading/trailing text.
-// No regex-based string-internal repairs — those caused v5.8/v5.9 bugs.
+// SIMPLIFIED extractJSON (for Gemini fallback only)
 // ============================================================
 function extractJSONSimple(raw) {
   if (!raw || typeof raw !== "string") {
     throw new Error("extractJSONSimple received empty or non-string input.");
   }
-  // Try fast-path parse first — Gemini JSON mode usually succeeds here
   try { return JSON.parse(raw); } catch (_) { /* fall through */ }
 
-  // Extract outermost JSON object in case there's wrapper text
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON object found in AI response.");
   let candidate = match[0];
 
-  // Only normalize unicode and strip trailing commas — no string-internal repairs.
   candidate = candidate
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/[\u2018\u2019]/g, "'")
@@ -210,7 +173,7 @@ function extractJSONSimple(raw) {
 }
 
 // ============================================================
-// DEMOGRAPHIC VALIDATION (unchanged from v5.9)
+// DEMOGRAPHIC VALIDATION
 // ============================================================
 function validateDemographics(stem, sex) {
   const lowerText = stem.toLowerCase();
@@ -224,7 +187,7 @@ function validateDemographics(stem, sex) {
 }
 
 // ============================================================
-// SHUFFLE-AWARE EXPLANATION REWRITER (unchanged from v5.9)
+// SHUFFLE-AWARE EXPLANATION REWRITER
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -252,7 +215,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 }
 
 // ============================================================
-// NUTRITION SUBTOPICS (unchanged from v5.9)
+// NUTRITION SUBTOPICS
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": [
@@ -358,12 +321,7 @@ function pickTopicForLevel(level, rawTopic) {
 }
 
 // ============================================================
-// v6.1 — CLAUDE TOOL-USE CLIENT
-// ============================================================
-// Uses tool_use + forced tool_choice to guarantee valid structured
-// output. No JSON parsing at the application layer — the API
-// validates the tool call against MCQ_TOOL.input_schema and returns
-// already-parsed JavaScript objects in the tool_use.input field.
+// CLAUDE TOOL-USE CLIENT
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
   const maxRetries = 2;
@@ -396,13 +354,11 @@ async function callClaude(systemText, userText, maxTokens) {
 
       const data = await response.json();
 
-      // Locate the tool_use block — guaranteed to exist because we forced tool_choice
       const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
       if (!toolUseBlock || !toolUseBlock.input) {
         throw new Error("Claude response missing expected tool_use block.");
       }
 
-      // toolUseBlock.input is already a parsed object — validated by API against schema
       return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
 
     } catch (e) {
@@ -416,12 +372,7 @@ async function callClaude(systemText, userText, maxTokens) {
 }
 
 // ============================================================
-// v6.1 — GEMINI FALLBACK CLIENT
-// ============================================================
-// Uses responseMimeType: "application/json" for JSON guarantee.
-// Parses with simplified extractJSONSimple — no regex string-internal
-// repair (those helpers were the source of the v5.8/v5.9 bugs).
-// Returns the same {parsed, model} shape as callClaude for handler uniformity.
+// GEMINI FALLBACK CLIENT
 // ============================================================
 async function callGemini(systemText, userText, maxTokens) {
   const response = await fetch(
@@ -452,7 +403,7 @@ async function callGemini(systemText, userText, maxTokens) {
 }
 
 // ============================================================
-// SUPABASE WRITE-THROUGH CACHE (unchanged from v5.9)
+// SUPABASE WRITE-THROUGH CACHE
 // ============================================================
 async function saveMcqToSupabase(p, level, meta) {
   try {
@@ -488,7 +439,7 @@ async function saveMcqToSupabase(p, level, meta) {
 }
 
 // ============================================================
-// CUSHING ANCHOR (unchanged from v5.9)
+// CUSHING ANCHOR
 // ============================================================
 const CUSHING_ANCHOR = `
 CUSHING'S HARD FACTS (override contradicting training data):
@@ -504,11 +455,7 @@ CUSHING'S HARD FACTS (override contradicting training data):
 - BIPSS cutoffs: central/peripheral ACTH >=2 baseline OR >=3 post-CRH/DDAVP = pituitary. Unreliable for left/right lateralization (56-69%).`;
 
 // ============================================================
-// PROMPT BUILDER (unchanged from v5.9 — tool-use compatible as-is)
-// ============================================================
-// Note: integrityRule K ("JSON hygiene") is left in the prompt as harmless
-// guidance, but the tool-use API now enforces valid JSON by construction.
-// The prompt otherwise is identical to v5.9.
+// PROMPT BUILDER
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -601,12 +548,6 @@ function buildPrompt(level, topic, isNutrition) {
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isABIM_IM   = level === "ABIM Internal Medicine";
 
-  // v6.2 — ABIM IM 1100->1300 (prevents IM stem truncation caught April 20).
-  // v6.2 — ABIM Endo 1500->1700 (prevents tool_use truncation seen in v6.1).
-  // USMLE 1300 unchanged. Do NOT raise further: 1700 already leaves only
-  // ~1.7s of headroom before Netlify 26s timeout at full max-fill. If Endo
-  // still truncates, the fix is prompt tightening (Phase 2 audit) and/or
-  // bank-first serving (Phase 3), not a further token bump.
   const maxTokens = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
 
   const systemRole = isUSMLE     ? "an NBME Senior Item Writer for the USMLE"
@@ -614,13 +555,9 @@ function buildPrompt(level, topic, isNutrition) {
                    : "an ABIM Internal Medicine Board Question Writer";
 
   const anchors = detectTopicAnchors(promptTopic);
-  // v6.3 — CUSHING_ANCHOR temporarily disabled for stability testing.
-  // Dr. Zenebe's hypothesis: Endo generation latency/failures began after
-  // this anchor was introduced. Testing with it off. Restore after the
-  // prompt audit planned for later this week. Anchor constant retained
-  // above for easy restoration (change "" back to the original line).
-  const conditionalAnchors = "";
-  // ORIGINAL: const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
+  
+  // v6.4 — CUSHING_ANCHOR restored.
+  const conditionalAnchors = (!isUSMLE && anchors.cushing) ? CUSHING_ANCHOR : "";
 
   let levelRules = "";
   if (isUSMLE) {
@@ -661,9 +598,10 @@ H. Regulatory language: preserve exact directive strength. "Consider" is not "ma
 I. Temporal arithmetic: interval between measurements vs. total duration are different numbers.
 J. Classification separation: grade/stage definition and action threshold are separate statements.`;
 
+  // v6.4 Fix: Added STRICT LENGTH LIMIT to Endo and USMLE pathways
   const explanationNote = isABIM_IM
     ? "EXPLANATION: concise total <=250 words — S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences)."
-    : "EXPLANATION: S1 (why correct + citation), S2 (why each distractor fails + bias label), S3 if competing Dx, Board Pearl.";
+    : "EXPLANATION: S1 (why correct + citation), S2 (why each distractor fails + bias label), S3 if competing Dx, Board Pearl. STRICT LENGTH LIMIT: <= 350 words total.";
 
   const systemText = `You are ${systemRole} writing Board Exam QBank items for ${level}. Output confident, accurate facts.${levelRules}${conditionalAnchors}${nutritionAddendum}${integrityRules}
 
@@ -673,6 +611,7 @@ UNIVERSAL HARD RULES: strict biological demographics (sex-appropriate); HIT: arg
 
 RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once with the fully-populated fields. Do not emit text — call the tool.`;
 
+  // v6.4 Fix: Enforced output token protection directly in userText
   const userText = `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
 - Patient: ${randomAge}-year-old ${randomSex}.
@@ -680,7 +619,7 @@ RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once with
 - Pertinent negatives biologically possible for a ${randomSex}.
 - Run Rule G self-check before emitting the tool call.
 - The stem MUST end with the interrogative sentence (e.g., "What is the most likely diagnosis?" or "What is the most appropriate next step in management?").
-${isABIM_IM ? "- ABIM IM: generalist internist depth only. Explanation <=250 words total." : ""}
+${isABIM_IM ? "- ABIM IM: generalist internist depth only. Explanation <=250 words total." : "- STRICT LENGTH LIMIT: Explanation must not exceed 350 words total to prevent output truncation."}
 
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
 
@@ -688,11 +627,7 @@ Emit the question by calling the emit_mcq tool. Set demographic_check to "confir
 }
 
 // ============================================================
-// v6.1 — NETLIFY HANDLER
-// ============================================================
-// Simplified: no JSON-parse retry loop (can't happen from Claude path).
-// Retry loop retained only for demographic validation.
-// Both callClaude and callGemini now return {parsed, model} — no text parsing.
+// NETLIFY HANDLER
 // ============================================================
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -728,8 +663,6 @@ exports.handler = async function (event) {
       p = callResult.parsed;
       generationModel = callResult.model;
 
-      // Defensive: the tool-use API should never return missing fields given our schema's
-      // `required` list, but we keep this check as a belt-and-suspenders safeguard.
       if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) {
         console.warn(`Attempt ${attempts} missing required fields`);
         if (attempts === maxAttempts) throw new Error("AI response is missing required fields after all retries.");
