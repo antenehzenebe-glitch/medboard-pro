@@ -1,7 +1,9 @@
 // generate-mcq.js — MedBoard Pro
-// v6.6 — Holistic Clinical Profiling (Age & Setting Dynamic Fix)
+// v6.7 — Holistic Clinical Profiling + Single-Pass Pathophysiology QA
 // ---------------------------------------------------------------
 // CHANGELOG:
+// - Added pathophysiology_scratchpad to MCQ_TOOL to force AI chain-of-thought and prevent physiological hallucinations.
+// - Added Rule K (Adversarial QA) to integrity rules.
 // - Removed 'randomAge' blind math generator to prevent epidemiological hallucinations 
 //   (e.g., 83-year-olds with PCOS).
 // - Unified Age and Setting into a single dynamic prompt instruction, forcing the LLM 
@@ -113,6 +115,10 @@ const MCQ_TOOL = {
         type: "string",
         description: "Confirmation that the vignette's patient sex matches the requested sex. Format: 'confirmed man' or 'confirmed woman'."
       },
+      pathophysiology_scratchpad: {
+        type: "string",
+        description: "CRITICAL QA STEP: Before generating choices or explanations, you MUST explicitly state the underlying biological mechanism of the correct diagnosis here in 1-2 sentences. Map out the mechanism explicitly to ensure no physiological contradictions exist in your subsequent distractor explanations (e.g., 'Insulinomas secrete excess insulin, which activates LPL, therefore they do not cause hypertriglyceridemia')."
+      },
       stem: {
         type: "string",
         description: "The clinical vignette. Must end with the interrogative sentence (e.g., 'What is the most likely diagnosis?')."
@@ -139,7 +145,7 @@ const MCQ_TOOL = {
         description: "Explanation block. S1 (why correct answer is correct + citation), S2 (why each distractor fails + bias label), S3 (competing diagnosis discussion if relevant), Board Pearl."
       }
     },
-    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
+    required: ["demographic_check", "pathophysiology_scratchpad", "stem", "choices", "correct", "explanation"]
   }
 };
 
@@ -577,7 +583,8 @@ F. Cognitive bias labels: anchoring, premature closure, availability bias, patte
 G. Self-check: audit A-J before emitting.
 H. Regulatory language: preserve exact directive strength. "Consider" is not "mandate."
 I. Temporal arithmetic: interval between measurements vs. total duration are different numbers.
-J. Classification separation: grade/stage definition and action threshold are separate statements.`;
+J. Classification separation: grade/stage definition and action threshold are separate statements.
+K. Adversarial Distractor QA: You must act as a hostile peer reviewer against your own distractors. Before finalizing, verify that NO distractor explanation contains a physiological contradiction (e.g., confusing excess hormone effects with deficient hormone effects). If a distractor relies on a false biological premise to make it 'incorrect', you MUST rewrite it.`;
 
   const explanationNote = isABIM_IM
     ? "EXPLANATION: concise total <=250 words — S1 (2-3 sentences), S2 (1-2 sentences per distractor), Board Pearl (1-2 sentences)."
@@ -694,6 +701,7 @@ exports.handler = async function (event) {
 
     saveMcqToSupabase(p, b.level, { resolvedTopic, generationModel }).catch(() => {});
     delete p.demographic_check;
+    delete p.pathophysiology_scratchpad; // Remove scratchpad before sending to frontend
 
     return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
   } catch (e) {
