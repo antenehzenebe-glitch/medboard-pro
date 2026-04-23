@@ -537,7 +537,8 @@ function buildPrompt(level, topic, isNutrition) {
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isABIM_IM   = level === "ABIM Internal Medicine";
 
-  const maxTokens = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
+  const maxTokens = // Increased from 1300/1700 to 2500 to accommodate the Chain of Thought scratchpad
+const maxTokens = 2500;
 
   const systemRole = isUSMLE     ? "an NBME Senior Item Writer for the USMLE"
                    : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director"
