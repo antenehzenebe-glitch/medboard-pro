@@ -1,11 +1,11 @@
 // generate-mcq.js — MedBoard Pro
-// v6.9 — Shuffler Synchronization & Regex Upgrade
+// v6.10 — Master File (Regex Shuffler Fix + Preemptive Guideline Anchors)
 // ---------------------------------------------------------------
 // CHANGELOG:
-// - Upgraded rewriteExplanationLetters with advanced regex to catch edge-case 
-//   LLM formatting (like bullets "• A" or line starts "A.") during the choice shuffle.
-// - Added INTEGRITY RULE E to strictly forbid standalone letters in S2 formatting.
-// - Retains v6.8 Dynamic Guidelines, Clinical Triage, and Nutrition architecture.
+// - Integrated preemptive CRITICAL anchors for COPD, HTN, Lipids, CKD to block statistical hallucinations.
+// - Upgraded rewriteExplanationLetters regex to perfectly sync shuffled choices.
+// - Strict Demographic Triage and 12% Nutrition Injection fully active.
+// - Claude Sonnet 4.6 (primary) with Gemini 2.0 Flash (fallback).
 
 const crypto = require("crypto");
 
@@ -18,20 +18,33 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// DYNAMIC 2025/2026 GUIDELINE MAP
+// DYNAMIC 2025/2026 GUIDELINE MAP (Preemptively Anchored)
 // ============================================================
 const GUIDELINE_MAP = [
+  // ENDOCRINE & METABOLIC
   { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: "ADA Standards of Medical Care in Diabetes—2026" },
   { keywords: ["thyroid", "nodule", "graves", "hashimoto"], citation: "ATA 2025 Management Guidelines" },
-  { keywords: ["obesity", "lipid", "dyslipidemia", "bariatric", "metabolic"], citation: "AACE 2026 Clinical Practice Guidelines" },
+  { keywords: ["obesity", "bariatric"], citation: "AACE 2026 Clinical Practice Guidelines" },
+  { keywords: ["lipid", "dyslipidemia", "cholesterol", "hypertriglyceridemia"], citation: "AACE 2025 Dyslipidemia Guidelines (CRITICAL: LDL target <70 mg/dL for ASCVD. Icosapent ethyl recommended for TG 150-499 in ASCVD; Niacin and EPA+DHA are NOT recommended. PCSK9i or Bempedoic Acid if statin goal unmet.)" },
   { keywords: ["pcos", "polycystic"], citation: "International Evidence-based PCOS Guideline 2023" },
-  { keywords: ["cardio", "acs", "arrhythmia", "heart failure"], citation: "ACC/AHA 2025-2026 Guidelines" },
-  { keywords: ["hypertension", "blood pressure"], citation: "ACC/AHA 2025 Hypertension Guidelines" },
-  { keywords: ["nephro", "renal", "ckd"], citation: "KDIGO 2025 Guidelines" },
-  { keywords: ["gastro", "hepat", "cirrhosis"], citation: "AASLD 2025 Practice Guidance" },
   { keywords: ["parathyroid", "calcium", "bone", "osteoporosis"], citation: "Endocrine Society 2022 Primary Hyperparathyroidism Guideline & AACE 2025 Osteoporosis Guideline" },
   { keywords: ["menopause", "hrt", "reproductive"], citation: "Endocrine Society Menopause Guidelines 2022 & NAMS 2025" },
-  { keywords: ["cushing", "adrenal"], citation: "Endocrine Society CPGs and Fleseriu 2021 Pituitary Society Consensus. (CRITICAL: MRI->BIPSS threshold is >=10mm. 1mg DST is screening; 8mg DST is obsolete for localization. ACTH <10 is independent, >20 is dependent.)" }
+  { keywords: ["cushing", "adrenal"], citation: "Endocrine Society CPGs and Fleseriu 2021 Pituitary Society Consensus. (CRITICAL: MRI->BIPSS threshold is >=10mm. 1mg DST is screening; 8mg DST is obsolete for localization. ACTH <10 is independent, >20 is dependent.)" },
+  
+  // CARDIOLOGY & HYPERTENSION
+  { keywords: ["hypertension", "blood pressure"], citation: "ACC/AHA 2025 Hypertension Guidelines (CRITICAL: Target is <120/80. PREVENT equations replace ASCVD pooled cohorts; race is removed from risk calculations. Beta-blockers are NOT first-line for uncomplicated HTN.)" },
+  { keywords: ["cardio", "acs", "arrhythmia", "heart failure", "congenital"], citation: "ACC/AHA 2025-2026 Guidelines (CRITICAL: HF guidelines mandate SGLT2i and ARNI. 2025 ACHD guidelines apply for adult congenital issues.)" },
+  
+  // PULMONOLOGY
+  { keywords: ["copd", "emphysema", "chronic bronchitis"], citation: "GOLD 2025 Guidelines (CRITICAL: Groups are A, B, E. Groups C and D no longer exist. Group B initial therapy is LABA+LAMA. Group E is LABA+LAMA +/- ICS. SABA monotherapy is not standard maintenance.)" },
+  { keywords: ["asthma", "pulm"], citation: "GINA 2024-2025 Guidelines" },
+  
+  // NEPHROLOGY
+  { keywords: ["nephro", "renal", "ckd", "kidney"], citation: "KDIGO 2024-2025 Guidelines (CRITICAL: SGLT2i and ns-MRAs like finerenone are strongly recommended to delay CKD progression. Dialysis initiation is personalized and symptom-driven, not strictly eGFR-based.)" },
+  
+  // GASTRO & INFECTIOUS DISEASE
+  { keywords: ["gastro", "hepat", "cirrhosis"], citation: "AASLD 2025 Practice Guidance" },
+  { keywords: ["infectious", "pneumonia", "uti", "sepsis", "hiv"], citation: "IDSA 2025 Guidelines" }
 ];
 
 function getGuidelineContext(topic, isNutrition) {
@@ -244,7 +257,7 @@ async function callGemini(systemText, userText, maxTokens) {
 }
 
 // ============================================================
-// SHUFFLE & DB SAVER (v6.9 UPGRADE)
+// SHUFFLE & DB SAVER (REGEX UPGRADE)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -254,7 +267,6 @@ function rewriteExplanationLetters(explanation, letterMap) {
     const placeholder = `§§LETTER_${idx}§§`;
     placeholders[placeholder] = letterMap[oldLetter];
     
-    // Upgraded patterns to catch LLM bullets (• A) and list numbers (A.) safely
     const patterns = [
       { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
       { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
@@ -334,7 +346,7 @@ function buildPrompt(level, topic, isNutrition) {
                  : isABIM_IM ? `ABIM IM RULES: Generalist level. First-line recognition, initial workup, when to refer, first-line management.` 
                  : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level — guideline-specific management, exact cutoff values, second/third-line decisions.`;
 
-  // v6.9 Fix: Strict Prompt Lock on formatting to prevent synchronization breaks
+  // INTEGRITY RULES (Enforces terminology and shuffler compliance)
   const integrityRules = `INTEGRITY RULES: 
 A. Distractor-stem independence. 
 B. Evidence discipline: cite only data explicitly in stem. 
