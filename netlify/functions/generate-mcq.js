@@ -1,11 +1,11 @@
 // generate-mcq.js — MedBoard Pro
-// v6.8 — Dynamic Guidelines + Nutrition Architecture Restored
+// v6.9 — Shuffler Synchronization & Regex Upgrade
 // ---------------------------------------------------------------
 // CHANGELOG:
-// - Dynamic GUIDELINE_MAP enforced for all topics.
-// - Dynamic clinical triage (Age/Setting) enforced to prevent hallucinations.
-// - Restored the 12% Nutrition Injection logic.
-// - Safe for deployment: Fully compatible with Supabase schema and Netlify bundler.
+// - Upgraded rewriteExplanationLetters with advanced regex to catch edge-case 
+//   LLM formatting (like bullets "• A" or line starts "A.") during the choice shuffle.
+// - Added INTEGRITY RULE E to strictly forbid standalone letters in S2 formatting.
+// - Retains v6.8 Dynamic Guidelines, Clinical Triage, and Nutrition architecture.
 
 const crypto = require("crypto");
 
@@ -244,7 +244,7 @@ async function callGemini(systemText, userText, maxTokens) {
 }
 
 // ============================================================
-// SHUFFLE & DB SAVER
+// SHUFFLE & DB SAVER (v6.9 UPGRADE)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
@@ -253,16 +253,25 @@ function rewriteExplanationLetters(explanation, letterMap) {
   Object.keys(letterMap).forEach((oldLetter, idx) => {
     const placeholder = `§§LETTER_${idx}§§`;
     placeholders[placeholder] = letterMap[oldLetter];
+    
+    // Upgraded patterns to catch LLM bullets (• A) and list numbers (A.) safely
     const patterns = [
-      { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "g"),  wrap: false },
-      { re: new RegExp(`(\\bchoice\\s+)${oldLetter}\\b`, "g"),  wrap: false },
-      { re: new RegExp(`(\\banswer\\s+)${oldLetter}\\b`, "gi"), wrap: false },
-      { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "gi"), wrap: false },
-      { re: new RegExp(`\\(${oldLetter}\\)`, "g"),              wrap: true  }
+      { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
+      { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
+      { re: new RegExp(`(\\banswer\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
+      { re: new RegExp(`\\(${oldLetter}\\)`, "g"),              wrap: 2 },
+      { re: new RegExp(`(•\\s*)${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 },
+      { re: new RegExp(`(^|\\n)\\s*${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 }
     ];
+    
     patterns.forEach(({ re, wrap }) => {
-      if (wrap) out = out.replace(re, `(${placeholder})`);
-      else out = out.replace(re, `$1${placeholder}`);
+      if (wrap === 1) {
+        out = out.replace(re, `$1${placeholder}`);
+      } else if (wrap === 2) {
+        out = out.replace(re, `(${placeholder})`);
+      } else if (wrap === 3) {
+        out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`);
+      }
     });
   });
   Object.keys(placeholders).forEach(placeholder => { out = out.split(placeholder).join(placeholders[placeholder]); });
@@ -325,15 +334,16 @@ function buildPrompt(level, topic, isNutrition) {
                  : isABIM_IM ? `ABIM IM RULES: Generalist level. First-line recognition, initial workup, when to refer, first-line management.` 
                  : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level — guideline-specific management, exact cutoff values, second/third-line decisions.`;
 
+  // v6.9 Fix: Strict Prompt Lock on formatting to prevent synchronization breaks
   const integrityRules = `INTEGRITY RULES: 
 A. Distractor-stem independence. 
 B. Evidence discipline: cite only data explicitly in stem. 
 C. Cognitive bias labels: anchoring, premature closure, availability bias. 
-D. "glucose" never "sugar".`;
+D. "glucose" never "sugar".
+E. EXPLANATION FORMATTING: In S2, you MUST refer to choices strictly as "Choice A", "Choice B", "Choice C", "Choice D", "Choice E". DO NOT use bullet points (e.g., "• A") or standalone letters.`;
 
   const explanationNote = isABIM_IM ? "EXPLANATION: concise total <=250 words." : "EXPLANATION: S1 (why correct), S2 (why distractors fail), Board Pearl. STRICT LENGTH LIMIT: <= 350 words total.";
   
-  // DYNAMIC GUIDELINE RESOLUTION
   const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
 
   const systemText = `You are ${systemRole}. Output confident, accurate facts.
@@ -365,7 +375,6 @@ exports.handler = async function (event) {
     if (b.warmup) return { statusCode: 200, body: "{}" };
     if (!b.level || !b.topic) return { statusCode: 400, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
 
-    // RESTORED NUTRITION INJECTION CALL
     const topicResult = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
     const isNutrition   = topicResult.isNutrition;
