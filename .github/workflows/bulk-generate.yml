@@ -1,0 +1,115 @@
+# .github/workflows/bulk-generate.yml
+# MedBoard Pro — Bulk MCQ Generator via GitHub Actions
+#
+# HOW TO USE:
+#   1. Add ANTHROPIC_API_KEY to GitHub Secrets (see README below)
+#   2. Go to GitHub → Actions tab → "Bulk MCQ Generator" → "Run workflow"
+#   3. Fill in the options and click the green "Run workflow" button
+#
+# SECRETS REQUIRED (Settings → Secrets → Actions → New repository secret):
+#   ANTHROPIC_API_KEY   — your Anthropic API key (sk-ant-...)
+#   SUPABASE_URL        — https://vhzeeskhvkujihuvddcc.supabase.co
+#   SUPABASE_ANON_KEY   — your Supabase anon key
+
+name: Bulk MCQ Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "Number of questions to generate"
+        required: true
+        default: "100"
+      level:
+        description: "Exam level (leave blank for all levels)"
+        required: false
+        default: ""
+        type: choice
+        options:
+          - ""
+          - "ABIM Endocrinology"
+          - "ABIM Internal Medicine"
+          - "USMLE Step 1"
+          - "USMLE Step 2 CK"
+          - "USMLE Step 3"
+      topic:
+        description: "Specific topic (leave blank for weighted distribution)"
+        required: false
+        default: ""
+      mode:
+        description: "Generation mode"
+        required: true
+        default: "standard"
+        type: choice
+        options:
+          - standard
+          - batch
+
+jobs:
+  generate:
+    name: Generate MCQs
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Show run parameters
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  MedBoard Pro — Bulk MCQ Generator"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Count:  ${{ github.event.inputs.count }}"
+          echo "  Level:  ${{ github.event.inputs.level || 'All levels' }}"
+          echo "  Topic:  ${{ github.event.inputs.topic || 'Weighted distribution' }}"
+          echo "  Mode:   ${{ github.event.inputs.mode }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Build run command
+        id: build_cmd
+        run: |
+          CMD="node scripts/bulk-generate.js --count ${{ github.event.inputs.count }} --mode ${{ github.event.inputs.mode }}"
+
+          if [ -n "${{ github.event.inputs.level }}" ]; then
+            CMD="$CMD --level \"${{ github.event.inputs.level }}\""
+          fi
+
+          if [ -n "${{ github.event.inputs.topic }}" ]; then
+            CMD="$CMD --topic \"${{ github.event.inputs.topic }}\""
+          fi
+
+          echo "cmd=$CMD" >> $GITHUB_OUTPUT
+          echo "  Command: $CMD"
+
+      - name: Run bulk generator
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          eval "${{ steps.build_cmd.outputs.cmd }}"
+
+      - name: Done
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ✅  Bulk generation complete!"
+          echo "  Check your Supabase mcqs table for new rows."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Failed
+        if: failure()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ❌  Generation failed. Check logs above."
+          echo "  Common causes:"
+          echo "    - ANTHROPIC_API_KEY secret not set"
+          echo "    - SUPABASE_URL or SUPABASE_ANON_KEY secret not set"
+          echo "    - Supabase RLS policy blocking INSERT"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
