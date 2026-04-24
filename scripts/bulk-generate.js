@@ -37,7 +37,7 @@ const TARGET_COUNT  = parseInt(process.env.BULK_COUNT  || getArg("--count", "500
 const FILTER_LEVEL  = (process.env.BULK_LEVEL  || getArg("--level", "")).trim()  || null;
 const FILTER_TOPIC  = (process.env.BULK_TOPIC  || getArg("--topic", "")).trim()  || null;
 const MODE          = (process.env.BULK_MODE   || getArg("--mode", "batch")).trim();
-const CONCURRENCY   = parseInt(getArg("--concurrency", "6"), 10);
+const CONCURRENCY   = parseInt(process.env.BULK_CONCURRENCY || getArg("--concurrency", "6"), 10);
 
 // ─── SHARED CONSTANTS (mirrored from generate-mcq.js) ────────────────────────
 const VALID_LEVELS = [
@@ -383,7 +383,7 @@ async function saveToSupabase(records) {
   let saved = 0, errors = 0;
 
   // Insert in chunks of 50 to avoid payload limits
-  const CHUNK = 50;
+  const CHUNK = 10;
   for (let i = 0; i < records.length; i += CHUNK) {
     const chunk = records.slice(i, i + CHUNK);
     try {
@@ -393,13 +393,13 @@ async function saveToSupabase(records) {
           "Content-Type": "application/json",
           "apikey": SUPABASE_ANON_KEY,
           "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-          "Prefer": "return=minimal"
+          "Prefer": "return=minimal,resolution=ignore-duplicates"
         },
         body: JSON.stringify(chunk)
       });
       if (!res.ok) {
         const errText = await res.text();
-        console.error(`  ⚠️  Supabase chunk error: ${res.status} — ${errText.slice(0, 120)}`);
+        console.error(`  ⚠️  Supabase chunk error: ${res.status} — ${errText.slice(0, 200)}`);
         errors += chunk.length;
       } else {
         saved += chunk.length;
@@ -609,7 +609,7 @@ async function runStandardMode(queue, silent = false) {
             messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${entropySeed}]` }]
           })
         });
-        if (res.status === 429) { await sleep(3000); continue; }
+        if (res.status === 429) { await sleep(5000 * (attempt + 1)); continue; }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data      = await res.json();
         const toolBlock = data.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
@@ -625,7 +625,7 @@ async function runStandardMode(queue, silent = false) {
           done++;
           if (!silent) process.stdout.write(`\r  ❌  ${done}/${queue.length} (error: ${e.message.slice(0,40)})   `);
         } else {
-          await sleep(1000);
+          await sleep(2000);
         }
       }
     }
@@ -640,7 +640,7 @@ async function runStandardMode(queue, silent = false) {
       if (r.status === "fulfilled" && r.value) results.push(r.value);
     }
     // Brief pause between windows to avoid sustained rate-limit pressure
-    if (i + CONCURRENCY < queue.length) await sleep(500);
+    if (i + CONCURRENCY < queue.length) await sleep(2000);
   }
 
   if (!silent) console.log("");
