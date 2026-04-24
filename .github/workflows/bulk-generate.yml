@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Show parameters
         run: |
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Show parameters
         run: |
@@ -136,6 +136,7 @@ jobs:
           BULK_LEVEL:        ${{ matrix.level }}
           BULK_COUNT:        ${{ github.event.inputs.count }}
           BULK_MODE:         ${{ github.event.inputs.mode }}
+          BULK_CONCURRENCY:  "3"
         run: node scripts/bulk-generate.js
 
       - name: Done
