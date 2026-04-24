@@ -32,11 +32,12 @@ function getArg(flag, defaultVal) {
   const i = args.indexOf(flag);
   return i !== -1 && args[i + 1] ? args[i + 1] : defaultVal;
 }
-const TARGET_COUNT  = parseInt(getArg("--count", "500"), 10);
-const FILTER_LEVEL  = getArg("--level", null);    // e.g. "ABIM Endocrinology"
-const FILTER_TOPIC  = getArg("--topic", null);    // e.g. "Diabetes"
-const MODE          = getArg("--mode", "batch");  // "batch" | "standard"
-const CONCURRENCY   = parseInt(getArg("--concurrency", "6"), 10); // for standard mode
+// Env vars take priority over CLI flags (avoids shell quoting issues in GitHub Actions)
+const TARGET_COUNT  = parseInt(process.env.BULK_COUNT  || getArg("--count", "500"), 10);
+const FILTER_LEVEL  = (process.env.BULK_LEVEL  || getArg("--level", "")).trim()  || null;
+const FILTER_TOPIC  = (process.env.BULK_TOPIC  || getArg("--topic", "")).trim()  || null;
+const MODE          = (process.env.BULK_MODE   || getArg("--mode", "batch")).trim();
+const CONCURRENCY   = parseInt(getArg("--concurrency", "6"), 10);
 
 // ─── SHARED CONSTANTS (mirrored from generate-mcq.js) ────────────────────────
 const VALID_LEVELS = [
