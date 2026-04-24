@@ -365,14 +365,14 @@ function processRawMcq(p, level, topic) {
 
   return {
     topic,
-    stem:          p.stem,
-    choices:       shuffledChoices,
-    correct:       newCorrectLetter,
-    explanation:   rewriteExplanationLetters(p.explanation, letterMap),
-    content_hash:  hashStem(p.stem),
-    exam_level:    level,
+    stem:            p.stem,
+    choices:         shuffledChoices,
+    correct_answer:  newCorrectLetter,
+    explanation:     rewriteExplanationLetters(p.explanation, letterMap),
+    content_hash:    hashStem(p.stem),
+    exam_level:      level,
     specialty_group: deriveSpecialtyGroup(level, topic),
-    blueprint_tag: topic,
+    blueprint_tag:   topic,
   };
 }
 
