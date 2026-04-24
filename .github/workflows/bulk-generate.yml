@@ -2,9 +2,11 @@
 # MedBoard Pro — Bulk MCQ Generator via GitHub Actions
 #
 # HOW TO USE:
-#   1. Add ANTHROPIC_API_KEY to GitHub Secrets (see README below)
-#   2. Go to GitHub → Actions tab → "Bulk MCQ Generator" → "Run workflow"
-#   3. Fill in the options and click the green "Run workflow" button
+#   Go to GitHub → Actions tab → "Bulk MCQ Generator" → "Run workflow"
+#   Fill in the options and click "Run workflow".
+#
+#   • Leave "Level" as "all" to run ALL 5 levels in parallel (recommended).
+#   • Pick a specific level to target just that one.
 #
 # SECRETS REQUIRED (Settings → Secrets → Actions → New repository secret):
 #   ANTHROPIC_API_KEY   — your Anthropic API key (sk-ant-...)
@@ -16,24 +18,24 @@ name: Bulk MCQ Generator
 on:
   workflow_dispatch:
     inputs:
-      count:
-        description: "Number of questions to generate"
-        required: true
-        default: "100"
       level:
-        description: "Exam level (leave blank for all levels)"
-        required: false
-        default: ""
+        description: "Exam level — pick one, or 'all' to run all 5 levels in parallel"
+        required: true
+        default: "all"
         type: choice
         options:
-          - ""
+          - "all"
           - "ABIM Endocrinology"
           - "ABIM Internal Medicine"
           - "USMLE Step 1"
           - "USMLE Step 2 CK"
           - "USMLE Step 3"
+      count:
+        description: "Questions per level"
+        required: true
+        default: "100"
       topic:
-        description: "Specific topic (leave blank for weighted distribution)"
+        description: "Specific topic (leave blank for weighted distribution across the level)"
         required: false
         default: ""
       mode:
@@ -46,70 +48,100 @@ on:
           - batch
 
 jobs:
-  generate:
-    name: Generate MCQs
+  # ── SINGLE LEVEL ──────────────────────────────────────────────────────────────
+  generate-single:
+    name: "Generate — ${{ github.event.inputs.level }}"
+    if: github.event.inputs.level != 'all'
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Show run parameters
+      - name: Show parameters
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "  MedBoard Pro — Bulk MCQ Generator"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Level:  ${{ github.event.inputs.level }}"
           echo "  Count:  ${{ github.event.inputs.count }}"
-          echo "  Level:  ${{ github.event.inputs.level || 'All levels' }}"
           echo "  Topic:  ${{ github.event.inputs.topic || 'Weighted distribution' }}"
           echo "  Mode:   ${{ github.event.inputs.mode }}"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      - name: Build run command
-        id: build_cmd
-        run: |
-          CMD="node scripts/bulk-generate.js --count ${{ github.event.inputs.count }} --mode ${{ github.event.inputs.mode }}"
-
-          if [ -n "${{ github.event.inputs.level }}" ]; then
-            CMD="$CMD --level \"${{ github.event.inputs.level }}\""
-          fi
-
-          if [ -n "${{ github.event.inputs.topic }}" ]; then
-            CMD="$CMD --topic \"${{ github.event.inputs.topic }}\""
-          fi
-
-          echo "cmd=$CMD" >> $GITHUB_OUTPUT
-          echo "  Command: $CMD"
-
-      - name: Run bulk generator
+      - name: Run generator
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          eval "${{ steps.build_cmd.outputs.cmd }}"
+          BULK_LEVEL:        ${{ github.event.inputs.level }}
+          BULK_COUNT:        ${{ github.event.inputs.count }}
+          BULK_TOPIC:        ${{ github.event.inputs.topic }}
+          BULK_MODE:         ${{ github.event.inputs.mode }}
+        run: node scripts/bulk-generate.js
 
       - name: Done
         if: success()
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  ✅  Bulk generation complete!"
-          echo "  Check your Supabase mcqs table for new rows."
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        run: echo "✅  Done! Check your Supabase mcqs table for new rows."
 
       - name: Failed
         if: failure()
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  ❌  Generation failed. Check logs above."
-          echo "  Common causes:"
+          echo "❌  Generation failed. Common causes:"
           echo "    - ANTHROPIC_API_KEY secret not set"
           echo "    - SUPABASE_URL or SUPABASE_ANON_KEY secret not set"
           echo "    - Supabase RLS policy blocking INSERT"
+
+  # ── ALL LEVELS IN PARALLEL ────────────────────────────────────────────────────
+  generate-all:
+    name: "Generate — ${{ matrix.level }}"
+    if: github.event.inputs.level == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    strategy:
+      fail-fast: false
+      matrix:
+        level:
+          - "ABIM Endocrinology"
+          - "ABIM Internal Medicine"
+          - "USMLE Step 1"
+          - "USMLE Step 2 CK"
+          - "USMLE Step 3"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Show parameters
+        run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  MedBoard Pro — Bulk MCQ Generator (ALL LEVELS)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Level:  ${{ matrix.level }}"
+          echo "  Count:  ${{ github.event.inputs.count }} per level"
+          echo "  Mode:   ${{ github.event.inputs.mode }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Run generator
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BULK_LEVEL:        ${{ matrix.level }}
+          BULK_COUNT:        ${{ github.event.inputs.count }}
+          BULK_MODE:         ${{ github.event.inputs.mode }}
+        run: node scripts/bulk-generate.js
+
+      - name: Done
+        if: success()
+        run: echo "✅  ${{ matrix.level }} — complete!"
+
+      - name: Failed
+        if: failure()
+        run: echo "❌  ${{ matrix.level }} — failed. Check logs above."
