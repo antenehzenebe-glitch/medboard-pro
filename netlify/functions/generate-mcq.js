@@ -508,7 +508,7 @@ function buildPrompt(level, topic, isNutrition) {
 
   const isABIM_Endo = level === "ABIM Endocrinology"; // declared early for qTypePool
   const isStep3    = level === "USMLE Step 3";         // declared early for qTypePool
-  const isABIM_IM_early = level === "ABIM Internal Medicine"; // declared early for qTypePool
+  const isABIM_IM = level === "ABIM Internal Medicine"; // declared early for qTypePool
   let qTypePool = [];
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
@@ -523,7 +523,7 @@ function buildPrompt(level, topic, isNutrition) {
       {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
       {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
     ];
-  } else if (isABIM_IM_early) {
+  } else if (isABIM_IM) {
     // Tier 3-4 cognitive complexity for ABIM Internal Medicine
     qTypePool = [
       {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:30},
@@ -548,8 +548,6 @@ function buildPrompt(level, topic, isNutrition) {
   const randomSex = pickSexForTopic(promptTopic);
 
   const isUSMLE     = level.includes("USMLE");
-  const isABIM_Endo = level === "ABIM Endocrinology";
-  const isABIM_IM   = level === "ABIM Internal Medicine";
   const maxTokens   = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
   
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
@@ -561,7 +559,7 @@ function buildPrompt(level, topic, isNutrition) {
 (Tier 5) COMPLEX SCENARIOS: competing contraindications (STEMI + recent stroke + cardiogenic shock), resource-limited environments, end-of-life decision conflicts, medical error disclosure.
 FORBIDDEN: Do NOT write Tier 1 questions ("What test do you order first?") or Tier 2 questions ("What is the best next step in evaluation?"). Every Step 3 question must require a PGY-1/PGY-2 resident's clinical judgment — not a medical student's recall.
 Patient setting: ICU, inpatient ward, ED, or outpatient follow-up of a recently discharged complex patient. Include realistic time pressures, resource constraints, or comorbidity conflicts in the stem.`
-    : isUSMLE ? \`USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1, M3/M4 for Step 2/3.\` 
+    : isUSMLE ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1, M3/M4 for Step 2/3.` 
                  : isABIM_IM ? `ABIM IM RULES — MANDATORY Tier 3–4 cognitive complexity:
 (Tier 3) DECISION INTEGRATION: borderline ASCVD risk + risk-enhancing factors (Lp(a), CAC, hsCRP) → treat or not?; statin myopathy → rechallenge or switch?; diabetes + CKD3 + proteinuria → which GLP-1 RA or SGLT2i?
 (Tier 4) MULTI-COMORBIDITY: ASCVD + statin intolerance + CKD3 → choose between ezetimibe, bempedoic acid, PCSK9i, inclisiran; HFrEF + CKD + T2DM → optimize GDMT sequence; COPD exacerbation + steroid-induced hyperglycemia + on metformin.
@@ -607,7 +605,7 @@ USMLE STEP 3 TIER 3–5 REQUIREMENTS (MANDATORY):
 - Stem must reflect a PGY-1/PGY-2 resident on call or in clinic managing a deteriorating or complex patient.
 - Cite the relevant 2023–2026 guideline in S1 of the explanation.` : "";
 
-  const abimIMTierPrompt = isABIM_IM_early ? `
+  const abimIMTierPrompt = isABIM_IM ? `
 ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS (MANDATORY):
 - Do NOT ask "what is the first test?" or "what is the most likely diagnosis?" for a classic presentation.
 - Present a scenario requiring synthesis: borderline risk scores + risk-enhancing factors, treatment failure, statin intolerance with high ASCVD risk, or multi-comorbidity drug selection.
@@ -615,7 +613,7 @@ ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS (MANDATORY):
 - Distractors must include the Tier 1 answer (what a MS4 would choose) — the correct answer requires internist-level guideline synthesis.
 - Cite the correct, existing guideline with the correct year in S1.` : "";
 
-  const endoTier3Prompt = isABIM_Endo ? \`
+  const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS (MANDATORY):
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario — NOT a textbook classic.
 - Consider: atypical DM subtypes (LADA, MODY, ketosis-prone, ICI-induced), rare pituitary or adrenal presentations, multi-hormone deficiency, genetic testing decisions, or cardiorenal treatment choices.
