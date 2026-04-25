@@ -1,5 +1,5 @@
 // bulk-generate.js — MedBoard Pro
-// v7.0 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
+// v7.1 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
 // ---------------------------------------------------------------
 "use strict";
 const crypto = require("crypto");
@@ -34,7 +34,7 @@ const GUIDELINE_MAP = [
   { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: "ADA Standards of Medical Care in Diabetes—2026" },
   { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg"], citation: `2024-2026 Clinical Consensus (ATA/AACE/Endocrine Society). 
 CRITICAL THYROID ANCHORS — ABIM ENDOCRINOLOGY (MANDATORY ACCURACY):
-1. OVERT vs SUBCLINICAL HYPOTHYROIDISM: Overt = elevated TSH + LOW free T4 (regardless of TSH numeric value). Subclinical = elevated TSH + NORMAL free T4. TSH >10 with NORMAL free T4 is still subclinical (grade 2).
+1. OVERT vs SUBCLINICAL HYPOTHYROIDISM: Overt = elevated TSH + LOW free T4. Subclinical = elevated TSH + NORMAL free T4. TSH >10 with NORMAL free T4 is still subclinical (grade 2).
 2. TSH TARGET RANGES: General adult (non-pregnant): 0.4–4.0 mIU/L. Pregnancy: TSH target 0.1–2.5 mIU/L (first trimester). DO NOT use 0.5-2.5 for non-pregnant adults.
 3. SUBCLINICAL HYPOTHYROIDISM TREATMENT: TSH >10: treat. TSH 4.5–10 + asymptomatic: observe. TSH 4.5–10 + pregnancy/trying to conceive: TREAT.
 4. GRAVES DISEASE: Methimazole first-line for most adults. PTU preferred in first trimester of pregnancy and thyroid storm.
@@ -43,9 +43,8 @@ COGNITIVE LEVEL: FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxin
   { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2024 AHA Scientific Statement on PREVENT Calculator; 2022 ACC Expert Consensus on Non-Statin Therapies.
 CRITICAL LIPID ANCHORS:
 1. RISK CALCULATOR: Use the PREVENT calculator (race-neutral, includes kidney function). PCE (2013) is LEGACY.
-2. VLDL vs LDL: You MUST accurately distinguish between VLDL and LDL in pathophysiology and treatment mechanisms. Do not conflate them.
-3. NON-STATIN THERAPIES: Add ezetimibe first when LDL not at goal. Add PCSK9i when LDL still not at goal or statin-intolerant + high risk. Bempedoic acid is an option for statin-intolerant patients.
-4. STATIN INTOLERANCE: True myopathy (CK >10x ULN) -> discontinue. Always rechallenge with alternate statin before declaring complete intolerance.` },
+2. NON-STATIN THERAPIES: Add ezetimibe first when LDL not at goal. Add PCSK9i when LDL still not at goal or statin-intolerant + high risk. Bempedoic acid is an option for statin-intolerant patients.
+3. STATIN INTOLERANCE: True myopathy (CK >10x ULN) -> discontinue. Always rechallenge with alternate statin before declaring complete intolerance.` },
   { keywords: ["obesity", "bariatric", "metabolic syndrome", "GLP-1", "wegovy", "tirzepatide", "semaglutide obesity"], citation: "AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2026 Standards of Care." },
   { keywords: ["pcos", "polycystic"], citation: "International Evidence-based PCOS Guideline 2023" },
   { keywords: ["cardio", "acs", "arrhythmia", "heart failure"], citation: "ACC/AHA 2025-2026 Guidelines" },
@@ -278,7 +277,7 @@ function buildPrompt(level, topic) {
 
   const isABIM_Endo = level === "ABIM Endocrinology"; 
   const isStep3     = level === "USMLE Step 3";
-  const isABIM_IM   = level === "ABIM Internal Medicine"; // BUG FIXED HERE
+  const isABIM_IM   = level === "ABIM Internal Medicine";
   const isStep1     = level === "USMLE Step 1";
 
   let qTypePool = [];
@@ -294,21 +293,19 @@ function buildPrompt(level, topic) {
       {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
       {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
     ];
-  } else if (isABIM_IM) { // BUG FIXED HERE
+  } else if (isABIM_IM) {
     qTypePool = [
-      {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:30},
-      {s:"MOST LIKELY DIAGNOSIS in a multi-system or atypical presentation requiring internist synthesis",w:20},
-      {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:25},
+      {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:40},
+      {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:35},
       {s:"MOST APPROPRIATE DRUG CHOICE given specific comorbidity profile (CKD, HF, DM, prior ASCVD)",w:20},
       {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
     ];
   } else if (isABIM_Endo) {
     qTypePool = [
-      {s:"NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:30},
-      {s:"MOST LIKELY DIAGNOSIS in an atypical or overlapping presentation",w:25},
-      {s:"NEXT STEP IN DIAGNOSIS using biomarker or genetic testing strategy",w:25},
-      {s:"MOST APPROPRIATE PHARMACOLOGIC CHOICE based on cardiorenal or comorbidity profile",w:15},
-      {s:"MOST LIKELY SUBTYPE based on clinical, biochemical, or genetic features",w:5}
+      {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:35},
+      {s:"MOST APPROPRIATE PHARMACOLOGIC CHOICE based on cardiorenal or comorbidity profile",w:30},
+      {s:"NEXT STEP IN DIAGNOSTIC WORKUP (e.g., dynamic testing, imaging, or genetic screening) to confirm a complex subtype",w:25},
+      {s:"MOST APPROPRIATE MODIFICATION to current therapy given a new complication or side effect",w:10}
     ];
   } else {
     qTypePool = [{s:"NEXT STEP IN DIAGNOSIS",w:25}, {s:"MOST LIKELY DIAGNOSIS",w:25}, {s:"NEXT STEP IN MANAGEMENT",w:40}, {s:"STRONGEST RISK FACTOR",w:10}];
@@ -351,7 +348,7 @@ F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text 
 
   const explanationNote = `EXPLANATION FORMAT — use these exact headers:
 🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
-🚫 Why the other choices fail: [Explain each wrong choice starting exactly with "Choice X:"].
+🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
 💎 Board Pearl: [one high-yield fact].`;
 
   const topicGuideline = getGuidelineContext(topic, isNutrition);
@@ -367,17 +364,20 @@ RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
 
   const step3TierPrompt = isStep3 ? `
 USMLE STEP 3 TIER 3–5 REQUIREMENTS:
-- The vignette MUST present a management decision, NOT a diagnosis or workup question.
+- FORBIDDEN: Do NOT ask "What is the most likely diagnosis?". The diagnosis MUST be implied or stated.
+- The vignette MUST present a management decision, disposition, or intervention.
 - Build in a realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
 - Distractors must include the Tier 1/2 answer (what a MS3 would choose) — the correct answer requires resident-level multi-step reasoning.` : "";
 
   const abimIMTierPrompt = isABIM_IM ? `
 ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS:
+- FORBIDDEN: Do NOT ask "What is the most likely diagnosis?". The diagnosis MUST be implied or stated.
 - Present a scenario requiring synthesis: borderline risk scores, treatment failure, statin intolerance with high ASCVD risk, or multi-comorbidity drug selection.
 - Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
 
   const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
+- FORBIDDEN: Do NOT ask "What is the most likely diagnosis?". The question must test subspecialty management, complex diagnostic workup (e.g., dynamic testing), or therapy modification.
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
 - Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
