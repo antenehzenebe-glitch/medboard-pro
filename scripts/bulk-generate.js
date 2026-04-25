@@ -478,6 +478,8 @@ function buildPrompt(level, topic) {
   const isNutrition = NUTRITION_BY_LEVEL[level]?.includes(topic) ?? false;
 
   const isABIM_Endo = level === "ABIM Endocrinology"; // early declaration for qTypePool
+  const isStep3     = level === "USMLE Step 3";
+  const isABIM_IM   = level === "ABIM Internal Medicine";
   let qTypePool = [];
   if (topic.includes("Ethics") || topic.includes("Behavioral") || topic.includes("HIPAA") || topic.includes("end-of-life") || topic.includes("consent")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
@@ -517,8 +519,6 @@ function buildPrompt(level, topic) {
   const randomSex   = pickSexForTopic(topic);
 
   const isUSMLE     = level.includes("USMLE");
-  const isABIM_Endo = level === "ABIM Endocrinology";
-  const isABIM_IM   = level === "ABIM Internal Medicine";
   const maxTokens   = isABIM_Endo ? 1700 : 1300;
 
   const systemRole  = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
@@ -533,7 +533,7 @@ function buildPrompt(level, topic) {
 (3) CUTTING-EDGE GUIDELINES — ADA 2025/2026 GLP-1 RA and SGLT2i cardiorenal indications, AASLD 2025 PBC, ES 2024 on AVP-D, 2018 AHA/ACC Cholesterol Guideline + 2022 ACC Expert Consensus for lipids, AACE 2022 + ATA 2016 thyroid nodule workup.
 (4) MULTI-AXIS WORKUP — simultaneous pituitary axes (TSH/free T4 + IGF-1 + cortisol + iron studies in hemochromatosis), multi-hormone deficiency patterns.
 (5) GENETIC TESTING DECISIONS — when to order RET for MEN2, VHL for paraganglioma, KCNJ5/CYP11B2 for familial hyperaldosteronism, HNF1A/HNF4A for MODY.
-Do NOT generate basic first-line questions (e.g. start metformin for T2DM, levothyroxine for hypothyroidism). Every question must require subspecialty reasoning.\`;
+Do NOT generate basic first-line questions (e.g. start metformin for T2DM, levothyroxine for hypothyroidism). Every question must require subspecialty reasoning.`;
 
   const integrityRules = `INTEGRITY RULES:
 A. Distractor-stem independence.
@@ -542,7 +542,7 @@ C. Cognitive bias labels: anchoring, premature closure, availability bias.
 D. "glucose" never "sugar".
 E. EXPLANATION FORMATTING: In S2, you MUST refer to choices strictly as "Choice A", "Choice B", "Choice C", "Choice D", "Choice E". DO NOT use bullet points (e.g., "• A") or standalone letters.
 F. GUIDELINE CURRENCY: You MUST cite guidelines from 2023 or later ONLY. Do NOT cite any guideline, criteria, or recommendation older than 2023. If you are uncertain of the year, do not cite it — state the recommending society only (e.g., "per ADA recommendations").
-G. EXPLANATION-CHOICE CONSISTENCY (CRITICAL): Before finalizing, perform a self-check — read every sentence in S2 and confirm it matches the actual text of the corresponding choice letter. The explanation MUST NOT describe a choice differently from what is written in the choices field. If you say "Choice B proposes X", then Choice B must literally contain X. NEVER call the correct answer a distractor and NEVER call a distractor the correct answer.\`;
+G. EXPLANATION-CHOICE CONSISTENCY (CRITICAL): Before finalizing, perform a self-check — read every sentence in S2 and confirm it matches the actual text of the corresponding choice letter. The explanation MUST NOT describe a choice differently from what is written in the choices field. If you say "Choice B proposes X", then Choice B must literally contain X. NEVER call the correct answer a distractor and NEVER call a distractor the correct answer.`;
 
   const explanationNote = isABIM_IM
     ? "EXPLANATION: concise total <=250 words. Cite only 2023+ guidelines."
@@ -574,7 +574,7 @@ ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS (MANDATORY):
 - Distractors must include the Tier 1 answer (what a MS4 would choose) — the correct answer requires internist-level guideline synthesis.
 - Cite the correct, existing guideline with the correct year in S1.` : "";
 
-  const endoTier3Prompt = isABIM_Endo ? \`
+  const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS (MANDATORY):
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario — NOT a textbook classic.
 - Consider: atypical DM subtypes (LADA, MODY, ketosis-prone, ICI-induced), rare pituitary or adrenal presentations, multi-hormone deficiency, genetic testing decisions, or cardiorenal treatment choices.
