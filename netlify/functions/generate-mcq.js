@@ -1,11 +1,6 @@
 // generate-mcq.js — MedBoard Pro
-// v6.9 — Shuffler Synchronization & Regex Upgrade
+// v7.0 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
 // ---------------------------------------------------------------
-// CHANGELOG:
-// - Upgraded rewriteExplanationLetters with advanced regex to catch edge-case 
-//   LLM formatting (like bullets "• A" or line starts "A.") during the choice shuffle.
-// - Added INTEGRITY RULE E to strictly forbid standalone letters in S2 formatting.
-// - Retains v6.8 Dynamic Guidelines, Clinical Triage, and Nutrition architecture.
 
 const crypto = require("crypto");
 
@@ -18,214 +13,35 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// DYNAMIC 2025/2026 GUIDELINE MAP
+// DYNAMIC 2025/2026 GUIDELINE MAP (UPDATED & SCRUBBED)
 // ============================================================
 const GUIDELINE_MAP = [
   { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: "ADA Standards of Medical Care in Diabetes—2026" },
-  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg"], citation: `ATA 2014 Guidelines for Hypothyroidism in Adults (Jonklaas et al., Thyroid 2014) — PRIMARY REFERENCE for hypothyroidism; ATA 2016 Guidelines for Thyroid Nodules and Differentiated Thyroid Cancer; ATA 2016 Guidelines for Hyperthyroidism; AACE 2022 Thyroid Nodule Clinical Practice Guidelines; ES 2016 Thyroid Dysfunction in Pregnancy Guidelines.
-
-⚠️ FABRICATED CITATION WARNING: "ATA 2025 Guidelines" DOES NOT EXIST as of April 2026. The last comprehensive ATA hypothyroidism guideline is Jonklaas et al. 2014. Do NOT invent guideline years. If uncertain, cite "per ATA recommendations" without a year, or cite the 2014 document explicitly.
-
+  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg"], citation: `2024-2026 Clinical Consensus (ATA/AACE/Endocrine Society). 
 CRITICAL THYROID ANCHORS — ABIM ENDOCRINOLOGY (MANDATORY ACCURACY):
-
-1. OVERT vs SUBCLINICAL HYPOTHYROIDISM — EXACT DEFINITIONS (DO NOT DEVIATE):
-   - OVERT hypothyroidism = elevated TSH + LOW free T4 (REGARDLESS of TSH numeric value).
-   - SUBCLINICAL hypothyroidism = elevated TSH + NORMAL free T4.
-   - TSH >10 with NORMAL free T4 = still subclinical (grade 2 subclinical); treatment generally recommended.
-   - TSH 9.8 + LOW free T4 = OVERT hypothyroidism — because free T4 is low, NOT because TSH >10.
-   - CRITICAL ERROR TO AVOID: Do NOT define overt hypothyroidism as "TSH >10" alone. The free T4 status determines overt vs subclinical.
-
-2. TSH TARGET RANGES — EXACT VALUES (DO NOT CONFUSE):
-   - General adult (non-pregnant): TSH target 0.4–4.0 mIU/L (ATA 2014 — lab reference range).
-   - Elderly patients (>65): target slightly higher, 1.0–4.0 mIU/L acceptable.
-   - Pregnancy / preconception: TSH target 0.1–2.5 mIU/L (first trimester), 0.2–3.0 (second), 0.3–3.0 (third).
-   - FORBIDDEN ERROR: Do NOT cite 0.5–2.5 mIU/L as the general adult target — this is the PREGNANCY target. Using it for a non-pregnant adult is a factual error.
-   - Differentiated thyroid cancer post-thyroidectomy: TSH suppression target depends on risk stratum (low-risk: 0.5–2.0; high-risk: <0.1).
-
-3. LEVOTHYROXINE DOSING:
-   - Full replacement: 1.6 mcg/kg/day — acceptable in young, healthy adults without cardiac disease (ATA 2014).
-   - Low-and-slow (25–50 mcg starting dose): preferred in elderly patients, patients with CAD, or long-standing severe hypothyroidism.
-   - In a young healthy adult (e.g., 34-year-old without cardiac disease), full weight-based dosing IS defensible — the explanation must acknowledge this nuance rather than calling it wrong.
-   - Recheck TSH 6–8 weeks after any dose change.
-
-4. SUBCLINICAL HYPOTHYROIDISM — TREATMENT THRESHOLDS:
-   - TSH >10: treat (strong recommendation, ATA 2014).
-   - TSH 4.5–10 + symptoms: treat (individualize).
-   - TSH 4.5–10 + asymptomatic: observe, recheck in 6 months.
-   - TSH 4.5–10 + pregnancy or trying to conceive: TREAT.
-   - TPO antibody positive: increases risk of progression — favor treatment.
-
-5. GRAVES DISEASE MANAGEMENT:
-   - Three options: antithyroid drugs (methimazole first-line), radioactive iodine (RAI), or thyroidectomy.
-   - Methimazole > PTU for most adults (less hepatotoxic); PTU preferred in first trimester of pregnancy and thyroid storm.
-   - TRAb (TSH receptor antibodies): diagnostic for Graves, also predicts remission — negative TRAb after 12–18 months ATD = consider stopping.
-   - Ophthalmopathy: RAI can worsen — prefer methimazole or surgery in active moderate-severe GO.
-
-6. THYROID NODULE WORKUP (AACE 2022 / ATA 2016):
-   - TSH first: if suppressed → radionuclide scan (hot nodule = rarely malignant).
-   - Ultrasound: characterize all nodules; TIRADS or ATA US pattern guides FNA decision.
-   - FNA: recommended based on US pattern + size thresholds (not all nodules need FNA).
-   - Molecular testing (ThyroSeq, Afirma): for indeterminate FNA (Bethesda III/IV).
-
-7. THYROID CANCER POST-THYROIDECTOMY:
-   - RAI remnant ablation: NOT routine for low-risk DTC (ATA 2015 guidelines revised this).
-   - Thyroglobulin (Tg) + anti-Tg antibodies: surveillance markers.
-   - TSH suppression: high-risk → TSH <0.1; low-risk → TSH 0.5–2.0.
-
-8. COGNITIVE LEVEL FOR ABIM ENDOCRINOLOGY THYROID QUESTIONS:
-   - FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxine?" (Tier 1 — every MS3 knows this).
-   - REQUIRED Tier 3+: "Patient on stable levothyroxine develops elevated TSH — what is the most likely cause?" (malabsorption, drug interaction, non-compliance, change in formulation).
-   - REQUIRED Tier 4: "Post-thyroidectomy for papillary thyroid cancer — TSH 1.2, Tg undetectable, anti-Tg rising — what is the interpretation and next step?"
-   - REQUIRED Tier 5: "Graves disease in first trimester — methimazole vs PTU; when to switch back post-partum?"` },
-  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2018 AHA/ACC/Multisociety Cholesterol Guideline (Grundy et al., Circulation 2019); 2019 ACC/AHA Primary Prevention Guideline (Arnett et al.); 2022 ACC Expert Consensus on Non-Statin Therapies (Lloyd-Jones et al.); 2024 AHA Scientific Statement on PREVENT Calculator.
-
+1. OVERT vs SUBCLINICAL HYPOTHYROIDISM: Overt = elevated TSH + LOW free T4 (regardless of TSH numeric value). Subclinical = elevated TSH + NORMAL free T4. TSH >10 with NORMAL free T4 is still subclinical (grade 2).
+2. TSH TARGET RANGES: General adult (non-pregnant): 0.4–4.0 mIU/L. Pregnancy: TSH target 0.1–2.5 mIU/L (first trimester). DO NOT use 0.5-2.5 for non-pregnant adults.
+3. SUBCLINICAL HYPOTHYROIDISM TREATMENT: TSH >10: treat. TSH 4.5–10 + asymptomatic: observe. TSH 4.5–10 + pregnancy/trying to conceive: TREAT.
+4. GRAVES DISEASE: Methimazole first-line for most adults. PTU preferred in first trimester of pregnancy and thyroid storm.
+5. THYROID NODULE WORKUP: TSH first: if suppressed → radionuclide scan. Ultrasound: characterize all nodules; size + TIRADS guides FNA.
+COGNITIVE LEVEL: FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxine?" REQUIRED: "Patient on stable levo develops elevated TSH — what is the most likely cause?" (malabsorption, non-compliance).` },
+  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2024 AHA Scientific Statement on PREVENT Calculator; 2022 ACC Expert Consensus on Non-Statin Therapies.
 CRITICAL LIPID ANCHORS:
-
-1. RISK CALCULATOR — USE PREVENT, NOT PCE:
-   - The PREVENT calculator (AHA 2023) is NOW the recommended ASCVD risk tool — race-neutral, includes kidney function, broader age range 30–79 years.
-   - Pooled Cohort Equations (PCE, 2013) are LEGACY — overestimate risk in many populations; do NOT cite PCE as current standard.
-   - Use neutral language when appropriate: "validated 10-year ASCVD risk calculator (PREVENT or equivalent)".
-
-2. RISK CATEGORIES & STATIN THRESHOLDS (2018 AHA/ACC):
-   - ASCVD ≥7.5% → high-intensity statin indicated.
-   - ASCVD 5–<7.5% → intermediate risk; risk discussion + risk-enhancing factors guide decision.
-   - ASCVD <5% → low risk; lifestyle first.
-   - Risk-enhancing factors: Lp(a) ≥125 nmol/L, hsCRP ≥2, ABI <0.9, family history premature ASCVD.
-   - Coronary artery calcium (CAC) score: CAC=0 → defer statin (unless DM, smoker, strong FH); CAC≥100 → treat.
-
-3. NON-STATIN THERAPIES — ABIM IM TIER 4 TERRITORY:
-   - Add ezetimibe first when LDL not at goal on max-tolerated statin (NNT favorable, oral, cheap).
-   - Add PCSK9 inhibitor (evolocumab/alirocumab) when LDL still not at goal or statin-intolerant with high ASCVD risk.
-   - Bempedoic acid: ATP-citrate lyase inhibitor; option for statin-intolerant patients (CLEAR Outcomes 2023 — reduced MACE).
-   - Inclisiran: siRNA PCSK9 inhibitor; twice-yearly injection; same efficacy as PCSK9i mAbs.
-   - Icosapentaenoic acid (EPA, Vascepa): for TG ≥150 + high CV risk on statin (REDUCE-IT trial); DHA-containing formulations NOT proven.
-
-4. STATIN INTOLERANCE:
-   - True myopathy: CK >10× ULN + symptoms → discontinue.
-   - Rechallenge with alternate statin (rosuvastatin, pravastatin) or every-other-day dosing before declaring intolerance.
-   - Statin-intolerant + very high risk → bempedoic acid + ezetimibe → PCSK9i.
-
-5. FORBIDDEN CITATIONS — DO NOT USE:
-   - "AACE 2026 Lipid Guidelines" — DOES NOT EXIST. Last comprehensive AACE lipid guideline: Jellinger et al. 2017.
-   - Do NOT cite AACE/ACE for lipids without specifying it is the 2017 document.` },
-  { keywords: ["obesity", "bariatric", "metabolic syndrome", "GLP-1", "wegovy", "tirzepatide", "semaglutide obesity"], citation: "AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2025/2026 Standards of Care." },
+1. RISK CALCULATOR: Use the PREVENT calculator (race-neutral, includes kidney function). PCE (2013) is LEGACY.
+2. VLDL vs LDL: You MUST accurately distinguish between VLDL and LDL in pathophysiology and treatment mechanisms. Do not conflate them.
+3. NON-STATIN THERAPIES: Add ezetimibe first when LDL not at goal. Add PCSK9i when LDL still not at goal or statin-intolerant + high risk. Bempedoic acid is an option for statin-intolerant patients.
+4. STATIN INTOLERANCE: True myopathy (CK >10x ULN) -> discontinue. Always rechallenge with alternate statin before declaring complete intolerance.` },
+  { keywords: ["obesity", "bariatric", "metabolic syndrome", "GLP-1", "wegovy", "tirzepatide", "semaglutide obesity"], citation: "AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2026 Standards of Care." },
   { keywords: ["pcos", "polycystic"], citation: "International Evidence-based PCOS Guideline 2023" },
   { keywords: ["cardio", "acs", "arrhythmia", "heart failure"], citation: "ACC/AHA 2025-2026 Guidelines" },
   { keywords: ["hypertension", "blood pressure"], citation: "ACC/AHA 2025 Hypertension Guidelines" },
   { keywords: ["nephro", "renal", "ckd"], citation: "KDIGO 2025 Guidelines" },
-  { keywords: ["gastro", "hepat", "cirrhosis", "ibd", "crohn", "colitis", "ulcerative", "inflammatory bowel", "infliximab", "adalimumab", "vedolizumab", "ustekinumab", "risankizumab", "tofacitinib", "upadacitinib", "biologic", "anti-tnf", "fistula", "perianal", "colonoscopy", "budesonide", "mesalamine", "azathioprine", "methotrexate ibd"], citation: `ACG 2024 Crohn's Disease Guidelines (Lichtenstein et al.); AGA 2021 Moderate-to-Severe Crohn's Guideline; ACG 2019 UC Guidelines; ECCO 2022 IBD Guidelines; AASLD 2025 Practice Guidance (hepatology); MKSAP 19 GI/Hepatology.
-
-CRITICAL IBD ANCHORS — ABIM IM TIER 3–4:
-
-1. THERAPEUTIC DRUG MONITORING (TDM) — ANTI-TNF:
-   - Infliximab trough goal: ≥5 mcg/mL (induction), ≥3–5 mcg/mL (maintenance).
-   - Anti-drug antibodies (ATI) present + low trough → switch biologic CLASS (primary immunogenicity).
-   - Subtherapeutic trough + no ATI → dose optimize (increase dose or shorten interval).
-   - Secondary loss of response: check trough + ATI before switching.
-
-2. TREATMENT STRATEGY — TOP-DOWN VS STEP-UP:
-   - Moderate-to-severe CD: early biologic + immunomodulator combination (top-down) — SONIC trial shows superiority over step-up.
-   - SONIC trial (NEJM 2010): infliximab + azathioprine > infliximab monotherapy > azathioprine alone for steroid-free remission in CD.
-   - Anti-TNF monotherapy vs combination: combination superior for CD (SONIC); UC data less definitive.
-
-3. BIOLOGIC SWITCHING RULES:
-   - Primary non-response (never responded) → switch to DIFFERENT MECHANISM CLASS (e.g., anti-TNF → vedolizumab or ustekinumab).
-   - Secondary loss of response (responded then lost) → TDM first; if ATI+ → switch class; if low trough/no ATI → dose optimize same agent.
-
-4. PRE-BIOLOGIC SCREENING (MANDATORY):
-   - TB: CXR + IGRA (QuantiFERON-TB Gold); treat LTBI before starting biologic.
-   - HBV: HBsAg, anti-HBc, anti-HBs; if HBsAg+ → antiviral prophylaxis (entecavir) before biologic.
-   - Varicella IgG: vaccinate if seronegative (live vaccine — give BEFORE biologic, not during).
-   - HPV vaccine: recommended for all IBD patients on immunosuppression up to age 45.
-   - Pneumococcal, influenza, COVID vaccines: give before or during (non-live okay during).
-
-5. CANCER SURVEILLANCE:
-   - UC: colonoscopy every 1–2 years starting 8–10 years after diagnosis.
-   - CD with colonic involvement: same surveillance intervals as UC.
-   - Primary sclerosing cholangitis (PSC) + IBD: annual colonoscopy from time of PSC diagnosis.
-
-6. PERIANAL DISEASE:
-   - Workup: EUA (exam under anesthesia) + MRI pelvis (best for fistula mapping).
-   - Treatment: infliximab has BEST perianal fistula data; surgical drainage + seton BEFORE biologic.
-   - Avoid: systemic corticosteroids in perianal fistulizing disease (worsen).
-
-7. FISTULIZING DISEASE:
-   - Staged approach: surgical drainage first → antibiotics (metronidazole/ciprofloxacin) → biologic (infliximab).
-   - Avoid corticosteroids in fistulizing disease.
-   - Combination biologic + immunomodulator preferred.
-
-8. PREGNANCY IN IBD:
-   - Anti-TNF agents (infliximab, adalimumab): SAFE throughout pregnancy; continue.
-   - Vedolizumab: likely safe; data emerging.
-   - Methotrexate: CONTRAINDICATED in pregnancy (teratogenic) — stop 3–6 months before conception.
-   - Thalidomide: absolutely contraindicated.
-   - Active IBD during pregnancy is more dangerous than biologic exposure.
-
-9. SMOKING IN IBD:
-   - Crohn's disease: smoking WORSENS disease course, increases surgery risk — cessation critical.
-   - Ulcerative colitis: smoking paradoxically PROTECTIVE — but NOT a reason to recommend smoking.
-
-10. SURGICAL CONSIDERATIONS:
-    - LIR!C trial: ileocecal resection non-inferior to infliximab for short-segment ileal CD — surgical option preferred in some patients.
-    - UC refractory to medical therapy → colectomy (curative).
-
-11. IMAGING:
-    - CT enterography vs MR enterography: MRE PREFERRED in young patients (avoids radiation).
-    - MRE better for perianal disease, small bowel wall inflammation.
-
-12. STEROID CHOICES:
-    - Budesonide: preferred for mild-moderate ileal/right-sided CD (first-pass hepatic metabolism, less systemic effect).
-    - Prednisone: for more extensive or severe disease; avoid long-term use.
-
-13. BIOLOGIC AGENTS — MECHANISM AND TIER:
-    - Anti-TNF: infliximab, adalimumab, certolizumab (CD), golimumab (UC).
-    - Vedolizumab (anti-α4β7): gut-selective integrin inhibitor; safer profile, slower onset; preferred when systemic immunosuppression a concern.
-    - Ustekinumab (anti-IL-12/23), risankizumab (anti-IL-23): options for CD; risankizumab approved 2022.
-    - Tofacitinib, upadacitinib (JAK inhibitors): UC; BLACK BOX WARNING: cardiovascular risk, malignancy, thrombosis — use with caution in patients >50 with CV risk factors.` },
+  { keywords: ["gastro", "hepat", "cirrhosis", "ibd", "crohn", "colitis", "ulcerative", "inflammatory bowel", "infliximab", "adalimumab", "vedolizumab", "ustekinumab", "risankizumab", "tofacitinib", "upadacitinib", "biologic", "anti-tnf", "fistula", "perianal", "colonoscopy", "budesonide", "mesalamine", "azathioprine", "methotrexate ibd"], citation: `ACG 2024 Crohn's Disease Guidelines; AGA 2021 Moderate-to-Severe Crohn's Guideline; AASLD 2025 Practice Guidance. Focus on Top-down therapy, therapeutic drug monitoring, and pre-biologic screening (TB/HBV mandatory). Methotrexate is contraindicated in pregnancy.` },
   { keywords: ["parathyroid", "calcium", "bone", "osteoporosis"], citation: "Endocrine Society 2022 Primary Hyperparathyroidism Guideline & AACE 2025 Osteoporosis Guideline" },
   { keywords: ["menopause", "hrt", "reproductive"], citation: "Endocrine Society Menopause Guidelines 2022 & NAMS 2025" },
-  { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin"], citation: "Pituitary Society 2023 Consensus on Acromegaly, Hypopituitarism, and Pituitary Tumors; Endocrine Society 2025 CPGs; European Journal of Endocrinology 2023 AVP-D Consensus. CRITICAL: copeptin ≥6.4 pmol/L after hypertonic saline confirms AVP-R (NDI); GH nadir <1 ng/mL on OGTT diagnoses acromegaly (or <0.4 with ultrasensitive assay); prolactin >500 ng/mL is virtually diagnostic of macroprolactinoma." },
-  { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines; IDSA/SCCM 2025 Sepsis Bundle Updates.
-
-CRITICAL CLINICAL ANCHORS FOR SEPSIS/ID QUESTIONS:
-
-1. PRESSORS & HEMODYNAMIC SUPPORT:
-   - Norepinephrine is FIRST-LINE vasopressor (SSC 2021, strong recommendation).
-   - Add VASOPRESSIN (0.03 units/min) when norepinephrine dose ≥0.25 mcg/kg/min to reduce catecholamine load — NOT dopamine.
-   - Dopamine only in select bradycardic patients; associated with higher arrhythmia risk.
-   - Epinephrine: third-line adjunct in refractory shock.
-
-2. STEROID USE IN SEPTIC SHOCK:
-   - IV hydrocortisone 200 mg/day ONLY if hemodynamically unstable despite adequate fluids AND vasopressors (SSC 2021).
-   - Do NOT use steroids in sepsis WITHOUT shock.
-   - ACTH stimulation test NOT required before initiating steroids in septic shock.
-   - Taper steroids when vasopressors no longer needed.
-
-3. ANTIBIOTIC STEWARDSHIP — ESBL & CARBAPENEM INDICATIONS:
-   - Empiric carbapenem (meropenem/ertapenem) indicated: known ESBL colonization/prior infection, high-risk travel exposure, recurrent UTI with prior ESBL, or septic shock with no time for cultures.
-   - De-escalate carbapenem to cephalosporin/quinolone once ESBL susceptibility confirmed — stewardship priority.
-   - Piperacillin-tazobactam NOT reliable for ESBL bacteremia (MERINO trial 2018 — higher mortality vs meropenem).
-   - Ceftolozane-tazobactam or ceftazidime-avibactam for MDR Pseudomonas or KPC-producing organisms.
-
-4. SOURCE CONTROL — OBSTRUCTIVE PYELONEPHRITIS:
-   - Obstructive pyelonephritis with sepsis = UROLOGIC EMERGENCY.
-   - Ureteral stent or percutaneous nephrostomy within 6–12 hours — antibiotics alone are INSUFFICIENT.
-   - Do NOT delay decompression for additional imaging if clinical picture is clear.
-   - Cystoscopy + stent placement preferred if expertise available; nephrostomy if not.
-
-5. REFRACTORY SHOCK — ESCALATION LADDER:
-   - Refractory shock = MAP <65 despite norepinephrine ≥0.25 mcg/kg/min + adequate volume resuscitation.
-   - Step 1: Add vasopressin 0.03 units/min.
-   - Step 2: Add hydrocortisone 200 mg/day IV.
-   - Step 3: Add epinephrine as third-line agent.
-   - Consider angiotensin II (Giapreza) in catecholamine-refractory vasodilatory shock.
-
-6. ICU TRANSFER CRITERIA — LACTATE & VASOPRESSOR ESCALATION:
-   - Lactate ≥4 mmol/L = high-risk; immediate ICU admission regardless of BP.
-   - Lactate 2–4 mmol/L = intermediate risk; reassess at 2 hours — failure to clear ≥10% = ICU transfer.
-   - Vasopressor requirement at any dose = ICU-level care mandatory.
-   - Lactate clearance ≥10% at 2 hours = favorable prognostic sign; do NOT use lactate normalization alone as ICU discharge criterion.` },
-  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma"], citation: "Endocrine Society 2024 CPG on Cushing Syndrome & Adrenal Incidentaloma; Pituitary Society 2023 Consensus on Cushing Disease. CRITICAL: MRI->BIPSS threshold >=6mm; 1mg DST is screening; ACTH <10 pg/mL = independent, >20 pg/mL = dependent; bilateral adrenal hyperplasia with suppressed renin = rule out KCNJ5 mutation." }
+  { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin"], citation: "Pituitary Society 2023 Consensus on Acromegaly, Hypopituitarism, and Pituitary Tumors; Endocrine Society 2025 CPGs. CRITICAL: copeptin >=6.4 pmol/L after hypertonic saline confirms AVP-R (NDI); GH nadir <1 ng/mL on OGTT diagnoses acromegaly." },
+  { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021/2025 Updates; IDSA 2024 Antibiotic Stewardship Guidelines. Focus: Norepinephrine is 1st line. Add vasopressin BEFORE dopamine. Steroids ONLY for refractory shock. Carbapenems for ESBL.` },
+  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma"], citation: "Endocrine Society 2024 CPG on Cushing Syndrome & Adrenal Incidentaloma. CRITICAL: 1mg DST is screening; ACTH <10 pg/mL = independent." }
 ];
 
 function getGuidelineContext(topic, isNutrition) {
@@ -291,7 +107,7 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
   if (level === "ABIM Endocrinology") return "Endocrinology";
   const t = (resolvedTopic || "").toLowerCase();
   if (t.includes("cardio")) return "Cardiology";
-  if (t.includes("endocrin") || t.includes("diabetes") || t.includes("thyroid") || t.includes("pituitary") || t.includes("adrenal") || t.includes("bone, calcium")) return "Endocrinology";
+  if (t.includes("endocrin") || t.includes("diabetes") || t.includes("thyroid") || t.includes("pituitary") || t.includes("adrenal") || t.includes("bone") || t.includes("calcium")) return "Endocrinology";
   if (t.includes("nephro") || t.includes("renal")) return "Nephrology";
   if (t.includes("pulm")) return "Pulmonology";
   if (t.includes("gastro") || t.includes("hepat")) return "Gastroenterology";
@@ -344,7 +160,7 @@ const MCQ_TOOL = {
       },
       explanation: {
         type: "string",
-        description: "Explanation block. S1 (why correct answer is correct + citation), S2 (why each distractor fails + bias label), S3 (competing diagnosis discussion if relevant), Board Pearl."
+        description: "🩺 Why this is the correct answer. 🚫 Why the other choices fail. 💎 Board Pearl."
       }
     },
     required: ["demographic_check", "stem", "choices", "correct", "explanation"]
@@ -438,17 +254,17 @@ async function callGemini(systemText, userText, maxTokens) {
 }
 
 // ============================================================
-// SHUFFLE & DB SAVER (v6.9 UPGRADE)
+// SHUFFLE & DB SAVER
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
   let out = explanation;
   const placeholders = {};
+  
   Object.keys(letterMap).forEach((oldLetter, idx) => {
     const placeholder = `§§LETTER_${idx}§§`;
     placeholders[placeholder] = letterMap[oldLetter];
     
-    // Upgraded patterns to catch LLM bullets (• A) and list numbers (A.) safely
     const patterns = [
       { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
       { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
@@ -459,15 +275,12 @@ function rewriteExplanationLetters(explanation, letterMap) {
     ];
     
     patterns.forEach(({ re, wrap }) => {
-      if (wrap === 1) {
-        out = out.replace(re, `$1${placeholder}`);
-      } else if (wrap === 2) {
-        out = out.replace(re, `(${placeholder})`);
-      } else if (wrap === 3) {
-        out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`);
-      }
+      if (wrap === 1) { out = out.replace(re, `$1${placeholder}`); } 
+      else if (wrap === 2) { out = out.replace(re, `(${placeholder})`); } 
+      else if (wrap === 3) { out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`); }
     });
   });
+  
   Object.keys(placeholders).forEach(placeholder => { out = out.split(placeholder).join(placeholders[placeholder]); });
   return out;
 }
@@ -506,16 +319,17 @@ function buildPrompt(level, topic, isNutrition) {
     }
   }
 
-  const isABIM_Endo = level === "ABIM Endocrinology"; // declared early for qTypePool
-  const isStep3    = level === "USMLE Step 3";         // declared early for qTypePool
-  const isABIM_IM = level === "ABIM Internal Medicine"; // declared early for qTypePool
+  const isABIM_Endo = level === "ABIM Endocrinology";
+  const isStep3    = level === "USMLE Step 3";
+  const isABIM_IM = level === "ABIM Internal Medicine";
+  const isStep1 = level === "USMLE Step 1";
+  
   let qTypePool = [];
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
-  } else if (level === "USMLE Step 1") {
+  } else if (isStep1) {
     qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
   } else if (isStep3) {
-    // Tier 3–5 cognitive complexity for USMLE Step 3
     qTypePool = [
       {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
       {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
@@ -524,7 +338,6 @@ function buildPrompt(level, topic, isNutrition) {
       {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
     ];
   } else if (isABIM_IM) {
-    // Tier 3-4 cognitive complexity for ABIM Internal Medicine
     qTypePool = [
       {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:30},
       {s:"MOST LIKELY DIAGNOSIS in a multi-system or atypical presentation requiring internist synthesis",w:20},
@@ -533,7 +346,6 @@ function buildPrompt(level, topic, isNutrition) {
       {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
     ];
   } else if (isABIM_Endo) {
-    // Tier 3+ cognitive complexity for ABIM Endocrinology
     qTypePool = [
       {s:"NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:30},
       {s:"MOST LIKELY DIAGNOSIS in an atypical or overlapping presentation",w:25},
@@ -548,85 +360,74 @@ function buildPrompt(level, topic, isNutrition) {
   const randomSex = pickSexForTopic(promptTopic);
 
   const isUSMLE     = level.includes("USMLE");
-  const maxTokens   = isABIM_IM ? 1300 : isABIM_Endo ? 1700 : 1300;
+  const maxTokens   = isABIM_Endo ? 1800 : isABIM_IM ? 1700 : isStep3 ? 1700 : 1400;
   
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
+
+  // Retain the perfect Step 1 logic, add Tier 3 Style Guide for upper levels
+  const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
+STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
+1. MAXIMUM 130 WORDS for the stem.
+2. ZERO INTRODUCTORY FLUFF. Start immediately with age, sex, and chief complaint (e.g., "A 54-year-old man is evaluated in the ED for...").
+3. HIGH-DENSITY DATA. Combine vitals and physical exam into single, comma-separated sentences. 
+4. DO NOT interpret labs. State the raw value and the reference range. 
+5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem. Force the examinee to deduce it from physical findings and labs.`;
 
   let levelRules = isStep3
     ? `USMLE STEP 3 RULES — MANDATORY Tier 3–5 cognitive complexity ONLY:
 (Tier 3) MANAGEMENT DECISIONS: reperfusion strategy given facility/time constraints, ventilator settings in ARDS, empiric carbapenem vs pip-tazo for ESBL sepsis, vasopressor choice in septic shock.
-(Tier 4) MULTI-STEP MANAGEMENT: norepinephrine at max dose → add vasopressin or steroids?; obstructive pyelonephritis not improving on antibiotics → source control timing?; lactate not clearing at 2h → ICU transfer trigger?; failed first-line therapy → what changed?
-(Tier 5) COMPLEX SCENARIOS: competing contraindications (STEMI + recent stroke + cardiogenic shock), resource-limited environments, end-of-life decision conflicts, medical error disclosure.
-FORBIDDEN: Do NOT write Tier 1 questions ("What test do you order first?") or Tier 2 questions ("What is the best next step in evaluation?"). Every Step 3 question must require a PGY-1/PGY-2 resident's clinical judgment — not a medical student's recall.
-Patient setting: ICU, inpatient ward, ED, or outpatient follow-up of a recently discharged complex patient. Include realistic time pressures, resource constraints, or comorbidity conflicts in the stem.`
+(Tier 4) MULTI-STEP MANAGEMENT: norepinephrine at max dose → add vasopressin or steroids?; obstructive pyelonephritis not improving on antibiotics → source control timing?
+Patient setting: ICU, inpatient ward, ED, or outpatient follow-up. Include realistic time pressures or comorbidity conflicts in the stem.`
     : isUSMLE ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1, M3/M4 for Step 2/3.` 
                  : isABIM_IM ? `ABIM IM RULES — MANDATORY Tier 3–4 cognitive complexity:
-(Tier 3) DECISION INTEGRATION: borderline ASCVD risk + risk-enhancing factors (Lp(a), CAC, hsCRP) → treat or not?; statin myopathy → rechallenge or switch?; diabetes + CKD3 + proteinuria → which GLP-1 RA or SGLT2i?
-(Tier 4) MULTI-COMORBIDITY: ASCVD + statin intolerance + CKD3 → choose between ezetimibe, bempedoic acid, PCSK9i, inclisiran; HFrEF + CKD + T2DM → optimize GDMT sequence; COPD exacerbation + steroid-induced hyperglycemia + on metformin.
-FORBIDDEN: Do NOT write Tier 1 questions ("What is the first diagnostic test?" or "What is the most likely diagnosis?" for classic textbook presentations). ABIM IM questions must require internist-level synthesis across guidelines, comorbidities, or treatment sequences — not medical student recall.` 
+(Tier 3) DECISION INTEGRATION: borderline ASCVD risk + risk-enhancing factors (Lp(a), CAC, hsCRP) → treat or not?; statin myopathy → rechallenge or switch?
+(Tier 4) MULTI-COMORBIDITY: ASCVD + statin intolerance + CKD3 → choose between ezetimibe, bempedoic acid, PCSK9i; HFrEF + CKD + T2DM → optimize GDMT sequence.
+FORBIDDEN: Do NOT write Tier 1 questions ("What is the first diagnostic test?"). ABIM IM questions must require internist-level synthesis.` 
                  : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level. MANDATORY Tier 3+ cognitive complexity:
-(1) ATYPICAL PRESENTATIONS — ketosis-prone DM2, ICI-induced diabetes/hypophysitis, LADA, MODY subtypes, euglycemic DKA on SGLT2i, acromegaly with normal IGF-1.
-(2) SUBTYPE DIFFERENTIATION — AVP-D vs AVP-R (copeptin testing), Cushing disease vs ectopic ACTH vs adrenal source, primary vs central adrenal insufficiency, familial vs sporadic hyperaldosteronism, Graves vs toxic MNG vs thyroiditis.
-(3) CUTTING-EDGE GUIDELINES — ADA 2025/2026 GLP-1 RA and SGLT2i cardiorenal indications, AASLD 2025 PBC, ES 2024 on AVP-D, 2018 AHA/ACC Cholesterol Guideline + 2022 ACC Expert Consensus for lipids, AACE 2022 + ATA 2016 thyroid nodule workup.
-(4) MULTI-AXIS WORKUP — simultaneous pituitary axes (TSH/free T4 + IGF-1 + cortisol + iron studies in hemochromatosis), multi-hormone deficiency patterns.
-(5) GENETIC TESTING DECISIONS — when to order RET for MEN2, VHL for paraganglioma, KCNJ5/CYP11B2 for familial hyperaldosteronism, HNF1A/HNF4A for MODY.
-Do NOT generate basic first-line questions (e.g. start metformin for T2DM, levothyroxine for hypothyroidism). Every question must require subspecialty reasoning.`;
+(1) ATYPICAL PRESENTATIONS — ketosis-prone DM2, ICI-induced diabetes, LADA, MODY, euglycemic DKA.
+(2) SUBTYPE DIFFERENTIATION — AVP-D vs AVP-R, Cushing disease vs ectopic, primary vs central adrenal insufficiency.
+(3) MULTI-AXIS WORKUP — simultaneous pituitary axes, multi-hormone deficiency patterns.
+Do NOT generate basic first-line questions (e.g. start metformin for T2DM). Every question must require subspecialty reasoning.`;
 
-  // v6.9 Fix: Strict Prompt Lock on formatting to prevent synchronization breaks
   const integrityRules = `INTEGRITY RULES:
-A. Distractor-stem independence.
-B. Evidence discipline: cite only data explicitly in stem.
-C. Cognitive bias labels: anchoring, premature closure, availability bias.
-D. "glucose" never "sugar".
-E. EXPLANATION FORMATTING: In S2, you MUST refer to choices strictly as "Choice A", "Choice B", "Choice C", "Choice D", "Choice E". DO NOT use bullet points (e.g., "• A") or standalone letters.
-F. GUIDELINE CURRENCY: You MUST cite guidelines from 2023 or later ONLY. Do NOT cite any guideline, criteria, or recommendation older than 2023. If you are uncertain of the year, do not cite it — state the recommending society only (e.g., "per ADA recommendations").
-G. EXPLANATION-CHOICE CONSISTENCY (CRITICAL): Before finalizing, perform a self-check — read every sentence in S2 and confirm it matches the actual text of the corresponding choice letter. The explanation MUST NOT describe a choice differently from what is written in the choices field. If you say "Choice B proposes X", then Choice B must literally contain X. NEVER call the correct answer a distractor and NEVER call a distractor the correct answer.`;
+A. Evidence discipline: cite only data explicitly in stem.
+B. "glucose" never "sugar".
+C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL; do not confuse them.
+D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis. 
+E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS): 
+   - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE. Do not write "Choice A is correct". Simply explain the clinical reasoning.
+   - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc. Do not use bullets.
+F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.`;
 
-  const explanationNote = isABIM_IM
-    ? "EXPLANATION: concise total <=250 words. Cite only 2023+ guidelines."
-    : `EXPLANATION: S1 (why correct answer is correct — cite the specific 2023–2026 guideline and year), S2 (why each distractor fails — reference each by its exact Choice letter and match its text precisely), Board Pearl (one high-yield exam fact). STRICT LENGTH LIMIT: <= 350 words total. SELF-CHECK BEFORE SUBMITTING: confirm that every choice letter referenced in S2 matches the actual choice text you wrote, and that no guideline cited predates 2023.`;
+  const explanationNote = `EXPLANATION FORMAT — use these exact headers:
+🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
+🚫 Why the other choices fail: [Explain each wrong choice starting exactly with "Choice X:"].
+💎 Board Pearl: [one high-yield fact].`;
   
   const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
 
   const systemText = `You are ${systemRole}. Output confident, accurate facts.
 ${levelRules}
+${VIGNETTE_STYLE_GUIDE}
 ${integrityRules}
 CLINICAL EVIDENCE STANDARD: You MUST base the diagnosis, management, and explanation citations strictly on: ${topicGuideline}. Do not use outdated criteria.
-
 ${explanationNote}
 UNIVERSAL HARD RULES: HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine.
 RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
 
-  const step3TierPrompt = isStep3 ? `
-USMLE STEP 3 TIER 3–5 REQUIREMENTS (MANDATORY):
-- The vignette MUST present a management decision, NOT a diagnosis or workup question.
-- Build in a realistic constraint: facility without cath lab, transfer time >120 min, patient refusing standard care, two active life threats, or failed first-line therapy.
-- Distractors must include the Tier 1/2 answer (what a MS3 would choose) — the correct answer requires resident-level multi-step reasoning.
-- Stem must reflect a PGY-1/PGY-2 resident on call or in clinic managing a deteriorating or complex patient.
-- Cite the relevant 2023–2026 guideline in S1 of the explanation.` : "";
-
-  const abimIMTierPrompt = isABIM_IM ? `
-ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS (MANDATORY):
-- Do NOT ask "what is the first test?" or "what is the most likely diagnosis?" for a classic presentation.
-- Present a scenario requiring synthesis: borderline risk scores + risk-enhancing factors, treatment failure, statin intolerance with high ASCVD risk, or multi-comorbidity drug selection.
-- For lipid questions: use PREVENT calculator (not PCE), cite 2018 AHA/ACC or 2022 ACC Expert Consensus, include non-statin options when relevant (ezetimibe, bempedoic acid, PCSK9i).
-- Distractors must include the Tier 1 answer (what a MS4 would choose) — the correct answer requires internist-level guideline synthesis.
-- Cite the correct, existing guideline with the correct year in S1.` : "";
-
-  const endoTier3Prompt = isABIM_Endo ? `
-ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS (MANDATORY):
-- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario — NOT a textbook classic.
-- Consider: atypical DM subtypes (LADA, MODY, ketosis-prone, ICI-induced), rare pituitary or adrenal presentations, multi-hormone deficiency, genetic testing decisions, or cardiorenal treatment choices.
-- Distractors must include the "classic teaching" answer that a non-subspecialist would choose — the correct answer requires deeper subspecialty reasoning.
-- Cite a specific 2024–2026 society guideline (ADA, ES, AACE, AASLD, ACC/AHA, ASCO) in the explanation.
-- Board Pearl must contain an exam-ready high-yield fact not obvious from the stem.` : "";
-
-  const userText = `Write 1 vignette on: ${promptTopic}.
+  const userText = isStep1 
+  ? `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
-- Patient Demographics & Setting: Patient is a ${randomSex}. You MUST select a clinically appropriate age and care setting (Clinic, ED, Inpatient, ICU) that matches the typical epidemiological presentation of the target diagnosis. DO NOT force an elderly patient into a pediatric/young adult disease, and DO NOT place a stable outpatient in the hospital.
+- Patient Demographics & Setting: Patient is a ${randomSex}. 
 - Pertinent negatives biologically possible for a ${randomSex}.
-- The stem MUST end with the interrogative sentence.${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
-Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
+- The stem MUST end with the interrogative sentence.
+Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
+  : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
+- Lead-in asks for: ${promptQType}.
+- Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
+- Pertinent Negatives: Include 1-2 pertinent negative exam or lab findings biologically relevant to a ${randomSex} to rule out the most obvious distractor.
+- The stem MUST end with the interrogative sentence.
+Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
 
   return { systemText, userText, randomSex, maxTokens, resolvedTopic: promptTopic };
 }
