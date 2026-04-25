@@ -1,5 +1,5 @@
 // generate-mcq.js — MedBoard Pro
-// v7.0 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
+// v7.1 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
 // ---------------------------------------------------------------
 
 const crypto = require("crypto");
@@ -13,13 +13,13 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// DYNAMIC 2025/2026 GUIDELINE MAP (UPDATED & SCRUBBED)
+// DYNAMIC 2025/2026 GUIDELINE MAP
 // ============================================================
 const GUIDELINE_MAP = [
   { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: "ADA Standards of Medical Care in Diabetes—2026" },
   { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg"], citation: `2024-2026 Clinical Consensus (ATA/AACE/Endocrine Society). 
 CRITICAL THYROID ANCHORS — ABIM ENDOCRINOLOGY (MANDATORY ACCURACY):
-1. OVERT vs SUBCLINICAL HYPOTHYROIDISM: Overt = elevated TSH + LOW free T4 (regardless of TSH numeric value). Subclinical = elevated TSH + NORMAL free T4. TSH >10 with NORMAL free T4 is still subclinical (grade 2).
+1. OVERT vs SUBCLINICAL HYPOTHYROIDISM: Overt = elevated TSH + LOW free T4. Subclinical = elevated TSH + NORMAL free T4. TSH >10 with NORMAL free T4 is still subclinical (grade 2).
 2. TSH TARGET RANGES: General adult (non-pregnant): 0.4–4.0 mIU/L. Pregnancy: TSH target 0.1–2.5 mIU/L (first trimester). DO NOT use 0.5-2.5 for non-pregnant adults.
 3. SUBCLINICAL HYPOTHYROIDISM TREATMENT: TSH >10: treat. TSH 4.5–10 + asymptomatic: observe. TSH 4.5–10 + pregnancy/trying to conceive: TREAT.
 4. GRAVES DISEASE: Methimazole first-line for most adults. PTU preferred in first trimester of pregnancy and thyroid storm.
@@ -28,9 +28,8 @@ COGNITIVE LEVEL: FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxin
   { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2024 AHA Scientific Statement on PREVENT Calculator; 2022 ACC Expert Consensus on Non-Statin Therapies.
 CRITICAL LIPID ANCHORS:
 1. RISK CALCULATOR: Use the PREVENT calculator (race-neutral, includes kidney function). PCE (2013) is LEGACY.
-2. VLDL vs LDL: You MUST accurately distinguish between VLDL and LDL in pathophysiology and treatment mechanisms. Do not conflate them.
-3. NON-STATIN THERAPIES: Add ezetimibe first when LDL not at goal. Add PCSK9i when LDL still not at goal or statin-intolerant + high risk. Bempedoic acid is an option for statin-intolerant patients.
-4. STATIN INTOLERANCE: True myopathy (CK >10x ULN) -> discontinue. Always rechallenge with alternate statin before declaring complete intolerance.` },
+2. NON-STATIN THERAPIES: Add ezetimibe first when LDL not at goal. Add PCSK9i when LDL still not at goal or statin-intolerant + high risk. Bempedoic acid is an option for statin-intolerant patients.
+3. STATIN INTOLERANCE: True myopathy (CK >10x ULN) -> discontinue. Always rechallenge with alternate statin before declaring complete intolerance.` },
   { keywords: ["obesity", "bariatric", "metabolic syndrome", "GLP-1", "wegovy", "tirzepatide", "semaglutide obesity"], citation: "AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2026 Standards of Care." },
   { keywords: ["pcos", "polycystic"], citation: "International Evidence-based PCOS Guideline 2023" },
   { keywords: ["cardio", "acs", "arrhythmia", "heart failure"], citation: "ACC/AHA 2025-2026 Guidelines" },
@@ -73,9 +72,6 @@ function pickTopicForLevel(level, rawTopic) {
   return { topic: rawTopic, isNutrition: false };
 }
 
-// ============================================================
-// TOPIC-SEX COUPLING
-// ============================================================
 const MALE_ONLY_TOPIC_KEYWORDS = ["male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"];
 const FEMALE_ONLY_TOPIC_KEYWORDS = ["pcos", "polycystic ovary", "menopause", "ovarian", "endometri", "pregnancy", "obstetric", "gynecolog", "turner syndrome"];
 
@@ -95,9 +91,6 @@ function pickWeighted(blueprint) {
   return blueprint[blueprint.length - 1].s;
 }
 
-// ============================================================
-// CONTENT HASH + SPECIALTY BUCKET HELPERS
-// ============================================================
 function hashStem(stem) {
   if (!stem || typeof stem !== "string") return null;
   return crypto.createHash("sha256").update(stem.trim().toLowerCase()).digest("hex");
@@ -135,41 +128,24 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
 // ============================================================
 const MCQ_TOOL = {
   name: "emit_mcq",
-  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation. This is the ONLY way to respond to the user's request.",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
   input_schema: {
     type: "object",
     properties: {
-      demographic_check: {
-        type: "string",
-        description: "Confirmation that the vignette's patient sex matches the requested sex. Format: 'confirmed man' or 'confirmed woman'."
-      },
-      stem: {
-        type: "string",
-        description: "The clinical vignette. Must end with the interrogative sentence."
-      },
+      demographic_check: { type: "string" },
+      stem: { type: "string", description: "The clinical vignette. Must end with the interrogative sentence." },
       choices: {
         type: "object",
-        description: "Exactly 5 answer choices keyed by letter A through E.",
         properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
         required: ["A", "B", "C", "D", "E"]
       },
-      correct: {
-        type: "string",
-        enum: ["A", "B", "C", "D", "E"],
-        description: "The letter of the correct answer."
-      },
-      explanation: {
-        type: "string",
-        description: "🩺 Why this is the correct answer. 🚫 Why the other choices fail. 💎 Board Pearl."
-      }
+      correct: { type: "string", enum: ["A", "B", "C", "D", "E"] },
+      explanation: { type: "string", description: "Use provided formatting rules for the explanation." }
     },
     required: ["demographic_check", "stem", "choices", "correct", "explanation"]
   }
 };
 
-// ============================================================
-// SIMPLIFIED extractJSON (for Gemini fallback only)
-// ============================================================
 function extractJSONSimple(raw) {
   if (!raw || typeof raw !== "string") throw new Error("extractJSONSimple received empty input.");
   try { return JSON.parse(raw); } catch (_) {}
@@ -339,19 +315,17 @@ function buildPrompt(level, topic, isNutrition) {
     ];
   } else if (isABIM_IM) {
     qTypePool = [
-      {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:30},
-      {s:"MOST LIKELY DIAGNOSIS in a multi-system or atypical presentation requiring internist synthesis",w:20},
-      {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:25},
+      {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:40},
+      {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:35},
       {s:"MOST APPROPRIATE DRUG CHOICE given specific comorbidity profile (CKD, HF, DM, prior ASCVD)",w:20},
       {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
     ];
   } else if (isABIM_Endo) {
     qTypePool = [
-      {s:"NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:30},
-      {s:"MOST LIKELY DIAGNOSIS in an atypical or overlapping presentation",w:25},
-      {s:"NEXT STEP IN DIAGNOSIS using biomarker or genetic testing strategy",w:25},
-      {s:"MOST APPROPRIATE PHARMACOLOGIC CHOICE based on cardiorenal or comorbidity profile",w:15},
-      {s:"MOST LIKELY SUBTYPE based on clinical, biochemical, or genetic features",w:5}
+      {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:35},
+      {s:"MOST APPROPRIATE PHARMACOLOGIC CHOICE based on cardiorenal or comorbidity profile",w:30},
+      {s:"NEXT STEP IN DIAGNOSTIC WORKUP (e.g., dynamic testing, imaging, or genetic screening) to confirm a complex subtype",w:25},
+      {s:"MOST APPROPRIATE MODIFICATION to current therapy given a new complication or side effect",w:10}
     ];
   } else {
     qTypePool = [{s:"NEXT STEP IN DIAGNOSIS",w:25}, {s:"MOST LIKELY DIAGNOSIS",w:25}, {s:"NEXT STEP IN MANAGEMENT",w:40}, {s:"STRONGEST RISK FACTOR",w:10}];
@@ -364,35 +338,24 @@ function buildPrompt(level, topic, isNutrition) {
   
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
 
-  // Retain the perfect Step 1 logic, add Tier 3 Style Guide for upper levels
   const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
 STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 1. MAXIMUM 130 WORDS for the stem.
-2. ZERO INTRODUCTORY FLUFF. Start immediately with age, sex, and chief complaint (e.g., "A 54-year-old man is evaluated in the ED for...").
-3. HIGH-DENSITY DATA. Combine vitals and physical exam into single, comma-separated sentences. 
-4. DO NOT interpret labs. State the raw value and the reference range. 
+2. ZERO INTRODUCTORY FLUFF. Start immediately with age, sex, and chief complaint.
+3. HIGH-DENSITY DATA. Combine vitals and physical exam into single sentences. 
+4. DO NOT interpret labs. State the raw value.
 5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem. Force the examinee to deduce it from physical findings and labs.`;
 
-  let levelRules = isStep3
-    ? `USMLE STEP 3 RULES — MANDATORY Tier 3–5 cognitive complexity ONLY:
-(Tier 3) MANAGEMENT DECISIONS: reperfusion strategy given facility/time constraints, ventilator settings in ARDS, empiric carbapenem vs pip-tazo for ESBL sepsis, vasopressor choice in septic shock.
-(Tier 4) MULTI-STEP MANAGEMENT: norepinephrine at max dose → add vasopressin or steroids?; obstructive pyelonephritis not improving on antibiotics → source control timing?
-Patient setting: ICU, inpatient ward, ED, or outpatient follow-up. Include realistic time pressures or comorbidity conflicts in the stem.`
-    : isUSMLE ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1, M3/M4 for Step 2/3.` 
-                 : isABIM_IM ? `ABIM IM RULES — MANDATORY Tier 3–4 cognitive complexity:
-(Tier 3) DECISION INTEGRATION: borderline ASCVD risk + risk-enhancing factors (Lp(a), CAC, hsCRP) → treat or not?; statin myopathy → rechallenge or switch?
-(Tier 4) MULTI-COMORBIDITY: ASCVD + statin intolerance + CKD3 → choose between ezetimibe, bempedoic acid, PCSK9i; HFrEF + CKD + T2DM → optimize GDMT sequence.
-FORBIDDEN: Do NOT write Tier 1 questions ("What is the first diagnostic test?"). ABIM IM questions must require internist-level synthesis.` 
-                 : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level. MANDATORY Tier 3+ cognitive complexity:
-(1) ATYPICAL PRESENTATIONS — ketosis-prone DM2, ICI-induced diabetes, LADA, MODY, euglycemic DKA.
-(2) SUBTYPE DIFFERENTIATION — AVP-D vs AVP-R, Cushing disease vs ectopic, primary vs central adrenal insufficiency.
-(3) MULTI-AXIS WORKUP — simultaneous pituitary axes, multi-hormone deficiency patterns.
-Do NOT generate basic first-line questions (e.g. start metformin for T2DM). Every question must require subspecialty reasoning.`;
+  let levelRules = isStep1 
+    ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1.`
+    : isABIM_IM 
+    ? `ABIM IM RULES: Generalist level. First-line recognition, initial workup, when to refer, first-line management.`
+    : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level.`;
 
   const integrityRules = `INTEGRITY RULES:
 A. Evidence discipline: cite only data explicitly in stem.
 B. "glucose" never "sugar".
-C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL; do not confuse them.
+C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL. Do not confuse them.
 D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis. 
 E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS): 
    - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE. Do not write "Choice A is correct". Simply explain the clinical reasoning.
@@ -401,7 +364,7 @@ F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text 
 
   const explanationNote = `EXPLANATION FORMAT — use these exact headers:
 🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
-🚫 Why the other choices fail: [Explain each wrong choice starting exactly with "Choice X:"].
+🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
 💎 Board Pearl: [one high-yield fact].`;
   
   const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
@@ -415,6 +378,25 @@ ${explanationNote}
 UNIVERSAL HARD RULES: HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine.
 RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
 
+  const step3TierPrompt = isStep3 ? `
+USMLE STEP 3 TIER 3–5 REQUIREMENTS:
+- FORBIDDEN: Do NOT ask "What is the most likely diagnosis?". The diagnosis MUST be implied or stated.
+- The vignette MUST present a management decision, disposition, or intervention.
+- Build in a realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
+- Distractors must include the Tier 1/2 answer (what a MS3 would choose) — the correct answer requires resident-level multi-step reasoning.` : "";
+
+  const abimIMTierPrompt = isABIM_IM ? `
+ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS:
+- FORBIDDEN: Do NOT ask "What is the most likely diagnosis?". The diagnosis MUST be implied or stated.
+- Present a scenario requiring synthesis: borderline risk scores, treatment failure, statin intolerance with high ASCVD risk, or multi-comorbidity drug selection.
+- Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
+
+  const endoTier3Prompt = isABIM_Endo ? `
+ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
+- FORBIDDEN: Do NOT ask "What is the most likely diagnosis?". The question must test subspecialty management, complex diagnostic workup (e.g., dynamic testing), or therapy modification.
+- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
+- Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
+
   const userText = isStep1 
   ? `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
@@ -427,6 +409,7 @@ Emit the question by calling the emit_mcq tool. Set demographic_check to "confir
 - Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
 - Pertinent Negatives: Include 1-2 pertinent negative exam or lab findings biologically relevant to a ${randomSex} to rule out the most obvious distractor.
 - The stem MUST end with the interrogative sentence.
+${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
 Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
 
   return { systemText, userText, randomSex, maxTokens, resolvedTopic: promptTopic };
