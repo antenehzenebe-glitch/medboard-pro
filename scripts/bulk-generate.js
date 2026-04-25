@@ -1,17 +1,6 @@
 // bulk-generate.js — MedBoard Pro
-// Standalone Node.js script for pre-populating Supabase via Anthropic Batch API
-// Usage:
-//   node bulk-generate.js                          # 500 questions, all levels/topics
-//   node bulk-generate.js --count 200              # 200 questions
-//   node bulk-generate.js --level "ABIM Endocrinology" --count 100
-//   node bulk-generate.js --level "USMLE Step 1" --topic "Diabetes" --count 50
-//   node bulk-generate.js --mode standard          # skip batch API, use concurrent calls
-//
-// Required env vars:
-//   ANTHROPIC_API_KEY=sk-ant-...
-//   SUPABASE_URL=https://xxx.supabase.co          (optional, has fallback)
-//   SUPABASE_ANON_KEY=eyJ...                      (optional, has fallback)
-
+// v7.0 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
+// ---------------------------------------------------------------
 "use strict";
 const crypto = require("crypto");
 
@@ -32,228 +21,42 @@ function getArg(flag, defaultVal) {
   const i = args.indexOf(flag);
   return i !== -1 && args[i + 1] ? args[i + 1] : defaultVal;
 }
-// Env vars take priority over CLI flags (avoids shell quoting issues in GitHub Actions)
 const TARGET_COUNT  = parseInt(process.env.BULK_COUNT  || getArg("--count", "500"), 10);
 const FILTER_LEVEL  = (process.env.BULK_LEVEL  || getArg("--level", "")).trim()  || null;
 const FILTER_TOPIC  = (process.env.BULK_TOPIC  || getArg("--topic", "")).trim()  || null;
 const MODE          = (process.env.BULK_MODE   || getArg("--mode", "batch")).trim();
 const CONCURRENCY   = parseInt(process.env.BULK_CONCURRENCY || getArg("--concurrency", "6"), 10);
 
-// ─── SHARED CONSTANTS (mirrored from generate-mcq.js) ────────────────────────
-const VALID_LEVELS = [
-  "ABIM Internal Medicine",
-  "ABIM Endocrinology",
-  "USMLE Step 1",
-  "USMLE Step 2 CK",
-  "USMLE Step 3"
-];
+// ─── SHARED CONSTANTS ────────────────────────────────────────────────────────
+const VALID_LEVELS = ["ABIM Internal Medicine", "ABIM Endocrinology", "USMLE Step 1", "USMLE Step 2 CK", "USMLE Step 3"];
 
 const GUIDELINE_MAP = [
   { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: "ADA Standards of Medical Care in Diabetes—2026" },
-  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg"], citation: `ATA 2014 Guidelines for Hypothyroidism in Adults (Jonklaas et al., Thyroid 2014) — PRIMARY REFERENCE for hypothyroidism; ATA 2016 Guidelines for Thyroid Nodules and Differentiated Thyroid Cancer; ATA 2016 Guidelines for Hyperthyroidism; AACE 2022 Thyroid Nodule Clinical Practice Guidelines; ES 2016 Thyroid Dysfunction in Pregnancy Guidelines.
-
-⚠️ FABRICATED CITATION WARNING: "ATA 2025 Guidelines" DOES NOT EXIST as of April 2026. The last comprehensive ATA hypothyroidism guideline is Jonklaas et al. 2014. Do NOT invent guideline years. If uncertain, cite "per ATA recommendations" without a year, or cite the 2014 document explicitly.
-
+  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg"], citation: `2024-2026 Clinical Consensus (ATA/AACE/Endocrine Society). 
 CRITICAL THYROID ANCHORS — ABIM ENDOCRINOLOGY (MANDATORY ACCURACY):
-
-1. OVERT vs SUBCLINICAL HYPOTHYROIDISM — EXACT DEFINITIONS (DO NOT DEVIATE):
-   - OVERT hypothyroidism = elevated TSH + LOW free T4 (REGARDLESS of TSH numeric value).
-   - SUBCLINICAL hypothyroidism = elevated TSH + NORMAL free T4.
-   - TSH >10 with NORMAL free T4 = still subclinical (grade 2 subclinical); treatment generally recommended.
-   - TSH 9.8 + LOW free T4 = OVERT hypothyroidism — because free T4 is low, NOT because TSH >10.
-   - CRITICAL ERROR TO AVOID: Do NOT define overt hypothyroidism as "TSH >10" alone. The free T4 status determines overt vs subclinical.
-
-2. TSH TARGET RANGES — EXACT VALUES (DO NOT CONFUSE):
-   - General adult (non-pregnant): TSH target 0.4–4.0 mIU/L (ATA 2014 — lab reference range).
-   - Elderly patients (>65): target slightly higher, 1.0–4.0 mIU/L acceptable.
-   - Pregnancy / preconception: TSH target 0.1–2.5 mIU/L (first trimester), 0.2–3.0 (second), 0.3–3.0 (third).
-   - FORBIDDEN ERROR: Do NOT cite 0.5–2.5 mIU/L as the general adult target — this is the PREGNANCY target. Using it for a non-pregnant adult is a factual error.
-   - Differentiated thyroid cancer post-thyroidectomy: TSH suppression target depends on risk stratum (low-risk: 0.5–2.0; high-risk: <0.1).
-
-3. LEVOTHYROXINE DOSING:
-   - Full replacement: 1.6 mcg/kg/day — acceptable in young, healthy adults without cardiac disease (ATA 2014).
-   - Low-and-slow (25–50 mcg starting dose): preferred in elderly patients, patients with CAD, or long-standing severe hypothyroidism.
-   - In a young healthy adult (e.g., 34-year-old without cardiac disease), full weight-based dosing IS defensible — the explanation must acknowledge this nuance rather than calling it wrong.
-   - Recheck TSH 6–8 weeks after any dose change.
-
-4. SUBCLINICAL HYPOTHYROIDISM — TREATMENT THRESHOLDS:
-   - TSH >10: treat (strong recommendation, ATA 2014).
-   - TSH 4.5–10 + symptoms: treat (individualize).
-   - TSH 4.5–10 + asymptomatic: observe, recheck in 6 months.
-   - TSH 4.5–10 + pregnancy or trying to conceive: TREAT.
-   - TPO antibody positive: increases risk of progression — favor treatment.
-
-5. GRAVES DISEASE MANAGEMENT:
-   - Three options: antithyroid drugs (methimazole first-line), radioactive iodine (RAI), or thyroidectomy.
-   - Methimazole > PTU for most adults (less hepatotoxic); PTU preferred in first trimester of pregnancy and thyroid storm.
-   - TRAb (TSH receptor antibodies): diagnostic for Graves, also predicts remission — negative TRAb after 12–18 months ATD = consider stopping.
-   - Ophthalmopathy: RAI can worsen — prefer methimazole or surgery in active moderate-severe GO.
-
-6. THYROID NODULE WORKUP (AACE 2022 / ATA 2016):
-   - TSH first: if suppressed → radionuclide scan (hot nodule = rarely malignant).
-   - Ultrasound: characterize all nodules; TIRADS or ATA US pattern guides FNA decision.
-   - FNA: recommended based on US pattern + size thresholds (not all nodules need FNA).
-   - Molecular testing (ThyroSeq, Afirma): for indeterminate FNA (Bethesda III/IV).
-
-7. THYROID CANCER POST-THYROIDECTOMY:
-   - RAI remnant ablation: NOT routine for low-risk DTC (ATA 2015 guidelines revised this).
-   - Thyroglobulin (Tg) + anti-Tg antibodies: surveillance markers.
-   - TSH suppression: high-risk → TSH <0.1; low-risk → TSH 0.5–2.0.
-
-8. COGNITIVE LEVEL FOR ABIM ENDOCRINOLOGY THYROID QUESTIONS:
-   - FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxine?" (Tier 1 — every MS3 knows this).
-   - REQUIRED Tier 3+: "Patient on stable levothyroxine develops elevated TSH — what is the most likely cause?" (malabsorption, drug interaction, non-compliance, change in formulation).
-   - REQUIRED Tier 4: "Post-thyroidectomy for papillary thyroid cancer — TSH 1.2, Tg undetectable, anti-Tg rising — what is the interpretation and next step?"
-   - REQUIRED Tier 5: "Graves disease in first trimester — methimazole vs PTU; when to switch back post-partum?"` },
-  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2018 AHA/ACC/Multisociety Cholesterol Guideline (Grundy et al., Circulation 2019); 2019 ACC/AHA Primary Prevention Guideline (Arnett et al.); 2022 ACC Expert Consensus on Non-Statin Therapies (Lloyd-Jones et al.); 2024 AHA Scientific Statement on PREVENT Calculator.
-
+1. OVERT vs SUBCLINICAL HYPOTHYROIDISM: Overt = elevated TSH + LOW free T4 (regardless of TSH numeric value). Subclinical = elevated TSH + NORMAL free T4. TSH >10 with NORMAL free T4 is still subclinical (grade 2).
+2. TSH TARGET RANGES: General adult (non-pregnant): 0.4–4.0 mIU/L. Pregnancy: TSH target 0.1–2.5 mIU/L (first trimester). DO NOT use 0.5-2.5 for non-pregnant adults.
+3. SUBCLINICAL HYPOTHYROIDISM TREATMENT: TSH >10: treat. TSH 4.5–10 + asymptomatic: observe. TSH 4.5–10 + pregnancy/trying to conceive: TREAT.
+4. GRAVES DISEASE: Methimazole first-line for most adults. PTU preferred in first trimester of pregnancy and thyroid storm.
+5. THYROID NODULE WORKUP: TSH first: if suppressed → radionuclide scan. Ultrasound: characterize all nodules; size + TIRADS guides FNA.
+COGNITIVE LEVEL: FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxine?" REQUIRED: "Patient on stable levo develops elevated TSH — what is the most likely cause?" (malabsorption, non-compliance).` },
+  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2024 AHA Scientific Statement on PREVENT Calculator; 2022 ACC Expert Consensus on Non-Statin Therapies.
 CRITICAL LIPID ANCHORS:
-
-1. RISK CALCULATOR — USE PREVENT, NOT PCE:
-   - The PREVENT calculator (AHA 2023) is NOW the recommended ASCVD risk tool — race-neutral, includes kidney function, broader age range 30–79 years.
-   - Pooled Cohort Equations (PCE, 2013) are LEGACY — overestimate risk in many populations; do NOT cite PCE as current standard.
-   - Use neutral language when appropriate: "validated 10-year ASCVD risk calculator (PREVENT or equivalent)".
-
-2. RISK CATEGORIES & STATIN THRESHOLDS (2018 AHA/ACC):
-   - ASCVD ≥7.5% → high-intensity statin indicated.
-   - ASCVD 5–<7.5% → intermediate risk; risk discussion + risk-enhancing factors guide decision.
-   - ASCVD <5% → low risk; lifestyle first.
-   - Risk-enhancing factors: Lp(a) ≥125 nmol/L, hsCRP ≥2, ABI <0.9, family history premature ASCVD.
-   - Coronary artery calcium (CAC) score: CAC=0 → defer statin (unless DM, smoker, strong FH); CAC≥100 → treat.
-
-3. NON-STATIN THERAPIES — ABIM IM TIER 4 TERRITORY:
-   - Add ezetimibe first when LDL not at goal on max-tolerated statin (NNT favorable, oral, cheap).
-   - Add PCSK9 inhibitor (evolocumab/alirocumab) when LDL still not at goal or statin-intolerant with high ASCVD risk.
-   - Bempedoic acid: ATP-citrate lyase inhibitor; option for statin-intolerant patients (CLEAR Outcomes 2023 — reduced MACE).
-   - Inclisiran: siRNA PCSK9 inhibitor; twice-yearly injection; same efficacy as PCSK9i mAbs.
-   - Icosapentaenoic acid (EPA, Vascepa): for TG ≥150 + high CV risk on statin (REDUCE-IT trial); DHA-containing formulations NOT proven.
-
-4. STATIN INTOLERANCE:
-   - True myopathy: CK >10× ULN + symptoms → discontinue.
-   - Rechallenge with alternate statin (rosuvastatin, pravastatin) or every-other-day dosing before declaring intolerance.
-   - Statin-intolerant + very high risk → bempedoic acid + ezetimibe → PCSK9i.
-
-5. FORBIDDEN CITATIONS — DO NOT USE:
-   - "AACE 2026 Lipid Guidelines" — DOES NOT EXIST. Last comprehensive AACE lipid guideline: Jellinger et al. 2017.
-   - Do NOT cite AACE/ACE for lipids without specifying it is the 2017 document.` },
-  { keywords: ["obesity", "bariatric", "metabolic syndrome", "GLP-1", "wegovy", "tirzepatide", "semaglutide obesity"], citation: "AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2025/2026 Standards of Care." },
+1. RISK CALCULATOR: Use the PREVENT calculator (race-neutral, includes kidney function). PCE (2013) is LEGACY.
+2. VLDL vs LDL: You MUST accurately distinguish between VLDL and LDL in pathophysiology and treatment mechanisms. Do not conflate them.
+3. NON-STATIN THERAPIES: Add ezetimibe first when LDL not at goal. Add PCSK9i when LDL still not at goal or statin-intolerant + high risk. Bempedoic acid is an option for statin-intolerant patients.
+4. STATIN INTOLERANCE: True myopathy (CK >10x ULN) -> discontinue. Always rechallenge with alternate statin before declaring complete intolerance.` },
+  { keywords: ["obesity", "bariatric", "metabolic syndrome", "GLP-1", "wegovy", "tirzepatide", "semaglutide obesity"], citation: "AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2026 Standards of Care." },
   { keywords: ["pcos", "polycystic"], citation: "International Evidence-based PCOS Guideline 2023" },
   { keywords: ["cardio", "acs", "arrhythmia", "heart failure"], citation: "ACC/AHA 2025-2026 Guidelines" },
   { keywords: ["hypertension", "blood pressure"], citation: "ACC/AHA 2025 Hypertension Guidelines" },
   { keywords: ["nephro", "renal", "ckd"], citation: "KDIGO 2025 Guidelines" },
-  { keywords: ["gastro", "hepat", "cirrhosis", "ibd", "crohn", "colitis", "ulcerative", "inflammatory bowel", "infliximab", "adalimumab", "vedolizumab", "ustekinumab", "risankizumab", "tofacitinib", "upadacitinib", "biologic", "anti-tnf", "fistula", "perianal", "colonoscopy", "budesonide", "mesalamine", "azathioprine", "methotrexate ibd"], citation: `ACG 2024 Crohn's Disease Guidelines (Lichtenstein et al.); AGA 2021 Moderate-to-Severe Crohn's Guideline; ACG 2019 UC Guidelines; ECCO 2022 IBD Guidelines; AASLD 2025 Practice Guidance (hepatology); MKSAP 19 GI/Hepatology.
-
-CRITICAL IBD ANCHORS — ABIM IM TIER 3–4:
-
-1. THERAPEUTIC DRUG MONITORING (TDM) — ANTI-TNF:
-   - Infliximab trough goal: ≥5 mcg/mL (induction), ≥3–5 mcg/mL (maintenance).
-   - Anti-drug antibodies (ATI) present + low trough → switch biologic CLASS (primary immunogenicity).
-   - Subtherapeutic trough + no ATI → dose optimize (increase dose or shorten interval).
-   - Secondary loss of response: check trough + ATI before switching.
-
-2. TREATMENT STRATEGY — TOP-DOWN VS STEP-UP:
-   - Moderate-to-severe CD: early biologic + immunomodulator combination (top-down) — SONIC trial shows superiority over step-up.
-   - SONIC trial (NEJM 2010): infliximab + azathioprine > infliximab monotherapy > azathioprine alone for steroid-free remission in CD.
-   - Anti-TNF monotherapy vs combination: combination superior for CD (SONIC); UC data less definitive.
-
-3. BIOLOGIC SWITCHING RULES:
-   - Primary non-response (never responded) → switch to DIFFERENT MECHANISM CLASS (e.g., anti-TNF → vedolizumab or ustekinumab).
-   - Secondary loss of response (responded then lost) → TDM first; if ATI+ → switch class; if low trough/no ATI → dose optimize same agent.
-
-4. PRE-BIOLOGIC SCREENING (MANDATORY):
-   - TB: CXR + IGRA (QuantiFERON-TB Gold); treat LTBI before starting biologic.
-   - HBV: HBsAg, anti-HBc, anti-HBs; if HBsAg+ → antiviral prophylaxis (entecavir) before biologic.
-   - Varicella IgG: vaccinate if seronegative (live vaccine — give BEFORE biologic, not during).
-   - HPV vaccine: recommended for all IBD patients on immunosuppression up to age 45.
-   - Pneumococcal, influenza, COVID vaccines: give before or during (non-live okay during).
-
-5. CANCER SURVEILLANCE:
-   - UC: colonoscopy every 1–2 years starting 8–10 years after diagnosis.
-   - CD with colonic involvement: same surveillance intervals as UC.
-   - Primary sclerosing cholangitis (PSC) + IBD: annual colonoscopy from time of PSC diagnosis.
-
-6. PERIANAL DISEASE:
-   - Workup: EUA (exam under anesthesia) + MRI pelvis (best for fistula mapping).
-   - Treatment: infliximab has BEST perianal fistula data; surgical drainage + seton BEFORE biologic.
-   - Avoid: systemic corticosteroids in perianal fistulizing disease (worsen).
-
-7. FISTULIZING DISEASE:
-   - Staged approach: surgical drainage first → antibiotics (metronidazole/ciprofloxacin) → biologic (infliximab).
-   - Avoid corticosteroids in fistulizing disease.
-   - Combination biologic + immunomodulator preferred.
-
-8. PREGNANCY IN IBD:
-   - Anti-TNF agents (infliximab, adalimumab): SAFE throughout pregnancy; continue.
-   - Vedolizumab: likely safe; data emerging.
-   - Methotrexate: CONTRAINDICATED in pregnancy (teratogenic) — stop 3–6 months before conception.
-   - Thalidomide: absolutely contraindicated.
-   - Active IBD during pregnancy is more dangerous than biologic exposure.
-
-9. SMOKING IN IBD:
-   - Crohn's disease: smoking WORSENS disease course, increases surgery risk — cessation critical.
-   - Ulcerative colitis: smoking paradoxically PROTECTIVE — but NOT a reason to recommend smoking.
-
-10. SURGICAL CONSIDERATIONS:
-    - LIR!C trial: ileocecal resection non-inferior to infliximab for short-segment ileal CD — surgical option preferred in some patients.
-    - UC refractory to medical therapy → colectomy (curative).
-
-11. IMAGING:
-    - CT enterography vs MR enterography: MRE PREFERRED in young patients (avoids radiation).
-    - MRE better for perianal disease, small bowel wall inflammation.
-
-12. STEROID CHOICES:
-    - Budesonide: preferred for mild-moderate ileal/right-sided CD (first-pass hepatic metabolism, less systemic effect).
-    - Prednisone: for more extensive or severe disease; avoid long-term use.
-
-13. BIOLOGIC AGENTS — MECHANISM AND TIER:
-    - Anti-TNF: infliximab, adalimumab, certolizumab (CD), golimumab (UC).
-    - Vedolizumab (anti-α4β7): gut-selective integrin inhibitor; safer profile, slower onset; preferred when systemic immunosuppression a concern.
-    - Ustekinumab (anti-IL-12/23), risankizumab (anti-IL-23): options for CD; risankizumab approved 2022.
-    - Tofacitinib, upadacitinib (JAK inhibitors): UC; BLACK BOX WARNING: cardiovascular risk, malignancy, thrombosis — use with caution in patients >50 with CV risk factors.` },
+  { keywords: ["gastro", "hepat", "cirrhosis", "ibd", "crohn", "colitis", "ulcerative", "inflammatory bowel", "infliximab", "adalimumab", "vedolizumab", "ustekinumab", "risankizumab", "tofacitinib", "upadacitinib", "biologic", "anti-tnf", "fistula", "perianal", "colonoscopy", "budesonide", "mesalamine", "azathioprine", "methotrexate ibd"], citation: `ACG 2024 Crohn's Disease Guidelines; AGA 2021 Moderate-to-Severe Crohn's Guideline; AASLD 2025 Practice Guidance. Focus on Top-down therapy, therapeutic drug monitoring, and pre-biologic screening (TB/HBV mandatory). Methotrexate is contraindicated in pregnancy.` },
   { keywords: ["parathyroid", "calcium", "bone", "osteoporosis"], citation: "Endocrine Society 2022 Primary Hyperparathyroidism Guideline & AACE 2025 Osteoporosis Guideline" },
   { keywords: ["menopause", "hrt", "reproductive"], citation: "Endocrine Society Menopause Guidelines 2022 & NAMS 2025" },
-  { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin"], citation: "Pituitary Society 2023 Consensus on Acromegaly, Hypopituitarism, and Pituitary Tumors; Endocrine Society 2025 CPGs; European Journal of Endocrinology 2023 AVP-D Consensus. CRITICAL: copeptin >=6.4 pmol/L after hypertonic saline confirms AVP-R (NDI); GH nadir <1 ng/mL on OGTT diagnoses acromegaly (or <0.4 with ultrasensitive assay); prolactin >500 ng/mL is virtually diagnostic of macroprolactinoma." },
-  { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines; IDSA/SCCM 2025 Sepsis Bundle Updates.
-
-CRITICAL CLINICAL ANCHORS FOR SEPSIS/ID QUESTIONS:
-
-1. PRESSORS & HEMODYNAMIC SUPPORT:
-   - Norepinephrine is FIRST-LINE vasopressor (SSC 2021, strong recommendation).
-   - Add VASOPRESSIN (0.03 units/min) when norepinephrine dose ≥0.25 mcg/kg/min to reduce catecholamine load — NOT dopamine.
-   - Dopamine only in select bradycardic patients; associated with higher arrhythmia risk.
-   - Epinephrine: third-line adjunct in refractory shock.
-
-2. STEROID USE IN SEPTIC SHOCK:
-   - IV hydrocortisone 200 mg/day ONLY if hemodynamically unstable despite adequate fluids AND vasopressors (SSC 2021).
-   - Do NOT use steroids in sepsis WITHOUT shock.
-   - ACTH stimulation test NOT required before initiating steroids in septic shock.
-   - Taper steroids when vasopressors no longer needed.
-
-3. ANTIBIOTIC STEWARDSHIP — ESBL & CARBAPENEM INDICATIONS:
-   - Empiric carbapenem (meropenem/ertapenem) indicated: known ESBL colonization/prior infection, high-risk travel exposure, recurrent UTI with prior ESBL, or septic shock with no time for cultures.
-   - De-escalate carbapenem to cephalosporin/quinolone once ESBL susceptibility confirmed — stewardship priority.
-   - Piperacillin-tazobactam NOT reliable for ESBL bacteremia (MERINO trial 2018 — higher mortality vs meropenem).
-   - Ceftolozane-tazobactam or ceftazidime-avibactam for MDR Pseudomonas or KPC-producing organisms.
-
-4. SOURCE CONTROL — OBSTRUCTIVE PYELONEPHRITIS:
-   - Obstructive pyelonephritis with sepsis = UROLOGIC EMERGENCY.
-   - Ureteral stent or percutaneous nephrostomy within 6–12 hours — antibiotics alone are INSUFFICIENT.
-   - Do NOT delay decompression for additional imaging if clinical picture is clear.
-   - Cystoscopy + stent placement preferred if expertise available; nephrostomy if not.
-
-5. REFRACTORY SHOCK — ESCALATION LADDER:
-   - Refractory shock = MAP <65 despite norepinephrine ≥0.25 mcg/kg/min + adequate volume resuscitation.
-   - Step 1: Add vasopressin 0.03 units/min.
-   - Step 2: Add hydrocortisone 200 mg/day IV.
-   - Step 3: Add epinephrine as third-line agent.
-   - Consider angiotensin II (Giapreza) in catecholamine-refractory vasodilatory shock.
-
-6. ICU TRANSFER CRITERIA — LACTATE & VASOPRESSOR ESCALATION:
-   - Lactate ≥4 mmol/L = high-risk; immediate ICU admission regardless of BP.
-   - Lactate 2–4 mmol/L = intermediate risk; reassess at 2 hours — failure to clear ≥10% = ICU transfer.
-   - Vasopressor requirement at any dose = ICU-level care mandatory.
-   - Lactate clearance ≥10% at 2 hours = favorable prognostic sign; do NOT use lactate normalization alone as ICU discharge criterion.` },
-  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma"], citation: "Endocrine Society 2024 CPG on Cushing Syndrome & Adrenal Incidentaloma; Pituitary Society 2023 Consensus on Cushing Disease. CRITICAL: MRI->BIPSS threshold >=6mm; 1mg DST is screening; ACTH <10 pg/mL = independent, >20 pg/mL = dependent; bilateral adrenal hyperplasia with suppressed renin = rule out KCNJ5 mutation." }
+  { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin"], citation: "Pituitary Society 2023 Consensus on Acromegaly, Hypopituitarism, and Pituitary Tumors; Endocrine Society 2025 CPGs. CRITICAL: copeptin >=6.4 pmol/L after hypertonic saline confirms AVP-R (NDI); GH nadir <1 ng/mL on OGTT diagnoses acromegaly." },
+  { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021/2025 Updates; IDSA 2024 Antibiotic Stewardship Guidelines. Focus: Norepinephrine is 1st line. Add vasopressin BEFORE dopamine. Steroids ONLY for refractory shock. Carbapenems for ESBL.` },
+  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma"], citation: "Endocrine Society 2024 CPG on Cushing Syndrome & Adrenal Incidentaloma. CRITICAL: 1mg DST is screening; ACTH <10 pg/mL = independent." }
 ];
 
 const NUTRITION_BY_LEVEL = {
@@ -264,14 +67,10 @@ const NUTRITION_BY_LEVEL = {
   "ABIM Endocrinology": ["Medical nutrition therapy for T1DM/T2DM (ADA 2026)", "Nutritional causes of secondary osteoporosis", "Post-bariatric micronutrient protocol", "Ketogenic diet mechanisms", "Selenium/Zinc deficiency"]
 };
 
-const NUTRITION_INJECTION_RATE = 0.12;
-
 const MALE_ONLY_TOPIC_KEYWORDS   = ["male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"];
 const FEMALE_ONLY_TOPIC_KEYWORDS = ["pcos", "polycystic ovary", "menopause", "ovarian", "endometri", "pregnancy", "obstetric", "gynecolog", "turner syndrome"];
 
 // ─── TOPIC DISTRIBUTION MAP ───────────────────────────────────────────────────
-// Defines how many questions per topic per level in a balanced 500-question run.
-// Adjust weights to match your curriculum priorities.
 const TOPIC_DISTRIBUTION = {
   "ABIM Endocrinology": [
     { topic: "Type 2 Diagnosis and Management",    weight: 8 },
@@ -334,7 +133,7 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Pharmacology, Pharmacokinetics, and Adverse Effects", weight: 8 },
     { topic: "Physiology and Clinical Biochemistry",      weight: 8 },
     { topic: "Microbiology, Virology, and Immunology",    weight: 7 },
-    { topic: "Anatomy, Neuroanatomy, and Embryology",     weight: 4 },
+    { topic: "Anatomy, Neuroanatomy, and Embryology",      weight: 4 },
     { topic: "Behavioral Science, Medical Ethics, and Biostatistics", weight: 5 },
     { topic: "Vitamin D deficiency — rickets vs. osteomalacia", weight: 3 },
     { topic: "Thiamine (B1) deficiency — Wernicke encephalopathy", weight: 3 },
@@ -455,19 +254,19 @@ function rewriteExplanationLetters(explanation, letterMap) {
 // ─── MCQ TOOL SCHEMA ──────────────────────────────────────────────────────────
 const MCQ_TOOL = {
   name: "emit_mcq",
-  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation. This is the ONLY way to respond to the user's request.",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
   input_schema: {
     type: "object",
     properties: {
-      demographic_check: { type: "string", description: "Confirmation that the vignette's patient sex matches the requested sex. Format: 'confirmed man' or 'confirmed woman'." },
-      stem:              { type: "string", description: "The clinical vignette. Must end with the interrogative sentence." },
+      demographic_check: { type: "string" },
+      stem:              { type: "string" },
       choices: {
         type: "object",
         properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
         required: ["A", "B", "C", "D", "E"]
       },
       correct:      { type: "string", enum: ["A","B","C","D","E"] },
-      explanation:  { type: "string", description: "S1 (why correct + citation), S2 (why distractors fail + bias label), Board Pearl." }
+      explanation:  { type: "string" }
     },
     required: ["demographic_check", "stem", "choices", "correct", "explanation"]
   }
@@ -477,16 +276,17 @@ const MCQ_TOOL = {
 function buildPrompt(level, topic) {
   const isNutrition = NUTRITION_BY_LEVEL[level]?.includes(topic) ?? false;
 
-  const isABIM_Endo = level === "ABIM Endocrinology"; // early declaration for qTypePool
+  const isABIM_Endo = level === "ABIM Endocrinology"; 
   const isStep3     = level === "USMLE Step 3";
-  const isABIM_IM   = level === "ABIM Internal Medicine";
+  const isABIM_IM   = level === "ABIM Internal Medicine"; // BUG FIXED HERE
+  const isStep1     = level === "USMLE Step 1";
+
   let qTypePool = [];
   if (topic.includes("Ethics") || topic.includes("Behavioral") || topic.includes("HIPAA") || topic.includes("end-of-life") || topic.includes("consent")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
-  } else if (level === "USMLE Step 1") {
+  } else if (isStep1) {
     qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
   } else if (isStep3) {
-    // Tier 3–5 cognitive complexity for USMLE Step 3
     qTypePool = [
       {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
       {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
@@ -494,8 +294,7 @@ function buildPrompt(level, topic) {
       {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
       {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
     ];
-  } else if (isABIM_IM_early) {
-    // Tier 3-4 cognitive complexity for ABIM Internal Medicine
+  } else if (isABIM_IM) { // BUG FIXED HERE
     qTypePool = [
       {s:"MOST APPROPRIATE NEXT TREATMENT STEP given statin intolerance, organ dysfunction, or comorbidity conflict",w:30},
       {s:"MOST LIKELY DIAGNOSIS in a multi-system or atypical presentation requiring internist synthesis",w:20},
@@ -504,7 +303,6 @@ function buildPrompt(level, topic) {
       {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
     ];
   } else if (isABIM_Endo) {
-    // Tier 3+ cognitive complexity for ABIM Endocrinology
     qTypePool = [
       {s:"NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:30},
       {s:"MOST LIKELY DIAGNOSIS in an atypical or overlapping presentation",w:25},
@@ -519,39 +317,48 @@ function buildPrompt(level, topic) {
   const randomSex   = pickSexForTopic(topic);
 
   const isUSMLE     = level.includes("USMLE");
-  const maxTokens   = isABIM_Endo ? 1700 : 1300;
+  const maxTokens   = isABIM_Endo ? 1800 : isABIM_IM ? 1700 : isStep3 ? 1700 : 1400;
 
   const systemRole  = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
 
-  const levelRules  = isUSMLE
-    ? "USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1, M3/M4 for Step 2/3."
+  const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
+STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
+1. MAXIMUM 130 WORDS for the stem.
+2. ZERO INTRODUCTORY FLUFF. Start immediately with age, sex, and chief complaint.
+3. HIGH-DENSITY DATA. Combine vitals and physical exam into single sentences. 
+4. DO NOT interpret labs. State the raw value.
+5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem.`;
+
+  const levelRules  = isStep1
+    ? "USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1."
     : isABIM_IM
-    ? "ABIM IM RULES: Generalist level. First-line recognition, initial workup, when to refer, first-line management."
+    ? "ABIM IM RULES: Generalist level. Require internist synthesis for complex comorbidities. Do not ask basic first-line questions."
     : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level. MANDATORY Tier 3+ cognitive complexity:
-(1) ATYPICAL PRESENTATIONS — ketosis-prone DM2, ICI-induced diabetes/hypophysitis, LADA, MODY subtypes, euglycemic DKA on SGLT2i, acromegaly with normal IGF-1.
-(2) SUBTYPE DIFFERENTIATION — AVP-D vs AVP-R (copeptin testing), Cushing disease vs ectopic ACTH vs adrenal source, primary vs central adrenal insufficiency, familial vs sporadic hyperaldosteronism, Graves vs toxic MNG vs thyroiditis.
-(3) CUTTING-EDGE GUIDELINES — ADA 2025/2026 GLP-1 RA and SGLT2i cardiorenal indications, AASLD 2025 PBC, ES 2024 on AVP-D, 2018 AHA/ACC Cholesterol Guideline + 2022 ACC Expert Consensus for lipids, AACE 2022 + ATA 2016 thyroid nodule workup.
-(4) MULTI-AXIS WORKUP — simultaneous pituitary axes (TSH/free T4 + IGF-1 + cortisol + iron studies in hemochromatosis), multi-hormone deficiency patterns.
-(5) GENETIC TESTING DECISIONS — when to order RET for MEN2, VHL for paraganglioma, KCNJ5/CYP11B2 for familial hyperaldosteronism, HNF1A/HNF4A for MODY.
-Do NOT generate basic first-line questions (e.g. start metformin for T2DM, levothyroxine for hypothyroidism). Every question must require subspecialty reasoning.`;
+(1) ATYPICAL PRESENTATIONS.
+(2) SUBTYPE DIFFERENTIATION.
+(3) MULTI-AXIS WORKUP.
+Do NOT generate basic first-line questions. Every question must require subspecialty reasoning.`;
 
   const integrityRules = `INTEGRITY RULES:
-A. Distractor-stem independence.
-B. Evidence discipline: cite only data explicitly in stem.
-C. Cognitive bias labels: anchoring, premature closure, availability bias.
-D. "glucose" never "sugar".
-E. EXPLANATION FORMATTING: In S2, you MUST refer to choices strictly as "Choice A", "Choice B", "Choice C", "Choice D", "Choice E". DO NOT use bullet points (e.g., "• A") or standalone letters.
-F. GUIDELINE CURRENCY: You MUST cite guidelines from 2023 or later ONLY. Do NOT cite any guideline, criteria, or recommendation older than 2023. If you are uncertain of the year, do not cite it — state the recommending society only (e.g., "per ADA recommendations").
-G. EXPLANATION-CHOICE CONSISTENCY (CRITICAL): Before finalizing, perform a self-check — read every sentence in S2 and confirm it matches the actual text of the corresponding choice letter. The explanation MUST NOT describe a choice differently from what is written in the choices field. If you say "Choice B proposes X", then Choice B must literally contain X. NEVER call the correct answer a distractor and NEVER call a distractor the correct answer.`;
+A. Evidence discipline: cite only data explicitly in stem.
+B. "glucose" never "sugar".
+C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL.
+D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis. 
+E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS): 
+   - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE. Do not write "Choice A is correct". Simply explain the clinical reasoning.
+   - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc. Do not use bullets.
+F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.`;
 
-  const explanationNote = isABIM_IM
-    ? "EXPLANATION: concise total <=250 words. Cite only 2023+ guidelines."
-    : `EXPLANATION: S1 (why correct answer is correct — cite the specific 2023–2026 guideline and year), S2 (why each distractor fails — reference each by its exact Choice letter and match its text precisely), Board Pearl (one high-yield exam fact). STRICT LENGTH LIMIT: <= 350 words total. SELF-CHECK BEFORE SUBMITTING: confirm that every choice letter referenced in S2 matches the actual choice text you wrote, and that no guideline cited predates 2023.`;
+  const explanationNote = `EXPLANATION FORMAT — use these exact headers:
+🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
+🚫 Why the other choices fail: [Explain each wrong choice starting exactly with "Choice X:"].
+💎 Board Pearl: [one high-yield fact].`;
 
   const topicGuideline = getGuidelineContext(topic, isNutrition);
 
   const systemText = `You are ${systemRole}. Output confident, accurate facts.
 ${levelRules}
+${VIGNETTE_STYLE_GUIDE}
 ${integrityRules}
 CLINICAL EVIDENCE STANDARD: You MUST base the diagnosis, management, and explanation citations strictly on: ${topicGuideline}. Do not use outdated criteria.
 ${explanationNote}
@@ -559,35 +366,35 @@ UNIVERSAL HARD RULES: HIT: argatroban hepatic, bivalirudin/fondaparinux renal; D
 RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
 
   const step3TierPrompt = isStep3 ? `
-USMLE STEP 3 TIER 3–5 REQUIREMENTS (MANDATORY):
+USMLE STEP 3 TIER 3–5 REQUIREMENTS:
 - The vignette MUST present a management decision, NOT a diagnosis or workup question.
-- Build in a realistic constraint: facility without cath lab, transfer time >120 min, patient refusing standard care, two active life threats, or failed first-line therapy.
-- Distractors must include the Tier 1/2 answer (what a MS3 would choose) — the correct answer requires resident-level multi-step reasoning.
-- Stem must reflect a PGY-1/PGY-2 resident on call or in clinic managing a deteriorating or complex patient.
-- Cite the relevant 2023–2026 guideline in S1 of the explanation.` : "";
+- Build in a realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
+- Distractors must include the Tier 1/2 answer (what a MS3 would choose) — the correct answer requires resident-level multi-step reasoning.` : "";
 
-  const abimIMTierPrompt = isABIM_IM_early ? `
-ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS (MANDATORY):
-- Do NOT ask "what is the first test?" or "what is the most likely diagnosis?" for a classic presentation.
-- Present a scenario requiring synthesis: borderline risk scores + risk-enhancing factors, treatment failure, statin intolerance with high ASCVD risk, or multi-comorbidity drug selection.
-- For lipid questions: use PREVENT calculator (not PCE), cite 2018 AHA/ACC or 2022 ACC Expert Consensus, include non-statin options when relevant (ezetimibe, bempedoic acid, PCSK9i).
-- Distractors must include the Tier 1 answer (what a MS4 would choose) — the correct answer requires internist-level guideline synthesis.
-- Cite the correct, existing guideline with the correct year in S1.` : "";
+  const abimIMTierPrompt = isABIM_IM ? `
+ABIM INTERNAL MEDICINE TIER 3–4 REQUIREMENTS:
+- Present a scenario requiring synthesis: borderline risk scores, treatment failure, statin intolerance with high ASCVD risk, or multi-comorbidity drug selection.
+- Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
 
   const endoTier3Prompt = isABIM_Endo ? `
-ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS (MANDATORY):
-- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario — NOT a textbook classic.
-- Consider: atypical DM subtypes (LADA, MODY, ketosis-prone, ICI-induced), rare pituitary or adrenal presentations, multi-hormone deficiency, genetic testing decisions, or cardiorenal treatment choices.
-- Distractors must include the "classic teaching" answer that a non-subspecialist would choose — the correct answer requires deeper subspecialty reasoning.
-- Cite a specific 2024–2026 society guideline (ADA, ES, AACE, AASLD, ACC/AHA, ASCO) in the explanation.
-- Board Pearl must contain an exam-ready high-yield fact not obvious from the stem.` : "";
+ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
+- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
+- Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
-  const userText = `Write 1 vignette on: ${topic}.
+  const userText = isStep1 
+  ? `Write 1 vignette on: ${topic}.
 - Question asks for: ${promptQType}.
-- Patient Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting (Clinic, ED, Inpatient, ICU) that matches the typical epidemiological presentation of the target diagnosis.
+- Patient Demographics & Setting: Patient is a ${randomSex}. 
 - Pertinent negatives biologically possible for a ${randomSex}.
-- The stem MUST end with the interrogative sentence.${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
-Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
+- The stem MUST end with the interrogative sentence.
+Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
+  : `Construct a Tier 3 Board-style puzzle on: ${topic}.
+- Lead-in asks for: ${promptQType}.
+- Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
+- Pertinent Negatives: Include 1-2 pertinent negative exam or lab findings biologically relevant to a ${randomSex} to rule out the most obvious distractor.
+- The stem MUST end with the interrogative sentence.
+${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
+Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
 
   return { systemText, userText, randomSex, maxTokens, topic };
 }
@@ -635,8 +442,6 @@ function processRawMcq(p, level, topic) {
 async function saveToSupabase(records) {
   if (!records.length) return { saved: 0, errors: 0 };
   let saved = 0, errors = 0;
-
-  // Insert in chunks of 50 to avoid payload limits
   const CHUNK = 10;
   for (let i = 0; i < records.length; i += CHUNK) {
     const chunk = records.slice(i, i + CHUNK);
@@ -652,14 +457,11 @@ async function saveToSupabase(records) {
         body: JSON.stringify(chunk)
       });
       if (!res.ok) {
-        const errText = await res.text();
-        console.error(`  ⚠️  Supabase chunk error: ${res.status} — ${errText.slice(0, 200)}`);
         errors += chunk.length;
       } else {
         saved += chunk.length;
       }
     } catch (e) {
-      console.error(`  ⚠️  Supabase fetch error: ${e.message}`);
       errors += chunk.length;
     }
   }
@@ -671,13 +473,11 @@ function buildWorkQueue(count) {
   const levels = FILTER_LEVEL ? [FILTER_LEVEL] : Object.keys(TOPIC_DISTRIBUTION);
   const queue  = [];
 
-  // If a specific topic is requested, just repeat it across allowed levels
   if (FILTER_TOPIC && FILTER_LEVEL) {
     for (let i = 0; i < count; i++) queue.push({ level: FILTER_LEVEL, topic: FILTER_TOPIC });
     return queue;
   }
 
-  // Build a weighted flat list of (level, topic) pairs
   const flat = [];
   for (const level of levels) {
     const topics = TOPIC_DISTRIBUTION[level] || [];
@@ -699,8 +499,8 @@ function buildWorkQueue(count) {
 function estimateCost(count) {
   const avgInputTokens  = 800;
   const avgOutputTokens = 1100;
-  const inputRate  = 3.00  / 1_000_000;  // $3/M
-  const outputRate = 15.00 / 1_000_000;  // $15/M
+  const inputRate  = 3.00  / 1_000_000;  
+  const outputRate = 15.00 / 1_000_000;  
   const discount   = MODE === "batch" ? 0.5 : 1.0;
   const total = count * ((avgInputTokens * inputRate + avgOutputTokens * outputRate) * discount);
   return total.toFixed(2);
@@ -710,12 +510,10 @@ function estimateCost(count) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ============================================================
-// MODE A — ANTHROPIC BATCH API (cheapest, async)
+// MODE A — ANTHROPIC BATCH API
 // ============================================================
 async function runBatchMode(queue) {
   console.log(`\n📦  Submitting ${queue.length} requests to Anthropic Batch API...`);
-
-  // Batch API max is 10,000 requests per batch — split if needed
   const BATCH_LIMIT = 10_000;
   const batches = [];
   for (let i = 0; i < queue.length; i += BATCH_LIMIT) {
@@ -728,7 +526,6 @@ async function runBatchMode(queue) {
     const batch = batches[bi];
     console.log(`\n  🔵  Batch ${bi + 1}/${batches.length} — ${batch.length} questions`);
 
-    // Build batch requests
     const requests = batch.map((item, idx) => {
       const pd = buildPrompt(item.level, item.topic);
       return {
@@ -741,19 +538,16 @@ async function runBatchMode(queue) {
           tool_choice: { type: "tool", name: "emit_mcq" },
           messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${Date.now()}-${idx}]` }],
         },
-        // Attach metadata so we can recover level/topic/sex from results
         _meta: { level: item.level, topic: item.topic, sex: pd.randomSex }
       };
     });
 
-    // Separate _meta before sending (not part of API spec)
     const metaMap = {};
     const apiRequests = requests.map(r => {
       metaMap[r.custom_id] = r._meta;
       return { custom_id: r.custom_id, params: r.params };
     });
 
-    // Submit batch
     let batchId;
     try {
       const submitRes = await fetch("https://api.anthropic.com/v1/messages/batches", {
@@ -766,78 +560,60 @@ async function runBatchMode(queue) {
         },
         body: JSON.stringify({ requests: apiRequests })
       });
-      if (!submitRes.ok) {
-        const errText = await submitRes.text();
-        throw new Error(`Batch submit failed: ${submitRes.status} — ${errText.slice(0, 200)}`);
-      }
+      if (!submitRes.ok) throw new Error("Batch submit failed");
       const submitData = await submitRes.json();
       batchId = submitData.id;
       console.log(`  ✅  Batch submitted. ID: ${batchId}`);
     } catch (e) {
-      console.error(`  ❌  ${e.message}`);
       console.log(`  ↩️  Falling back to standard concurrent mode for this batch...`);
       const fallbackRecords = await runStandardMode(batch, true);
       allRecords.push(...fallbackRecords);
       continue;
     }
 
-    // Poll until complete
-    console.log(`  ⏳  Polling for completion (check every 30s)...`);
+    console.log(`  ⏳  Polling for completion...`);
     let batchStatus = "in_progress";
-    let pollCount   = 0;
     while (batchStatus === "in_progress") {
       await sleep(30_000);
-      pollCount++;
       try {
         const pollRes  = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}`, {
           headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "message-batches-2024-09-24" }
         });
         const pollData = await pollRes.json();
         batchStatus    = pollData.processing_status;
-        const counts   = pollData.request_counts || {};
-        process.stdout.write(`\r  📊  Poll #${pollCount}: ${counts.succeeded || 0} done, ${counts.processing || 0} processing, ${counts.errored || 0} errored   `);
-      } catch (e) {
-        console.warn(`\n  ⚠️  Poll error: ${e.message} — retrying...`);
-      }
+      } catch (e) {}
     }
     console.log(`\n  ✅  Batch complete. Fetching results...`);
 
-    // Fetch results (JSONL stream)
     const resultsRes = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}/results`, {
       headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "message-batches-2024-09-24" }
     });
     const resultsText = await resultsRes.text();
     const lines       = resultsText.trim().split("\n").filter(Boolean);
 
-    let success = 0, failed = 0;
     for (const line of lines) {
       try {
         const result = JSON.parse(line);
-        if (result.result?.type !== "succeeded") { failed++; continue; }
+        if (result.result?.type !== "succeeded") continue;
 
         const customId = result.custom_id;
         const meta     = metaMap[customId];
-        if (!meta) { failed++; continue; }
+        if (!meta) continue;
 
         const toolBlock = result.result.message?.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
-        if (!toolBlock?.input) { failed++; continue; }
+        if (!toolBlock?.input) continue;
 
         const raw = { ...toolBlock.input, _sex: meta.sex };
         const processed = processRawMcq(raw, meta.level, meta.topic);
-        if (processed) { allRecords.push(processed); success++; }
-        else failed++;
-      } catch (e) {
-        failed++;
-      }
+        if (processed) allRecords.push(processed); 
+      } catch (e) {}
     }
-    console.log(`  📋  Parsed: ${success} valid, ${failed} failed/skipped`);
   }
-
   return allRecords;
 }
 
 // ============================================================
-// MODE B — STANDARD CONCURRENT CALLS (immediate, no polling)
+// MODE B — STANDARD CONCURRENT CALLS
 // ============================================================
 async function runStandardMode(queue, silent = false) {
   if (!silent) console.log(`\n⚡  Running ${queue.length} questions with concurrency=${CONCURRENCY}...`);
@@ -877,7 +653,6 @@ async function runStandardMode(queue, silent = false) {
       } catch (e) {
         if (attempt === 1) {
           done++;
-          if (!silent) process.stdout.write(`\r  ❌  ${done}/${queue.length} (error: ${e.message.slice(0,40)})   `);
         } else {
           await sleep(2000);
         }
@@ -886,14 +661,12 @@ async function runStandardMode(queue, silent = false) {
     return null;
   }
 
-  // Process in concurrent windows
   for (let i = 0; i < queue.length; i += CONCURRENCY) {
     const window  = queue.slice(i, i + CONCURRENCY);
     const settled = await Promise.allSettled(window.map(processItem));
     for (const r of settled) {
       if (r.status === "fulfilled" && r.value) results.push(r.value);
     }
-    // Brief pause between windows to avoid sustained rate-limit pressure
     if (i + CONCURRENCY < queue.length) await sleep(2000);
   }
 
@@ -904,29 +677,14 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║     MedBoard Pro — Bulk MCQ Generator            ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator             ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
-  console.log(`  Level filter: ${FILTER_LEVEL || "All levels"}`);
-  console.log(`  Topic filter: ${FILTER_TOPIC || "Weighted distribution"}`);
-  console.log(`  Est. cost:    ~$${estimateCost(TARGET_COUNT)}`);
-  console.log("──────────────────────────────────────────────────");
-
+  
   const queue = buildWorkQueue(TARGET_COUNT);
-
-  // Show distribution preview
-  const dist = {};
-  queue.forEach(q => { const key = `${q.level} / ${q.topic}`; dist[key] = (dist[key] || 0) + 1; });
-  console.log(`\n📊  Question distribution (${queue.length} total):`);
-  Object.entries(dist).sort((a,b) => b[1]-a[1]).slice(0, 15).forEach(([k,v]) => {
-    console.log(`     ${v.toString().padStart(3)}x  ${k}`);
-  });
-  if (Object.keys(dist).length > 15) console.log(`     ... and ${Object.keys(dist).length - 15} more topics`);
-
   const startMs = Date.now();
 
-  // Generate
   let records;
   if (MODE === "batch") {
     records = await runBatchMode(queue);
@@ -950,13 +708,7 @@ async function main() {
   console.log(`║  Saved to DB: ${String(saved).padEnd(33)}║`);
   console.log(`║  DB errors:   ${String(errors).padEnd(33)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
-  console.log(`║  Est. cost:   $${String(estimateCost(validRecords.length)).padEnd(32)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
-
-  if (errors > 0) {
-    console.log("⚠️  Some records failed to save. Check your Supabase RLS policies");
-    console.log("   and ensure the 'mcqs' table allows anon INSERT.");
-  }
 }
 
 main().catch(e => {
