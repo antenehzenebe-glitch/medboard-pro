@@ -1,6 +1,17 @@
 // generate-mcq.js — MedBoard Pro
-// v7.1 — Tier 3 Quality Overhaul, Mismatch Fix, & 2026 Guidelines
+// v7.2 — Stem Economy Fix: Pertinent Negative Sanity (B-hCG/PSA Trap)
 // ---------------------------------------------------------------
+// CHANGELOG (from v7.1):
+// - SURGICAL: Replaced "Pertinent Negatives biologically relevant to {sex}"
+//   instruction in user prompt — was causing B-hCG to appear in 67yo women,
+//   PSA in young men with thyroid disease, etc. Replaced with relevance-gated
+//   instruction. Applied to both Step-1 and non-Step-1 branches.
+// - VALIDATOR: validateDemographics() now also rejects (and triggers retry):
+//     - B-hCG / pregnancy testing in women >=55 unless topic is pregnancy-related
+//     - PSA mention in men unless topic is urological
+//   Existing sex-contradiction checks unchanged.
+// - All other v7.1 logic preserved verbatim (Tier 3 prompts, integrity rules,
+//   shuffle, save, schema, etc.).
 
 const crypto = require("crypto");
 
@@ -155,15 +166,45 @@ function extractJSONSimple(raw) {
   try { return JSON.parse(candidate); } catch (e) { throw new Error(`Gemini JSON malformed: ${e.message}`); }
 }
 
-function validateDemographics(stem, sex) {
+// ============================================================
+// VALIDATOR (v7.2 — adds sex-irrelevant lab safety net)
+// ============================================================
+function validateDemographics(stem, sex, topic) {
   const lowerText = stem.toLowerCase();
+  const lowerTopic = (topic || "").toLowerCase();
+
+  // Existing sex-contradiction checks (unchanged behavior from v7.1)
   if (sex === "man") {
     const femaleTerms = ["oral contraceptive","ocp","pregnant","pregnancy","gravida","menopause","menstrual","menses","amenorrhea","ovary","uterus","endometrial","vaginal","cervical cancer"];
-    return !femaleTerms.some(term => lowerText.includes(term));
+    if (femaleTerms.some(term => lowerText.includes(term))) return false;
   } else {
     const maleTerms = ["prostate","bph","psa level","testicle","testicular","scrotal","sildenafil","erectile dysfunction"];
-    return !maleTerms.some(term => lowerText.includes(term));
+    if (maleTerms.some(term => lowerText.includes(term))) return false;
   }
+
+  // v7.2 — Extract age from "X-year-old" pattern (handles "67-year-old", "67 year old", "67-year old")
+  const ageMatch = stem.match(/(\d+)[\s\-]*year[\s\-]*old/i);
+  const age = ageMatch ? parseInt(ageMatch[1], 10) : null;
+
+  // v7.2 — Block B-hCG / pregnancy testing in postmenopausal women (age >= 55)
+  // unless the topic itself is pregnancy-related.
+  if (sex === "woman" && age !== null && age >= 55) {
+    const pregTestTerms = ["b-hcg", "beta-hcg", "β-hcg", "pregnancy test", "urine pregnancy", "serum hcg", "qhcg", "quantitative hcg"];
+    const isPregnancyRelevantTopic = lowerTopic.includes("pregnancy") || lowerTopic.includes("obstet") || lowerTopic.includes("gestational") || lowerTopic.includes("prolactin") || lowerTopic.includes("hyperprolactin");
+    if (!isPregnancyRelevantTopic && pregTestTerms.some(term => lowerText.includes(term))) {
+      return false;
+    }
+  }
+
+  // v7.2 — Block PSA mention in men unless topic is urological/prostate-related.
+  if (sex === "man") {
+    const isUrologicalTopic = lowerTopic.includes("prostate") || lowerTopic.includes("urolog") || lowerTopic.includes("bph") || lowerTopic.includes("hypogonadism");
+    if (!isUrologicalTopic && (lowerText.includes(" psa ") || lowerText.includes("prostate-specific antigen") || lowerText.includes("psa level") || lowerText.includes("psa is") || lowerText.includes("psa was"))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // ============================================================
@@ -397,17 +438,19 @@ ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
 - Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
+  // v7.2 SURGICAL FIX: replaced "Pertinent negatives biologically possible/relevant for a {sex}"
+  // with relevance-gated wording. This was the line causing B-hCG in 67yo women, PSA in young men, etc.
   const userText = isStep1 
   ? `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
 - Patient Demographics & Setting: Patient is a ${randomSex}. 
-- Pertinent negatives biologically possible for a ${randomSex}.
+- Pertinent Negatives: Include a pertinent negative ONLY if it helps rule out a competing answer choice. Do NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, etc.) unless directly relevant to the diagnosis.
 - The stem MUST end with the interrogative sentence.
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
   : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
 - Lead-in asks for: ${promptQType}.
 - Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
-- Pertinent Negatives: Include 1-2 pertinent negative exam or lab findings biologically relevant to a ${randomSex} to rule out the most obvious distractor.
+- Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing answer choice. DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them. If a pertinent negative would not change which choice is correct, omit it.
 - The stem MUST end with the interrogative sentence.
 ${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
 Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
@@ -446,12 +489,13 @@ exports.handler = async function (event) {
       generationModel = callResult.model;
       if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) continue;
 
-      isValid = validateDemographics(p.stem, pd.randomSex);
+      // v7.2: pass topic to validator
+      isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
       if (!isValid && attempts === 3) {
         const fbResult = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
         p = fbResult.parsed;
         generationModel = fbResult.model;
-        isValid = validateDemographics(p.stem, pd.randomSex);
+        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
       }
     }
 
