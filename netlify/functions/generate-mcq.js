@@ -1,17 +1,33 @@
 // generate-mcq.js — MedBoard Pro
-// v7.2 — Stem Economy Fix: Pertinent Negative Sanity (B-hCG/PSA Trap)
+// v7.3 — Truncation Budget Increase & Stem-Explanation Hallucination Guard
 // ---------------------------------------------------------------
-// CHANGELOG (from v7.1):
-// - SURGICAL: Replaced "Pertinent Negatives biologically relevant to {sex}"
-//   instruction in user prompt — was causing B-hCG to appear in 67yo women,
-//   PSA in young men with thyroid disease, etc. Replaced with relevance-gated
-//   instruction. Applied to both Step-1 and non-Step-1 branches.
-// - VALIDATOR: validateDemographics() now also rejects (and triggers retry):
-//     - B-hCG / pregnancy testing in women >=55 unless topic is pregnancy-related
-//     - PSA mention in men unless topic is urological
-//   Existing sex-contradiction checks unchanged.
-// - All other v7.1 logic preserved verbatim (Tier 3 prompts, integrity rules,
-//   shuffle, save, schema, etc.).
+// CHANGELOG (from v7.2):
+// - FIX 1 (TRUNCATION BUDGET): Raised max_tokens across all levels.
+//     ABIM Endocrinology: 1800 → 2400
+//     ABIM Internal Medicine: 1700 → 2200
+//     USMLE Step 3: 1700 → 2200
+//     USMLE Step 1 / Step 2 CK: 1400 → 1800
+//   Rationale: The 🩺+🚫×4+💎 explanation format plus tool-use JSON
+//   overhead was regularly approaching the old limits on complex
+//   endocrine/Tier-3 cases, causing truncated output that reached Supabase
+//   as partial JSON — the primary cause of the rejected questions.
+//
+// - FIX 2 (HALLUCINATION GUARD): Added validateConsistency(p) function.
+//   Extracts lab/vital name-value pairs from both stem and explanation
+//   using a targeted regex. If the same lab (TSH, HbA1c, glucose, etc.)
+//   appears in both fields with DIFFERENT numeric values → returns false
+//   → triggers a retry. Guideline cutoff numbers cited in the explanation
+//   but absent from the stem are intentionally NOT flagged (avoids false
+//   positives on "TSH >10 mIU/L per ATA guidelines").
+//
+// - FIX 2b (PROMPT HARDENING): Added INTEGRITY RULE G to system prompt.
+//   Forces model to self-verify numeric consistency before calling emit_mcq.
+//
+// - validateConsistency() is wired into the retry loop alongside
+//   validateDemographics(). Both must pass for a question to be accepted.
+//
+// - All other v7.2 logic preserved verbatim (Tier 3 prompts, shuffle,
+//   demographic validator, B-hCG/PSA traps, guideline map, etc.).
 
 const crypto = require("crypto");
 
@@ -83,7 +99,7 @@ function pickTopicForLevel(level, rawTopic) {
   return { topic: rawTopic, isNutrition: false };
 }
 
-const MALE_ONLY_TOPIC_KEYWORDS = ["male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"];
+const MALE_ONLY_TOPIC_KEYWORDS   = ["male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"];
 const FEMALE_ONLY_TOPIC_KEYWORDS = ["pcos", "polycystic ovary", "menopause", "ovarian", "endometri", "pregnancy", "obstetric", "gynecolog", "turner syndrome"];
 
 function pickSexForTopic(promptTopic) {
@@ -167,13 +183,12 @@ function extractJSONSimple(raw) {
 }
 
 // ============================================================
-// VALIDATOR (v7.2 — adds sex-irrelevant lab safety net)
+// VALIDATOR v7.2 — sex-irrelevant lab safety net (unchanged)
 // ============================================================
 function validateDemographics(stem, sex, topic) {
-  const lowerText = stem.toLowerCase();
+  const lowerText  = stem.toLowerCase();
   const lowerTopic = (topic || "").toLowerCase();
 
-  // Existing sex-contradiction checks (unchanged behavior from v7.1)
   if (sex === "man") {
     const femaleTerms = ["oral contraceptive","ocp","pregnant","pregnancy","gravida","menopause","menstrual","menses","amenorrhea","ovary","uterus","endometrial","vaginal","cervical cancer"];
     if (femaleTerms.some(term => lowerText.includes(term))) return false;
@@ -182,28 +197,67 @@ function validateDemographics(stem, sex, topic) {
     if (maleTerms.some(term => lowerText.includes(term))) return false;
   }
 
-  // v7.2 — Extract age from "X-year-old" pattern (handles "67-year-old", "67 year old", "67-year old")
   const ageMatch = stem.match(/(\d+)[\s\-]*year[\s\-]*old/i);
   const age = ageMatch ? parseInt(ageMatch[1], 10) : null;
 
-  // v7.2 — Block B-hCG / pregnancy testing in postmenopausal women (age >= 55)
-  // unless the topic itself is pregnancy-related.
   if (sex === "woman" && age !== null && age >= 55) {
     const pregTestTerms = ["b-hcg", "beta-hcg", "β-hcg", "pregnancy test", "urine pregnancy", "serum hcg", "qhcg", "quantitative hcg"];
     const isPregnancyRelevantTopic = lowerTopic.includes("pregnancy") || lowerTopic.includes("obstet") || lowerTopic.includes("gestational") || lowerTopic.includes("prolactin") || lowerTopic.includes("hyperprolactin");
-    if (!isPregnancyRelevantTopic && pregTestTerms.some(term => lowerText.includes(term))) {
-      return false;
-    }
+    if (!isPregnancyRelevantTopic && pregTestTerms.some(term => lowerText.includes(term))) return false;
   }
 
-  // v7.2 — Block PSA mention in men unless topic is urological/prostate-related.
   if (sex === "man") {
     const isUrologicalTopic = lowerTopic.includes("prostate") || lowerTopic.includes("urolog") || lowerTopic.includes("bph") || lowerTopic.includes("hypogonadism");
-    if (!isUrologicalTopic && (lowerText.includes(" psa ") || lowerText.includes("prostate-specific antigen") || lowerText.includes("psa level") || lowerText.includes("psa is") || lowerText.includes("psa was"))) {
+    if (!isUrologicalTopic && (lowerText.includes(" psa ") || lowerText.includes("prostate-specific antigen") || lowerText.includes("psa level") || lowerText.includes("psa is") || lowerText.includes("psa was"))) return false;
+  }
+
+  return true;
+}
+
+// ============================================================
+// v7.3 — HALLUCINATION GUARD: Stem-Explanation Consistency
+// ============================================================
+// Strategy: extract (lab_name → numeric_value) pairs from both stem and
+// explanation using a targeted clinical regex. If the SAME lab appears in
+// both fields with DIFFERENT values → the model hallucinated a number in
+// the explanation → return false → trigger retry.
+//
+// Design choices:
+//  ✓ Only flags mismatches when the lab appears in BOTH fields.
+//    Numbers that only appear in the explanation (guideline cutoffs like
+//    "TSH >10 per ATA") are intentionally ignored — no false positives.
+//  ✓ Keeps first occurrence per lab name (primary stated value).
+//  ✓ Case-insensitive, handles decimals (0.02, 11.2, 420).
+//  ✓ Matches common phrasing: "TSH 0.02", "TSH of 0.02", "TSH was 0.02",
+//    "TSH: 0.02".
+
+const LAB_VALUE_PATTERN = /\b(tsh|free\s*t4|free\s*t3|total\s*t4|total\s*t3|hba1c|a1c|fasting\s*glucose|glucose|sodium|potassium|creatinine|egfr|calcium|phosphorus|cortisol|acth|igf-1|igf1|prolactin|lh|fsh|testosterone|estradiol|aldosterone|plasma\s*renin|renin|creatine\s*kinase|ck\b|alt|ast|alp|tbili|bilirubin|hemoglobin|hgb|hematocrit|wbc|platelets|inr|ptt|bun|bicarbonate|bicarb|co2|pco2|po2|ldl|hdl|triglyceride|total\s*cholesterol|cholesterol|trab|tpo\s*antibody|vitamin\s*d|25-oh\s*vitamin|pth|parathyroid\s*hormone|urine\s*cortisol|urine\s*albumin|albumin|ferritin|b12|folate|tsh\s*receptor\s*antibod)\s+(?:of\s+|was\s+|is\s+|:?\s*)(\d+\.?\d*)/gi;
+
+function extractLabValues(text) {
+  const values = {};
+  LAB_VALUE_PATTERN.lastIndex = 0;
+  let m;
+  while ((m = LAB_VALUE_PATTERN.exec(text)) !== null) {
+    const labName = m[1].toLowerCase().replace(/\s+/g, " ").trim();
+    if (!(labName in values)) values[labName] = m[2]; // keep first occurrence
+  }
+  return values;
+}
+
+function validateConsistency(p) {
+  if (!p || !p.stem || !p.explanation) return true;
+
+  const stemValues = extractLabValues(p.stem);
+  const explValues = extractLabValues(p.explanation);
+
+  for (const lab of Object.keys(explValues)) {
+    if (stemValues[lab] !== undefined && stemValues[lab] !== explValues[lab]) {
+      console.warn(
+        `[validateConsistency] Value mismatch — ${lab}: stem="${stemValues[lab]}" vs explanation="${explValues[lab]}"`
+      );
       return false;
     }
   }
-
   return true;
 }
 
@@ -211,7 +265,7 @@ function validateDemographics(stem, sex, topic) {
 // CLAUDE & GEMINI CLIENTS
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
-  const maxRetries = 2;
+  const maxRetries  = 2;
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
 
@@ -271,17 +325,15 @@ async function callGemini(systemText, userText, maxTokens) {
 }
 
 // ============================================================
-// SHUFFLE & DB SAVER
+// SHUFFLE & DB SAVER (unchanged from v7.2)
 // ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
   let out = explanation;
   const placeholders = {};
-  
   Object.keys(letterMap).forEach((oldLetter, idx) => {
     const placeholder = `§§LETTER_${idx}§§`;
     placeholders[placeholder] = letterMap[oldLetter];
-    
     const patterns = [
       { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
       { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
@@ -290,14 +342,12 @@ function rewriteExplanationLetters(explanation, letterMap) {
       { re: new RegExp(`(•\\s*)${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 },
       { re: new RegExp(`(^|\\n)\\s*${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 }
     ];
-    
     patterns.forEach(({ re, wrap }) => {
-      if (wrap === 1) { out = out.replace(re, `$1${placeholder}`); } 
-      else if (wrap === 2) { out = out.replace(re, `(${placeholder})`); } 
+      if (wrap === 1) { out = out.replace(re, `$1${placeholder}`); }
+      else if (wrap === 2) { out = out.replace(re, `(${placeholder})`); }
       else if (wrap === 3) { out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`); }
     });
   });
-  
   Object.keys(placeholders).forEach(placeholder => { out = out.split(placeholder).join(placeholders[placeholder]); });
   return out;
 }
@@ -320,7 +370,7 @@ async function saveMcqToSupabase(p, level, meta) {
 }
 
 // ============================================================
-// PROMPT BUILDER
+// PROMPT BUILDER (v7.3 — adds Integrity Rule G)
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -337,10 +387,10 @@ function buildPrompt(level, topic, isNutrition) {
   }
 
   const isABIM_Endo = level === "ABIM Endocrinology";
-  const isStep3    = level === "USMLE Step 3";
-  const isABIM_IM = level === "ABIM Internal Medicine";
-  const isStep1 = level === "USMLE Step 1";
-  
+  const isStep3     = level === "USMLE Step 3";
+  const isABIM_IM   = level === "ABIM Internal Medicine";
+  const isStep1     = level === "USMLE Step 1";
+
   let qTypePool = [];
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
@@ -372,11 +422,13 @@ function buildPrompt(level, topic, isNutrition) {
     qTypePool = [{s:"NEXT STEP IN DIAGNOSIS",w:25}, {s:"MOST LIKELY DIAGNOSIS",w:25}, {s:"NEXT STEP IN MANAGEMENT",w:40}, {s:"STRONGEST RISK FACTOR",w:10}];
   }
   const promptQType = pickWeighted(qTypePool);
-  const randomSex = pickSexForTopic(promptTopic);
+  const randomSex   = pickSexForTopic(promptTopic);
 
-  const isUSMLE     = level.includes("USMLE");
-  const maxTokens   = isABIM_Endo ? 1800 : isABIM_IM ? 1700 : isStep3 ? 1700 : 1400;
-  
+  const isUSMLE = level.includes("USMLE");
+
+  // v7.3 — Raised max_tokens to prevent truncation on complex explanations
+  const maxTokens = isABIM_Endo ? 2400 : (isABIM_IM || isStep3) ? 2200 : 1800;
+
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
 
   const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
@@ -387,12 +439,13 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 4. DO NOT interpret labs. State the raw value.
 5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem. Force the examinee to deduce it from physical findings and labs.`;
 
-  let levelRules = isStep1 
+  let levelRules = isStep1
     ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1.`
-    : isABIM_IM 
+    : isABIM_IM
     ? `ABIM IM RULES: Generalist level. First-line recognition, initial workup, when to refer, first-line management.`
     : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level.`;
 
+  // v7.3 — Added Integrity Rule G: numeric self-consistency lock
   const integrityRules = `INTEGRITY RULES:
 A. Evidence discipline: cite only data explicitly in stem.
 B. "glucose" never "sugar".
@@ -401,13 +454,14 @@ D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a hi
 E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS): 
    - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE. Do not write "Choice A is correct". Simply explain the clinical reasoning.
    - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc. Do not use bullets.
-F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.`;
+F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.
+G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. You are STRICTLY FORBIDDEN from writing a different number in the explanation than what appears in the stem. Before calling emit_mcq, re-read your stem and verify every number in your explanation matches exactly.`;
 
   const explanationNote = `EXPLANATION FORMAT — use these exact headers:
 🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
 🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
 💎 Board Pearl: [one high-yield fact].`;
-  
+
   const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
 
   const systemText = `You are ${systemRole}. Output confident, accurate facts.
@@ -438,9 +492,7 @@ ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
 - Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
-  // v7.2 SURGICAL FIX: replaced "Pertinent negatives biologically possible/relevant for a {sex}"
-  // with relevance-gated wording. This was the line causing B-hCG in 67yo women, PSA in young men, etc.
-  const userText = isStep1 
+  const userText = isStep1
   ? `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
 - Patient Demographics & Setting: Patient is a ${randomSex}. 
@@ -468,7 +520,7 @@ exports.handler = async function (event) {
     if (b.warmup) return { statusCode: 200, body: "{}" };
     if (!b.level || !b.topic) return { statusCode: 400, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
 
-    const topicResult = pickTopicForLevel(b.level, b.topic);
+    const topicResult   = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
     const isNutrition   = topicResult.isNutrition;
 
@@ -482,25 +534,28 @@ exports.handler = async function (event) {
     while (!isValid && attempts < 3) {
       attempts++;
       let callResult;
-      try { callResult = await callClaude(pd.systemText, pd.userText, pd.maxTokens); } 
+      try { callResult = await callClaude(pd.systemText, pd.userText, pd.maxTokens); }
       catch (e) { throw new Error(`AI Network Failure: ${e.message}`); }
 
       p = callResult.parsed;
       generationModel = callResult.model;
       if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) continue;
 
-      // v7.2: pass topic to validator
-      isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
+      // v7.3: both validators must pass
+      const demoOk        = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
+      const consistencyOk = validateConsistency(p);
+      isValid = demoOk && consistencyOk;
+
       if (!isValid && attempts === 3) {
-        const fbResult = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
-        p = fbResult.parsed;
+        const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
+        p               = fbResult.parsed;
         generationModel = fbResult.model;
-        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
+        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) && validateConsistency(p);
       }
     }
 
     p.topic = pd.resolvedTopic;
-    const letters = ['A', 'B', 'C', 'D', 'E'];
+    const letters      = ['A', 'B', 'C', 'D', 'E'];
     const correctIndex = letters.indexOf(p.correct);
     const optionsArray = letters.map((letter, i) => ({ originalLetter: letter, text: p.choices[letter], isCorrect: i === correctIndex })).filter(opt => opt.text != null);
 
@@ -510,8 +565,8 @@ exports.handler = async function (event) {
     }
 
     const shuffledChoices = {};
-    const letterMap = {};
-    let newCorrectLetter = 'A';
+    const letterMap       = {};
+    let newCorrectLetter  = 'A';
     optionsArray.forEach((item, index) => {
       const newLetter = letters[index];
       shuffledChoices[newLetter] = item.text;
@@ -519,8 +574,8 @@ exports.handler = async function (event) {
       if (item.isCorrect) newCorrectLetter = newLetter;
     });
 
-    p.choices = shuffledChoices;
-    p.correct = newCorrectLetter;
+    p.choices     = shuffledChoices;
+    p.correct     = newCorrectLetter;
     p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
 
     saveMcqToSupabase(p, b.level, { resolvedTopic: pd.resolvedTopic, generationModel }).catch(() => {});
