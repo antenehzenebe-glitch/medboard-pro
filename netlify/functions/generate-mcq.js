@@ -18,25 +18,11 @@
 //     regardless of glycemic efficacy (empagliflozin dismissal)
 //   • ATA and ESMO are SEPARATE organizations — no joint guidelines exist
 //   • AACE 2026 Lipid Guidelines DO NOT EXIST — last AACE lipid was 2017
+//   • MEN1 and MEN2 Guidelines locked to 2012/2015 respectively to prevent date hallucinations.
 //
 // - PRESERVED: All v7.4 architecture (TOPIC_GUARDRAILS, validateConsistency,
 //   raised maxTokens 2400/2200/1800, B-hCG/PSA traps, demographic validator,
 //   self-verification block, Integrity Rules A-G).
-//
-// CHANGELOG (v7.4 from v7.3):
-// - NEW: getTopicGuardrails(level, topic) returns a 2-layer guardrail block
-//     LAYER 1 (Foundational Anchors) — injected into SYSTEM prompt after
-//       integrityRules. Hard clinical facts the model MUST NOT violate.
-//     LAYER 2 (Cognitive Complexity Forcing) — injected into USER prompt
-//       alongside question type. Forces Tier 3+ questions for ABIM Endo,
-//       Tier 2-3+ for ABIM IM. Prevents Tier 1 collapse.
-// - NEW: Mandatory 5-point self-verification block at end of user prompt.
-//     Forces model to audit scenario plausibility, answer defensibility,
-//     distractor audit, numeric consistency, citation accuracy.
-// - Routing: only the matching topic's guardrail enters the prompt.
-//     Avoids "lost in the middle" attention decay.
-// - All v7.3 logic preserved (validateConsistency, validateDemographics,
-//     B-hCG/PSA traps, raised maxTokens, Integrity Rule G, Gemini fallback).
 
 const crypto = require("crypto");
 
@@ -51,12 +37,6 @@ const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 
 // ============================================================
 // v7.4 — TOPIC GUARDRAIL MAP (Layer 1 + Layer 2 per topic)
 // ============================================================
-// Keyword-matched. Each entry has:
-//   keywords: array of lowercase substrings to detect topic
-//   l1: foundational anchors → SYSTEM prompt
-//   l2: cognitive complexity rules → USER prompt
-// First match wins. Fallthrough uses generic block.
-
 const TOPIC_GUARDRAILS = [
   // ─── ENDOCRINOLOGY: DIABETES CLUSTER ──────────────────────────────────────
   {
@@ -672,7 +652,7 @@ REQUIRED Tier 2-3 angles:
 const GENERIC_GUARDRAILS = {
   l1: `GENERAL CLINICAL ANCHORS:
 - Cite only data explicitly present in the stem.
-- Use 2024-2026 society guidelines, not legacy criteria.
+- Use current officially published society guidelines, not legacy criteria. Do not invent recent dates for older guidelines.
 - Numeric values in explanation must match stem exactly (Integrity Rule G).`,
   l2: `COGNITIVE COMPLEXITY EXPECTATION:
 FORBIDDEN: "What is the most likely diagnosis?" as the question type for ABIM-level questions.
@@ -687,7 +667,7 @@ function getTopicGuardrails(level, topic) {
 }
 
 // ============================================================
-// DYNAMIC 2025/2026 GUIDELINE MAP (unchanged from v7.3)
+// DYNAMIC GUIDELINE MAP
 // ============================================================
 const GUIDELINE_MAP = [
   { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: `ADA Standards of Medical Care in Diabetes 2026; ADA/EASD Consensus Report 2022.
@@ -911,7 +891,7 @@ CRITICAL BONE/PTH ANCHORS:
 1. PRIMARY HYPERPARATHYROIDISM:
    - Diagnosis: ↑Ca + ↑PTH (or inappropriately normal PTH).
    - 24h urine calcium DISTINGUISHES from FHH (Ca/Cr clearance ratio <0.01 = FHH).
-   - Surgery indications: symptomatic, age <50, Ca >1 above ULN, eGFR <60, T-score ≤-2.5, vertebral fracture, kidney stones, 24h urine Ca >400.
+   - Surgery indications (any one): symptomatic, age <50, Ca >1 above ULN, eGFR <60, T-score ≤-2.5, vertebral fracture, kidney stones, 24h urine Ca >400.
    - Sestamibi + neck US for localization.
    - Hungry bone syndrome: post-op severe hypocalcemia.
 
@@ -963,7 +943,7 @@ CRITICAL PITUITARY ANCHORS:
    - Macroprolactin: inactive complex causing lab elevation without disease.
 
 2. ACROMEGALY:
-   - GH nadir <1 ng/mL on 75g OGTT diagnoses (or <0.4 with ultrasensitive assay).
+   - GH nadir <1 ng/mL on 75g OGTT (or <0.4 with ultrasensitive assay).
    - IGF-1 used for diagnosis and monitoring.
    - Transsphenoidal surgery first-line.
    - Somatostatin analogs (octreotide, lanreotide) for residual disease.
@@ -1029,6 +1009,7 @@ CRITICAL SEPSIS/ID ANCHORS:
    - Native valve viridans/Strep gallolyticus: penicillin/ceftriaxone.
    - Native valve Staph: nafcillin (MSSA), vancomycin (MRSA).
    - Prosthetic valve: vancomycin + gentamicin + rifampin.` },
+  { keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer", "men2", "men 2a", "men 2b", "ret mutation", "prophylactic thyroidectomy"], citation: `Endocrine Society Clinical Practice Guidelines for MEN1 (2012) and MEN2/MTC (2015). Do not cite guidelines newer than these.` },
   { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma", "addison", "cortisol", "acth", "metanephrine", "phenoxybenzamine", "spironolactone adrenal", "eplerenone"], citation: `Endocrine Society 2008 Cushing Syndrome Diagnostic CPG (Nieman et al.) + 2015 Treatment CPG; Pituitary Society 2023 Consensus on Cushing Disease; Endocrine Society 2016 Primary Aldosteronism CPG; Endocrine Society 2014 Pheochromocytoma/Paraganglioma CPG.
 
 CRITICAL ADRENAL ANCHORS:
@@ -1075,11 +1056,11 @@ function getGuidelineContext(topic, isNutrition) {
   if (isNutrition) return "ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI Nutrition Guidelines";
   const t = topic.toLowerCase();
   const match = GUIDELINE_MAP.find(g => g.keywords.some(k => t.includes(k)));
-  return match ? match.citation : "the most current 2025-2026 official society guidelines";
+  return match ? match.citation : "the most recent applicable society guidelines (do not fabricate publication years)";
 }
 
 // ============================================================
-// NUTRITION & TOPIC HELPERS (unchanged from v7.3)
+// NUTRITION & TOPIC HELPERS
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": ["Vitamin D deficiency — rickets vs. osteomalacia", "Thiamine (B1) deficiency — Wernicke encephalopathy", "Vitamin B12 deficiency", "Refeeding syndrome pathophysiology", "Starvation biochemistry"],
@@ -1184,7 +1165,7 @@ function extractJSONSimple(raw) {
 }
 
 // ============================================================
-// VALIDATORS (unchanged from v7.3)
+// VALIDATORS
 // ============================================================
 function validateDemographics(stem, sex, topic) {
   const lowerText  = stem.toLowerCase();
@@ -1245,7 +1226,7 @@ function validateConsistency(p) {
 // CLAUDE & GEMINI CLIENTS
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
-  const maxRetries  = 2;
+  const maxRetries  = 1; // <--- SET TO 1 TO FIX 26s TIMEOUT ISSUE
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
 
@@ -1256,7 +1237,7 @@ async function callClaude(systemText, userText, maxTokens) {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "claude-sonnet-4-6", // <--- MODEL LOCKED AS REQUESTED
           max_tokens: maxTokens,
           temperature: 0.6,
           system: systemText,
@@ -1350,7 +1331,7 @@ async function saveMcqToSupabase(p, level, meta) {
 }
 
 // ============================================================
-// PROMPT BUILDER (v7.4 — guardrail injection + self-verification)
+// PROMPT BUILDER
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
@@ -1434,17 +1415,15 @@ E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS):
 F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.
 G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. Re-read your stem before calling emit_mcq.`;
 
-  // v7.4 — get topic-specific guardrails
   const guardrails = getTopicGuardrails(level, promptTopic);
 
   const explanationNote = `EXPLANATION FORMAT — use these exact headers:
-🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
+🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite the most recent officially published guideline (do not fabricate dates if older)].
 🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
 💎 Board Pearl: [one high-yield fact].`;
 
   const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
 
-  // v7.4 — Layer 1 guardrails injected after integrityRules in SYSTEM prompt
   const systemText = `You are ${systemRole}. Output confident, accurate facts.
 ${levelRules}
 ${VIGNETTE_STYLE_GUIDE}
@@ -1477,7 +1456,6 @@ ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
 - Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
-  // v7.4 — Layer 2 guardrails + self-verification block injected into USER prompt
   const selfVerification = `
 MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
 1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic? (e.g., eGFR 28 in a 34yo requires explicit etiology)
