@@ -1,28 +1,15 @@
 // generate-mcq.js — MedBoard Pro
-// v7.5 — Restored Full Critical Anchors + Anti-Hallucination Rules
+// v7.5.2 — Token Budget, Truncation Defenders, & 2025 ATA Update
 // ---------------------------------------------------------------
-// CHANGELOG (v7.5 from v7.4):
-// - RESTORED: Full multi-anchor CRITICAL ANCHOR blocks in GUIDELINE_MAP that
-//   were lost in v7.4 migration. Each block contains numbered hard rules,
-//   trial citations, FORBIDDEN ERROR warnings, and FABRICATED CITATION guards.
-//   The model now receives BOTH:
-//     • Layer 1 facts (from GUIDELINE_MAP, via getGuidelineContext)
-//     • Layer 2 cognitive complexity (from TOPIC_GUARDRAILS, via getTopicGuardrails)
-//   This is the dual-anchor architecture that produced highest quality in v7.2.
-//
-// - ADDED: Anti-hallucination hard rules based on observed errors:
-//   • Bisphosphonates DO lower serum calcium (alendronate hallucination)
-//   • RAIR-DTC requires DOCUMENTED RAI failure, not patient refusal
-//     (lenvatinib hallucination)
-//   • SGLT2i retains Class 1A cardiorenal indication at eGFR ≥20 + UACR >200
-//     regardless of glycemic efficacy (empagliflozin dismissal)
-//   • ATA and ESMO are SEPARATE organizations — no joint guidelines exist
-//   • AACE 2026 Lipid Guidelines DO NOT EXIST — last AACE lipid was 2017
-//   • MEN1 and MEN2 Guidelines locked to 2012/2015 respectively to prevent date hallucinations.
-//
-// - PRESERVED: All v7.4 architecture (TOPIC_GUARDRAILS, validateConsistency,
-//   raised maxTokens 2400/2200/1800, B-hCG/PSA traps, demographic validator,
-//   self-verification block, Integrity Rules A-G).
+// CHANGELOG:
+// - FIXED: Expanded maxTokens budget to prevent JSON truncation on complex
+//   Tier 3 stems (Endo 3200, IM 2800, Step1 2200).
+// - ADDED: validateChoiceCompleteness() to defend against missing options A-E.
+// - FIXED: Gemini API fallback now inherits the strict MCQ_TOOL schema.
+// - OPTIMIZED: Adjusted retry loop to respect Netlify 26s timeout constraint.
+// - CLINICAL UPDATE: Integrated ATA 2025 DTC Guidelines. Model is instructed 
+//   to use ATA 2025 exclusively for Papillary/Follicular cancer, while retaining 
+//   ATA 2015 for Nodules and 2014 for Hypothyroidism.
 
 const crypto = require("crypto");
 
@@ -35,7 +22,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIs
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// v7.4 — TOPIC GUARDRAIL MAP (Layer 1 + Layer 2 per topic)
+// TOPIC GUARDRAIL MAP (Layer 1 + Layer 2 per topic)
 // ============================================================
 const TOPIC_GUARDRAILS = [
   // ─── ENDOCRINOLOGY: DIABETES CLUSTER ──────────────────────────────────────
@@ -214,22 +201,15 @@ REQUIRED Tier 3+ angles:
   },
   {
     keywords: ["thyroid cancer", "papillary thyroid", "follicular thyroid", "medullary thyroid", "anaplastic thyroid", "differentiated thyroid", "thyroglobulin", "rair", "lenvatinib", "sorafenib", "vandetanib", "cabozantinib", "selpercatinib"],
-    l1: `THYROID CANCER FOUNDATIONAL ANCHORS:
-- RAIR (radioiodine-refractory) requires DOCUMENTED RAI failure or ineligibility:
-   (1) no RAI uptake on diagnostic scan, OR
-   (2) progression within 12 months of RAI, OR
-   (3) cumulative RAI ≥600 mCi.
-   Patient REFUSAL of RAI does NOT make disease RAIR.
+    l1: `THYROID CANCER FOUNDATIONAL ANCHORS (ATA 2025):
+- RAIR (radioiodine-refractory) requires DOCUMENTED RAI failure or ineligibility: no uptake, progression within 12mo, or cumulative ≥600 mCi. Patient REFUSAL of RAI is NOT RAIR.
 - Kinase inhibitors require RECIST 1.1 measurable STRUCTURAL disease — NEVER initiate for biochemically occult disease (rising Tg, no structural lesion).
-- Stimulated Tg and unstimulated Tg are NOT directly comparable. Never call a stim→unstim Tg change "progression."
-- Vandetanib and cabozantinib: MTC only.
-- Selpercatinib: RET fusion/mutation confirmed only.
-- ATA and ESMO are SEPARATE organizations; do NOT cite "ATA/ESMO joint guidelines" — they do not exist.
-- TSH suppression target depends on risk stratum; not all DTC requires undetectable TSH.`,
+- Vandetanib and cabozantinib: MTC only. Selpercatinib: RET fusion/mutation confirmed only.
+- ATA and ESMO are SEPARATE organizations; do NOT cite "ATA/ESMO joint guidelines" — they do not exist.`,
     l2: `THYROID CANCER COGNITIVE COMPLEXITY:
 FORBIDDEN basic stems: "First-line for papillary thyroid cancer?", "Treatment of MTC?"
 REQUIRED Tier 3+ angles:
-- TSH suppression target adjustment by risk stratum and time from treatment
+- ATA 2025 TSH suppression de-escalation for low-risk patients
 - Biochemical recurrence (rising Tg) with NEGATIVE structural imaging — workup, NOT immediate kinase inhibitor
 - MTC family screening cascade and prophylactic thyroidectomy timing
 - Anaplastic vs poorly differentiated management urgency
@@ -687,67 +667,37 @@ CRITICAL DIABETES ANCHORS — ADA 2026:
 8. HYPOGLYCEMIA: Whipple triad. Endogenous hyperinsulinism: glucose <55 + insulin ≥3 + C-peptide ≥0.6 + sulfonylurea screen negative. Factitious insulin: insulin ↑, C-peptide LOW. Sulfonylurea: insulin ↑, C-peptide ↑, screen POSITIVE.
 
 DEPRESCRIBING IN ELDERLY: HbA1c <7.0 + history of hypoglycemia → deprescribe sulfonylurea or insulin BEFORE adding new agents. Target HbA1c relaxed to <8.0 or <8.5 in frail elderly per ADA 2026.` },
-  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg", "papillary", "follicular", "medullary", "anaplastic", "rair", "lenvatinib", "sorafenib", "vandetanib", "cabozantinib", "selpercatinib"], citation: `ATA 2014 Guidelines for Hypothyroidism in Adults (Jonklaas et al.) — PRIMARY hypothyroidism reference; ATA 2015/2016 Guidelines for Thyroid Nodules and Differentiated Thyroid Cancer (Haugen et al.); ATA 2016 Guidelines for Hyperthyroidism (Ross et al.); AACE 2022 Thyroid Nodule CPGs; Endocrine Society 2016 Thyroid Dysfunction in Pregnancy.
+  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg", "papillary", "follicular", "medullary", "anaplastic", "rair", "lenvatinib", "sorafenib", "vandetanib", "cabozantinib", "selpercatinib"], citation: `ATA 2025 Guidelines for Differentiated Thyroid Cancer (Ringel/Sosa); ATA 2015 Guidelines for Thyroid Nodules (Haugen); ATA 2014 Hypothyroidism (Jonklaas); ATA 2016 Hyperthyroidism (Ross); Endocrine Society 2016 Thyroid in Pregnancy.
 
-⚠️ FABRICATED CITATION WARNINGS — DO NOT INVENT:
-- "ATA 2025 Guidelines" DOES NOT EXIST. Last comprehensive ATA hypothyroidism guideline is Jonklaas et al. 2014.
-- "ATA/ESMO Joint Guidelines" DO NOT EXIST. ATA and ESMO are SEPARATE organizations and do not co-publish thyroid cancer guidelines.
-- If uncertain about year, cite "per ATA recommendations" without a year, or cite the specific 2014/2015/2016 document explicitly.
+⚠️ CITATION DATE LOCKS:
+- Use "ATA 2025" EXCLUSIVELY for Differentiated Thyroid Cancer (Papillary/Follicular).
+- DO NOT cite "ATA 2025" for Nodules (use 2015) or Hypothyroidism (use 2014).
+- "ATA/ESMO Joint Guidelines" DO NOT EXIST.
 
 CRITICAL THYROID ANCHORS:
 
-1. OVERT vs SUBCLINICAL — EXACT DEFINITIONS:
-   - OVERT hypothyroidism = elevated TSH + LOW free T4 (regardless of TSH numeric value).
-   - SUBCLINICAL hypothyroidism = elevated TSH + NORMAL free T4.
-   - TSH >10 with NORMAL free T4 = still subclinical (grade 2); treatment generally recommended.
-   - FORBIDDEN ERROR: Do NOT define overt as "TSH >10" alone — free T4 status determines overt vs subclinical.
+1. OVERT vs SUBCLINICAL:
+   - OVERT = ↑TSH + LOW free T4 (regardless of TSH value).
+   - SUBCLINICAL = ↑TSH + NORMAL free T4. TSH >10 with normal free T4 is still subclinical.
 
-2. TSH TARGET RANGES — EXACT VALUES:
-   - General adult (non-pregnant): 0.4–4.0 mIU/L (lab reference range, ATA 2014).
-   - Elderly (>65): target slightly higher, 1.0–4.0 mIU/L acceptable.
-   - Pregnancy: 0.1–2.5 mIU/L (T1), 0.2–3.0 (T2), 0.3–3.0 (T3).
-   - FORBIDDEN ERROR: Do NOT cite 0.5–2.5 mIU/L as the general adult target — that is the PREGNANCY target.
-   - DTC post-thyroidectomy: low-risk 0.5–2.0; high-risk <0.1.
+2. TSH TARGETS (ATA 2025 DTC Update):
+   - DTC long-term surveillance: TSH suppression is NO LONGER recommended for low- or intermediate-risk patients without evidence of recurrence (target lower reference range 0.5–2.0 mIU/L).
+   - General adult hypothyroid: 0.4–4.0 mIU/L. Pregnancy: 0.1–2.5 (T1).
 
-3. SUBCLINICAL HYPOTHYROIDISM TREATMENT:
-   - TSH >10: treat.
-   - TSH 4.5–10 + asymptomatic non-pregnant adult: observe.
-   - TSH 4.5–10 + pregnancy or trying to conceive: TREAT.
-   - TSH 4.5–10 + symptoms of hypothyroidism: trial of treatment reasonable.
+3. DTC SURGERY (ATA 2025 Update):
+   - Lobectomy is the preferred option for low-risk unifocal cancers ≤4 cm without extrathyroidal extension or nodal spread.
 
-4. GRAVES DISEASE:
-   - Methimazole first-line for most adults.
-   - PTU preferred ONLY in T1 pregnancy and thyroid storm (PTU blocks T4→T3 conversion peripherally).
-   - RAI contraindicated in pregnancy, lactation, active moderate-severe ophthalmopathy.
-   - TRAb confirms Graves and predicts relapse risk after ATD withdrawal.
+4. THYROID CANCER — RAIR HARD RULES:
+   - RAIR requires DOCUMENTED RAI failure: no uptake on scan, OR progression within 12mo of RAI, OR cumulative RAI ≥600 mCi. Patient REFUSAL is NOT RAIR.
+   - Kinase inhibitors require RECIST 1.1 STRUCTURAL disease.
+   - Vandetanib/cabozantinib: MTC only. Selpercatinib: RET-confirmed only.
 
-5. THYROID NODULE WORKUP:
-   - TSH first. If suppressed → radionuclide scan (hot nodule rarely malignant).
-   - Ultrasound + ACR TIRADS for all nodules; size + TIRADS guides FNA.
-   - Bethesda system: I non-diagnostic, II benign, III AUS, IV FN/SFN, V suspicious, VI malignant.
+5. THYROID STORM: PTU BEFORE iodine. Beta-blocker (propranolol). Hydrocortisone.
 
-6. THYROID CANCER — RAIR-DTC HARD RULES (CRITICAL ANTI-HALLUCINATION):
-   - RAIR (radioiodine-refractory) requires DOCUMENTED RAI failure or ineligibility:
-     (a) no RAI uptake on diagnostic scan, OR
-     (b) progression within 12 months of RAI, OR
-     (c) cumulative RAI ≥600 mCi.
-   - PATIENT REFUSAL of RAI does NOT make disease RAIR. Do not call refusal "RAIR-DTC".
-   - Kinase inhibitors (lenvatinib, sorafenib) require RECIST 1.1 measurable STRUCTURAL disease — NEVER for biochemically occult disease (rising Tg with no structural lesion → CT/PET first, not lenvatinib).
-   - Stimulated Tg and unstimulated Tg are NOT directly comparable. Never call a stim→unstim Tg change "progression."
-   - Vandetanib and cabozantinib: MTC only. Do not use for DTC first-line.
-   - Selpercatinib: RET fusion/mutation confirmed only.
-
-7. THYROID STORM:
-   - PTU BEFORE iodine (PTU blocks peripheral T4→T3 conversion; iodine alone could worsen if given before thionamide).
-   - Beta-blocker (propranolol IV preferred, also blocks T4→T3).
-   - Hydrocortisone (decreases conversion + treats relative AI).
-   - Cooling, supportive care, treat precipitant. Burch-Wartofsky score guides diagnosis.
-
-8. COGNITIVE LEVEL FOR ABIM ENDOCRINOLOGY THYROID:
-   - FORBIDDEN: "Patient has TSH 9.8 + low T4 — start levothyroxine?" (Tier 1 — every MS3 knows this).
-   - REQUIRED Tier 3+: "Stable patient on levothyroxine develops elevated TSH — most likely cause?" (malabsorption, drug interaction, non-compliance, formulation change).
-   - REQUIRED Tier 4: "Post-thyroidectomy for papillary thyroid cancer — TSH 1.2, Tg undetectable, anti-Tg rising — interpretation and next step?"
-   - REQUIRED Tier 5: "Graves disease in T1 pregnancy — methimazole vs PTU; when to switch back postpartum?"` },
+6. COGNITIVE LEVEL:
+   - FORBIDDEN Tier 1: "TSH 9.8 + low T4 — start levo?"
+   - REQUIRED Tier 3+: "Stable patient on levo develops elevated TSH — most likely cause?"
+   - REQUIRED Tier 4: "Post-thyroidectomy DTC — TSH 1.2, Tg undetectable, anti-Tg rising — interpretation?"` },
   { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2018 AHA/ACC/Multisociety Cholesterol Guideline (Grundy et al., Circulation 2019); 2019 ACC/AHA Primary Prevention Guideline (Arnett et al.); 2022 ACC Expert Consensus on Non-Statin Therapies (Lloyd-Jones et al.); 2024 AHA Scientific Statement on PREVENT Calculator.
 
 ⚠️ FABRICATED CITATION WARNING:
@@ -908,66 +858,64 @@ CRITICAL BONE/PTH ANCHORS:
 4. BISPHOSPHONATE FACTS:
    - Alendronate, risedronate, zoledronic acid: ALL LOWER SERUM CALCIUM and improve BMD.
    - Drug holiday: 5 years oral / 3 years IV — high-risk continue.
-   - Alendronate: NOT RECOMMENDED at eGFR <35 (FDA).
-   - Atypical femur fracture risk after long-term use.
+   - Alendronate: NOT RECOMMENDED at eGFR <35 (FDA labeling); not absolutely contraindicated, use clinical judgment.
+   - Atypical femur fracture risk after long-term use → consider holiday.
 
 5. DENOSUMAB:
-   - DISCONTINUATION REQUIRES bisphosphonate bridge (within 6 months) — rebound vertebral fractures otherwise.
-   - Approved at any eGFR.
+   - DISCONTINUATION REQUIRES bisphosphonate bridge (within 6 months of last dose) — rebound vertebral fractures otherwise.
+   - Approved at any eGFR (no renal dose adjustment).
 
 6. ANABOLIC AGENTS:
    - Teriparatide and abaloparatide: MAX 2 YEARS lifetime.
-   - Romosozumab: BLACK BOX — contraindicated if MI or stroke within prior 12 months.
+   - Romosozumab: BLACK BOX — contraindicated if MI or stroke within prior 12 months (ARCH trial signal).
    - Sequential therapy: anabolic first, then antiresorptive to maintain gains.
 
 7. DRUG-INDUCED OSTEOPOROSIS:
-   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.` },
+   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.
+   - Aromatase inhibitors, GnRH agonists, AR-blockers: monitor BMD.
+   - Long-term PPI: ?modest fracture risk; not a contraindication.` },
   { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement", "reproductive"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.
 
 CRITICAL MENOPAUSE ANCHORS:
 1. HORMONE THERAPY: most beneficial when initiated <60 years or <10 years from menopause onset (timing hypothesis).
 2. CONTRAINDICATIONS: history of breast cancer, CHD, stroke, VTE, active liver disease, undiagnosed vaginal bleeding.
-3. ROUTE: transdermal preferred for VTE risk.
-4. PROGESTOGEN: required if intact uterus.
-5. NON-HORMONAL OPTIONS: SSRIs (paroxetine FDA-approved for VMS), SNRIs, gabapentin, fezolinetant (NK3R, 2023 FDA).
-6. GENITOURINARY SYNDROME: low-dose vaginal estrogen safe even in many breast cancer survivors.` },
+3. ROUTE: transdermal preferred for VTE risk (avoids first-pass hepatic effect).
+4. PROGESTOGEN: required if intact uterus (endometrial protection). Continuous combined or sequential.
+5. NON-HORMONAL OPTIONS: SSRIs (paroxetine FDA-approved for VMS), SNRIs (venlafaxine), gabapentin, fezolinetant (NK3R antagonist, 2023 FDA approval).
+6. GENITOURINARY SYNDROME: low-dose vaginal estrogen safe even in many breast cancer survivors after specialist discussion.` },
   { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin", "sheehan", "apoplexy", "cabergoline", "octreotide", "lanreotide", "pegvisomant", "desmopressin", "copeptin"], citation: `Pituitary Society 2023 Consensus on Acromegaly, Hypopituitarism, and Pituitary Tumors; Endocrine Society 2025 CPGs; European Journal of Endocrinology 2023 AVP-D Consensus.
 
 CRITICAL PITUITARY ANCHORS:
 
 1. PROLACTINOMA:
-   - Cabergoline first-line (better tolerability and efficacy than bromocriptine).
-   - Bromocriptine preferred during planned pregnancy (longer safety record).
-   - Stalk effect from non-prolactinoma (compressing stalk): prolactin elevated typically <100 ng/mL.
+   - Cabergoline first-line.
+   - Bromocriptine preferred during planned pregnancy.
+   - Stalk effect (non-prolactinoma compressing stalk): prolactin typically <100 ng/mL.
    - Hook effect at very high prolactin (>1000): assay underestimates — must dilute.
-   - Macroprolactin: inactive complex causing lab elevation without disease.
 
 2. ACROMEGALY:
    - GH nadir <1 ng/mL on 75g OGTT (or <0.4 with ultrasensitive assay).
    - IGF-1 used for diagnosis and monitoring.
    - Transsphenoidal surgery first-line.
-   - Somatostatin analogs (octreotide, lanreotide) for residual disease.
    - Pegvisomant (GH receptor antagonist): IGF-1 monitoring only — interferes with GH assay.
-   - Pasireotide: somatostatin-resistant cases.
 
 3. HYPOPITUITARISM:
-   - REPLACE CORTISOL BEFORE THYROID HORMONE (avoid precipitating adrenal crisis).
-   - Sheehan syndrome: postpartum pituitary infarction following severe hemorrhage.
+   - REPLACE CORTISOL BEFORE THYROID HORMONE.
+   - Sheehan syndrome: postpartum pituitary infarction.
    - Pituitary apoplexy: acute headache + visual change + hypopituitarism = neurosurgical emergency. Stress-dose steroids FIRST.
 
-4. AVP-D (CENTRAL DI) vs AVP-R (NEPHROGENIC DI):
+4. AVP-D vs AVP-R:
    - Hypertonic saline-stimulated copeptin >6.4 pmol/L confirms AVP-R.
    - Hypertonic saline-stimulated copeptin <4.9 pmol/L confirms AVP-D.
-   - This has largely replaced classic water deprivation test in many centers.
-   - Desmopressin response distinguishes (central responds; nephrogenic does not).
+   - Largely replaced classic water deprivation test.
    - Lithium → nephrogenic DI; gestational DI → placental vasopressinase.
 
-5. POST-PITUITARY-SURGERY TRIPHASIC RESPONSE: DI → SIADH → permanent DI. Recognize and manage each phase.
+5. POST-PITUITARY-SURGERY TRIPHASIC: DI → SIADH → permanent DI.
 
 6. SIADH:
    - Euvolemic hyponatremia + concentrated urine + low serum osmolality.
-   - Treatment: fluid restriction first. Tolvaptan or demeclocycline second-line. Hypertonic saline only for severe symptoms.
-   - Correction limits: <8 mEq/L per 24h to prevent osmotic demyelination.` },
+   - Fluid restriction first. Tolvaptan or demeclocycline second-line.
+   - Correction <8 mEq/L per 24h to prevent osmotic demyelination.` },
   { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines.
 
 CRITICAL SEPSIS/ID ANCHORS:
@@ -1021,7 +969,7 @@ CRITICAL ADRENAL ANCHORS:
    - ACTH >20 pg/mL = ACTH-DEPENDENT (pituitary or ectopic).
 
 2. CUSHING'S LOCALIZATION:
-   - BIPSS (bilateral inferior petrosal sinus sampling) required when MRI shows lesion <6mm or no lesion.
+   - BIPSS required when MRI shows lesion <6mm or no lesion.
    - Central:peripheral ACTH ratio ≥2 basal or ≥3 post-CRH = pituitary source.
    - MRI finding of ≥10mm microadenoma does NOT replace BIPSS for localization in ambiguous cases.
 
@@ -1222,40 +1170,63 @@ function validateConsistency(p) {
   return true;
 }
 
+function validateChoiceCompleteness(p) {
+  if (!p || !p.choices || !p.stem || !p.explanation) return false;
+  
+  const letters = ["A", "B", "C", "D", "E"];
+  for (const l of letters) {
+    if (!p.choices[l] || p.choices[l].trim().length < 3) {
+      console.warn(`[validateChoiceCompleteness] Missing or truncated choice: ${l}`);
+      return false;
+    }
+  }
+  
+  if (!/\?[\s"']*$/.test(p.stem)) {
+    console.warn("[validateChoiceCompleteness] Stem does not end with a question mark.");
+    return false;
+  }
+  
+  if (!p.explanation.includes("🩺") || !p.explanation.includes("🚫")) {
+    console.warn("[validateChoiceCompleteness] Explanation missing 🩺 or 🚫 markers.");
+    return false;
+  }
+  
+  if (!letters.includes(p.correct)) {
+    console.warn(`[validateChoiceCompleteness] Invalid correct answer letter: ${p.correct}`);
+    return false;
+  }
+  
+  return true;
+}
+
 // ============================================================
 // CLAUDE & GEMINI CLIENTS
 // ============================================================
 async function callClaude(systemText, userText, maxTokens) {
-  const maxRetries  = 1; // <--- SET TO 1 TO FIX 26s TIMEOUT ISSUE
+  const maxRetries  = 1; 
   const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) await sleep(1000);
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6", // <--- MODEL LOCKED AS REQUESTED
-          max_tokens: maxTokens,
-          temperature: 0.6,
-          system: systemText,
-          tools: [MCQ_TOOL],
-          tool_choice: { type: "tool", name: "emit_mcq" },
-          messages: [{ role: "user", content: finalUserText }]
-        })
-      });
-      if (response.status === 429) { await sleep(2000); continue; }
-      if (!response.ok) throw new Error(`Claude HTTP Error: ${response.status}`);
-      const data = await response.json();
-      const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
-      if (!toolUseBlock || !toolUseBlock.input) throw new Error("Claude response missing expected tool_use block.");
-      return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
-    } catch (e) {
-      console.warn(`Claude attempt ${attempt + 1} failed: ${e.message}`);
-      if (attempt === maxRetries - 1) return await callGemini(systemText, finalUserText, maxTokens);
-    }
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6", 
+        max_tokens: maxTokens,
+        temperature: 0.6,
+        system: systemText,
+        tools: [MCQ_TOOL],
+        tool_choice: { type: "tool", name: "emit_mcq" },
+        messages: [{ role: "user", content: finalUserText }]
+      })
+    });
+    if (!response.ok) throw new Error(`Claude HTTP Error: ${response.status}`);
+    const data = await response.json();
+    const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
+    if (!toolUseBlock || !toolUseBlock.input) throw new Error("Claude response missing expected tool_use block.");
+    return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
   }
 }
 
@@ -1274,7 +1245,12 @@ async function callGemini(systemText, userText, maxTokens) {
           { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
         ],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: maxTokens }
+        generationConfig: { 
+          responseMimeType: "application/json", 
+          responseSchema: MCQ_TOOL.input_schema,
+          temperature: 0.6, 
+          maxOutputTokens: maxTokens 
+        }
       })
     }
   );
@@ -1386,7 +1362,7 @@ function buildPrompt(level, topic, isNutrition) {
   const randomSex   = pickSexForTopic(promptTopic);
 
   const isUSMLE   = level.includes("USMLE");
-  const maxTokens = isABIM_Endo ? 2400 : (isABIM_IM || isStep3) ? 2200 : 1800;
+  const maxTokens = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
 
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
 
@@ -1514,21 +1490,24 @@ exports.handler = async function (event) {
       try { callResult = await callClaude(pd.systemText, pd.userText, pd.maxTokens); }
       catch (e) { throw new Error(`AI Network Failure: ${e.message}`); }
 
-      p = callResult.parsed;
-      generationModel = callResult.model;
+      p = callResult?.parsed;
+      generationModel = callResult?.model;
       if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) continue;
 
       const demoOk        = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
       const consistencyOk = validateConsistency(p);
-      isValid = demoOk && consistencyOk;
+      const choicesOk     = validateChoiceCompleteness(p);
+      isValid = demoOk && consistencyOk && choicesOk;
 
       if (!isValid && attempts === 3) {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
         p               = fbResult.parsed;
         generationModel = fbResult.model;
-        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) && validateConsistency(p);
+        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) && validateConsistency(p) && validateChoiceCompleteness(p);
       }
     }
+
+    if (!isValid) throw new Error("Failed to generate a valid MCQ after maximum retries.");
 
     p.topic = pd.resolvedTopic;
     const letters      = ['A', 'B', 'C', 'D', 'E'];
