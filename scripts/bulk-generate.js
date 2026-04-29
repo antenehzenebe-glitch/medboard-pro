@@ -18,19 +18,12 @@
 //     regardless of glycemic efficacy (empagliflozin dismissal)
 //   • ATA and ESMO are SEPARATE organizations — no joint guidelines exist
 //   • AACE 2026 Lipid Guidelines DO NOT EXIST — last AACE lipid was 2017
+//   • MEN1 and MEN2 Guidelines locked to 2012/2015 respectively to prevent date hallucinations.
 //
 // - PRESERVED: All v7.4 architecture (TOPIC_GUARDRAILS, validateConsistency,
 //   raised maxTokens 2400/2200/1800, B-hCG/PSA traps, demographic validator,
 //   self-verification block, Integrity Rules A-G).
-//
-// CHANGELOG (v7.4 from v7.3):
-// - NEW: getTopicGuardrails(level, topic) — Layer 1 + Layer 2 per topic
-//     L1 → SYSTEM prompt (foundational anchors, hallucination prevention)
-//     L2 → USER prompt (cognitive complexity forcing)
-// - NEW: 5-point self-verification block at end of user prompt.
-// - Routing: only matching topic's guardrail is injected.
-// - All v7.3 logic preserved (validators, raised maxTokens, batch+standard).
-// ---------------------------------------------------------------
+
 "use strict";
 const crypto = require("crypto");
 
@@ -136,35 +129,35 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Thiamine (B1) deficiency — Wernicke encephalopathy",  weight: 3 },
   ],
   "USMLE Step 2 CK": [
-    { topic: "ACS STEMI NSTEMI",                                                weight: 6 },
-    { topic: "Heart Failure",                                                    weight: 5 },
-    { topic: "Pneumonia",                                                        weight: 5 },
-    { topic: "Sepsis and Septic Shock",                                          weight: 5 },
-    { topic: "Acute Kidney Injury",                                              weight: 5 },
-    { topic: "Type 2 Diagnosis and Management",                                  weight: 5 },
-    { topic: "Gestational Diabetes",                                             weight: 4 },
-    { topic: "Obstetrics and Gynecology",                                        weight: 5 },
-    { topic: "Pediatrics and Congenital Issues",                                 weight: 5 },
+    { topic: "ACS STEMI NSTEMI",                                       weight: 6 },
+    { topic: "Heart Failure",                                          weight: 5 },
+    { topic: "Pneumonia",                                              weight: 5 },
+    { topic: "Sepsis and Septic Shock",                                weight: 5 },
+    { topic: "Acute Kidney Injury",                                    weight: 5 },
+    { topic: "Type 2 Diagnosis and Management",                        weight: 5 },
+    { topic: "Gestational Diabetes",                                   weight: 4 },
+    { topic: "Obstetrics and Gynecology",                              weight: 5 },
+    { topic: "Pediatrics and Congenital Issues",                       weight: 5 },
     { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 5 },
-    { topic: "Psychiatry and Substance Abuse",                                   weight: 4 },
-    { topic: "General Surgery and Trauma Management",                            weight: 5 },
+    { topic: "Psychiatry and Substance Abuse",                         weight: 4 },
+    { topic: "General Surgery and Trauma Management",                  weight: 5 },
   ],
   "USMLE Step 3": [
-    { topic: "ACS STEMI NSTEMI",                                                weight: 5 },
-    { topic: "Sepsis and Septic Shock",                                          weight: 5 },
-    { topic: "Pulmonary Embolism",                                               weight: 4 },
-    { topic: "CKD",                                                              weight: 4 },
-    { topic: "Type 2 Diagnosis and Management",                                  weight: 4 },
+    { topic: "ACS STEMI NSTEMI",                                       weight: 5 },
+    { topic: "Sepsis and Septic Shock",                                weight: 5 },
+    { topic: "Pulmonary Embolism",                                     weight: 4 },
+    { topic: "CKD",                                                    weight: 4 },
+    { topic: "Type 2 Diagnosis and Management",                        weight: 4 },
     { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 6 },
-    { topic: "Psychiatry and Substance Abuse",                                   weight: 4 },
-    { topic: "Obstetrics and Gynecology",                                        weight: 4 },
-    { topic: "ICU nutrition — ASPEN/ESPEN 2023",                                weight: 3 },
-    { topic: "Chronic disease nutrition management",                             weight: 3 },
+    { topic: "Psychiatry and Substance Abuse",                         weight: 4 },
+    { topic: "Obstetrics and Gynecology",                              weight: 4 },
+    { topic: "ICU nutrition — ASPEN/ESPEN 2023",                       weight: 3 },
+    { topic: "Chronic disease nutrition management",                   weight: 3 },
   ],
 };
 
 // ============================================================
-// v7.4 — TOPIC GUARDRAIL MAP (extracted from generate-mcq.js)
+// TOPIC GUARDRAIL MAP
 // ============================================================
 const TOPIC_GUARDRAILS = [
   {
@@ -756,7 +749,7 @@ REQUIRED Tier 2-3 angles:
 const GENERIC_GUARDRAILS = {
   l1: `GENERAL CLINICAL ANCHORS:
 - Cite only data explicitly present in the stem.
-- Use 2024-2026 society guidelines, not legacy criteria.
+- Use current officially published society guidelines, not legacy criteria. Do not invent recent dates for older guidelines.
 - Numeric values in explanation must match stem exactly.`,
   l2: `COGNITIVE COMPLEXITY EXPECTATION:
 FORBIDDEN: "What is the most likely diagnosis?" for ABIM-level questions.
@@ -965,7 +958,7 @@ CRITICAL IBD ANCHORS:
    - HRS-AKI: terlipressin + albumin first-line.
    - HE: lactulose + rifaximin.
    - HCC screening: q6mo US ± AFP in cirrhosis.` },
-  { keywords: ["parathyroid", "calcium", "bone", "osteoporosis", "hyperparathyroidism", "hypercalcemia", "bisphosphonate", "denosumab", "teriparatide", "abaloparatide", "romosozumab", "frax"], citation: `Endocrine Society 2022 Primary Hyperparathyroidism Guideline (Bilezikian et al.); AACE 2020 Postmenopausal Osteoporosis Guideline + 2024 Updates.
+  { keywords: ["parathyroid", "calcium", "bone", "osteoporosis", "hyperparathyroidism", "hypercalcemia", "bisphosphonate", "denosumab", "teriparatide", "abaloparatide", "romosozumab", "frax", "pthrp", "calcimimetic", "cinacalcet"], citation: `Endocrine Society 2022 Primary Hyperparathyroidism Guideline (Bilezikian et al.); AACE 2020 Postmenopausal Osteoporosis Guideline + 2024 Updates.
 
 CRITICAL BONE/PTH ANCHORS:
 
@@ -974,81 +967,81 @@ CRITICAL BONE/PTH ANCHORS:
    - 24h urine calcium DISTINGUISHES from FHH (Ca/Cr clearance ratio <0.01 = FHH).
    - Surgery indications (any one): symptomatic, age <50, Ca >1 above ULN, eGFR <60, T-score ≤-2.5, vertebral fracture, kidney stones, 24h urine Ca >400.
    - Sestamibi + neck US for localization.
-   - Hungry bone syndrome: post-op severe hypocalcemia from rapid bone uptake.
+   - Hungry bone syndrome: post-op severe hypocalcemia.
 
-2. HYPERCALCEMIA — TREATMENT (CRITICAL ANTI-HALLUCINATION):
-   - PTH-mediated (high or inappropriately normal PTH): primary HPT, FHH, lithium.
-   - PTH-independent (low PTH): malignancy (PTHrP, osteolytic, 1,25-D), granulomatous, vitamin D toxicity, milk-alkali, immobilization.
+2. HYPERCALCEMIA — CRITICAL ANTI-HALLUCINATION RULES:
    - Treatment sequence: IV fluids first → calcitonin (rapid, tachyphylaxis 48h) → BISPHOSPHONATE (4-7 day onset).
    - BISPHOSPHONATES DO LOWER SERUM CALCIUM via osteoclast inhibition. NEVER state "alendronate does not lower calcium" — this is FALSE.
    - Denosumab: alternative when bisphosphonate contraindicated (renal failure).
-   - Cinacalcet: in severe primary HPT or parathyroid carcinoma not amenable to surgery.
-   - Granulomatous (sarcoid, TB) hypercalcemia: corticosteroids effective.
+   - Cinacalcet: severe primary HPT or parathyroid carcinoma not amenable to surgery.
+   - Granulomatous (sarcoid, TB) hypercalcemia: corticosteroids effective (1,25-D mediated).
 
-3. OSTEOPOROSIS — TREATMENT THRESHOLD:
+3. OSTEOPOROSIS TREATMENT THRESHOLD:
    - T-score ≤-2.5, OR T -1.0 to -2.5 + FRAX MOF ≥20% or hip ≥3%.
 
 4. BISPHOSPHONATE FACTS:
    - Alendronate, risedronate, zoledronic acid: ALL LOWER SERUM CALCIUM and improve BMD.
    - Drug holiday: 5 years oral / 3 years IV — high-risk continue.
-   - Alendronate: NOT RECOMMENDED at eGFR <35 (FDA labeling); not absolutely contraindicated, use clinical judgment.
-   - Atypical femur fracture risk after long-term use → consider holiday.
+   - Alendronate: NOT RECOMMENDED at eGFR <35 (FDA).
+   - Atypical femur fracture risk after long-term use.
 
 5. DENOSUMAB:
-   - DISCONTINUATION REQUIRES bisphosphonate bridge (within 6 months of last dose) — rebound vertebral fractures otherwise.
-   - Approved at any eGFR (no renal dose adjustment).
+   - DISCONTINUATION REQUIRES bisphosphonate bridge (within 6 months) — rebound vertebral fractures otherwise.
+   - Approved at any eGFR.
 
 6. ANABOLIC AGENTS:
    - Teriparatide and abaloparatide: MAX 2 YEARS lifetime.
-   - Romosozumab: BLACK BOX — contraindicated if MI or stroke within prior 12 months (ARCH trial signal).
+   - Romosozumab: BLACK BOX — contraindicated if MI or stroke within prior 12 months.
    - Sequential therapy: anabolic first, then antiresorptive to maintain gains.
 
 7. DRUG-INDUCED OSTEOPOROSIS:
-   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.
-   - Aromatase inhibitors, GnRH agonists, AR-blockers: monitor BMD.
-   - Long-term PPI: ?modest fracture risk; not a contraindication.` },
-  { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.
+   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.` },
+  { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement", "reproductive"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.
 
 CRITICAL MENOPAUSE ANCHORS:
 1. HORMONE THERAPY: most beneficial when initiated <60 years or <10 years from menopause onset (timing hypothesis).
 2. CONTRAINDICATIONS: history of breast cancer, CHD, stroke, VTE, active liver disease, undiagnosed vaginal bleeding.
-3. ROUTE: transdermal preferred for VTE risk (avoids first-pass hepatic effect).
-4. PROGESTOGEN: required if intact uterus (endometrial protection). Continuous combined or sequential.
-5. NON-HORMONAL OPTIONS: SSRIs (paroxetine FDA-approved for VMS), SNRIs (venlafaxine), gabapentin, fezolinetant (NK3R antagonist, 2023 FDA approval).
-6. GENITOURINARY SYNDROME: low-dose vaginal estrogen safe even in many breast cancer survivors after specialist discussion.` },
+3. ROUTE: transdermal preferred for VTE risk.
+4. PROGESTOGEN: required if intact uterus.
+5. NON-HORMONAL OPTIONS: SSRIs (paroxetine FDA-approved for VMS), SNRIs, gabapentin, fezolinetant (NK3R, 2023 FDA).
+6. GENITOURINARY SYNDROME: low-dose vaginal estrogen safe even in many breast cancer survivors.` },
   { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin", "sheehan", "apoplexy", "cabergoline", "octreotide", "lanreotide", "pegvisomant", "desmopressin", "copeptin"], citation: `Pituitary Society 2023 Consensus on Acromegaly, Hypopituitarism, and Pituitary Tumors; Endocrine Society 2025 CPGs; European Journal of Endocrinology 2023 AVP-D Consensus.
 
 CRITICAL PITUITARY ANCHORS:
 
 1. PROLACTINOMA:
-   - Cabergoline first-line.
-   - Bromocriptine preferred during planned pregnancy.
-   - Stalk effect (non-prolactinoma compressing stalk): prolactin typically <100 ng/mL.
+   - Cabergoline first-line (better tolerability and efficacy than bromocriptine).
+   - Bromocriptine preferred during planned pregnancy (longer safety record).
+   - Stalk effect from non-prolactinoma (compressing stalk): prolactin elevated typically <100 ng/mL.
    - Hook effect at very high prolactin (>1000): assay underestimates — must dilute.
+   - Macroprolactin: inactive complex causing lab elevation without disease.
 
 2. ACROMEGALY:
    - GH nadir <1 ng/mL on 75g OGTT (or <0.4 with ultrasensitive assay).
    - IGF-1 used for diagnosis and monitoring.
    - Transsphenoidal surgery first-line.
+   - Somatostatin analogs (octreotide, lanreotide) for residual disease.
    - Pegvisomant (GH receptor antagonist): IGF-1 monitoring only — interferes with GH assay.
+   - Pasireotide: somatostatin-resistant cases.
 
 3. HYPOPITUITARISM:
-   - REPLACE CORTISOL BEFORE THYROID HORMONE.
-   - Sheehan syndrome: postpartum pituitary infarction.
+   - REPLACE CORTISOL BEFORE THYROID HORMONE (avoid precipitating adrenal crisis).
+   - Sheehan syndrome: postpartum pituitary infarction following severe hemorrhage.
    - Pituitary apoplexy: acute headache + visual change + hypopituitarism = neurosurgical emergency. Stress-dose steroids FIRST.
 
-4. AVP-D vs AVP-R:
+4. AVP-D (CENTRAL DI) vs AVP-R (NEPHROGENIC DI):
    - Hypertonic saline-stimulated copeptin >6.4 pmol/L confirms AVP-R.
    - Hypertonic saline-stimulated copeptin <4.9 pmol/L confirms AVP-D.
-   - Largely replaced classic water deprivation test.
+   - This has largely replaced classic water deprivation test in many centers.
+   - Desmopressin response distinguishes (central responds; nephrogenic does not).
    - Lithium → nephrogenic DI; gestational DI → placental vasopressinase.
 
-5. POST-PITUITARY-SURGERY TRIPHASIC: DI → SIADH → permanent DI.
+5. POST-PITUITARY-SURGERY TRIPHASIC RESPONSE: DI → SIADH → permanent DI. Recognize and manage each phase.
 
 6. SIADH:
    - Euvolemic hyponatremia + concentrated urine + low serum osmolality.
-   - Fluid restriction first. Tolvaptan or demeclocycline second-line.
-   - Correction <8 mEq/L per 24h to prevent osmotic demyelination.` },
+   - Treatment: fluid restriction first. Tolvaptan or demeclocycline second-line. Hypertonic saline only for severe symptoms.
+   - Correction limits: <8 mEq/L per 24h to prevent osmotic demyelination.` },
   { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines.
 
 CRITICAL SEPSIS/ID ANCHORS:
@@ -1090,6 +1083,7 @@ CRITICAL SEPSIS/ID ANCHORS:
    - Native valve viridans/Strep gallolyticus: penicillin/ceftriaxone.
    - Native valve Staph: nafcillin (MSSA), vancomycin (MRSA).
    - Prosthetic valve: vancomycin + gentamicin + rifampin.` },
+  { keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer", "men2", "men 2a", "men 2b", "ret mutation", "prophylactic thyroidectomy"], citation: `Endocrine Society Clinical Practice Guidelines for MEN1 (2012) and MEN2/MTC (2015). Do not cite guidelines newer than these.` },
   { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma", "addison", "cortisol", "acth", "metanephrine", "phenoxybenzamine", "spironolactone adrenal", "eplerenone"], citation: `Endocrine Society 2008 Cushing Syndrome Diagnostic CPG (Nieman et al.) + 2015 Treatment CPG; Pituitary Society 2023 Consensus on Cushing Disease; Endocrine Society 2016 Primary Aldosteronism CPG; Endocrine Society 2014 Pheochromocytoma/Paraganglioma CPG.
 
 CRITICAL ADRENAL ANCHORS:
@@ -1137,7 +1131,7 @@ function getGuidelineContext(topic, isNutrition) {
   if (isNutrition) return "ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI Nutrition Guidelines";
   const t = topic.toLowerCase();
   const match = GUIDELINE_MAP.find(g => g.keywords.some(k => t.includes(k)));
-  return match ? match.citation : "the most current 2025-2026 official society guidelines";
+  return match ? match.citation : "the most recent applicable society guidelines (do not fabricate publication years)";
 }
 
 function pickSexForTopic(promptTopic) {
@@ -1358,7 +1352,7 @@ G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric resul
   const guardrails = getTopicGuardrails(level, topic);
 
   const explanationNote = `EXPLANATION FORMAT — use these exact headers:
-🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite 2024+ guideline].
+🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite the most recent officially published guideline (do not fabricate dates if older)].
 🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
 💎 Board Pearl: [one high-yield fact].`;
 
@@ -1623,7 +1617,7 @@ async function runStandardMode(queue, silent = false) {
     const pd = buildPrompt(item.level, item.topic);
     const entropySeed = `${Date.now()}-${Math.random()}`;
 
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 1; attempt++) {
       try {
         const res = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -1649,7 +1643,7 @@ async function runStandardMode(queue, silent = false) {
         if (!silent) process.stdout.write(`\r  ✅  ${done}/${queue.length} complete   `);
         return processed;
       } catch (e) {
-        if (attempt === 1) done++;
+        if (attempt === 0) done++;
         else await sleep(2000);
       }
     }
@@ -1672,7 +1666,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.4)      ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5)      ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
