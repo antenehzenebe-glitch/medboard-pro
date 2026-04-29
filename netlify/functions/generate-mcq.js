@@ -1,15 +1,10 @@
 // generate-mcq.js — MedBoard Pro
-// v7.5.2 — Token Budget, Truncation Defenders, & 2025 ATA Update
+// v7.5.3 — Randomization Loop & Nutrition Bug Fixes
 // ---------------------------------------------------------------
 // CHANGELOG:
-// - FIXED: Expanded maxTokens budget to prevent JSON truncation on complex
-//   Tier 3 stems (Endo 3200, IM 2800, Step1 2200).
-// - ADDED: validateChoiceCompleteness() to defend against missing options A-E.
-// - FIXED: Gemini API fallback now inherits the strict MCQ_TOOL schema.
-// - OPTIMIZED: Adjusted retry loop to respect Netlify 26s timeout constraint.
-// - CLINICAL UPDATE: Integrated ATA 2025 DTC Guidelines. Model is instructed 
-//   to use ATA 2025 exclusively for Papillary/Follicular cancer, while retaining 
-//   ATA 2015 for Nodules and 2014 for Hypothyroidism.
+// - FIXED (v7.5.3): Broken "Random" query loop that caused constant PBH collisions.
+// - FIXED (v7.5.3): Nutrition injection logic inversion (now properly targets Random).
+// - OPTIMIZED: Synchronized TOPIC_DISTRIBUTION and deriveSpecialtyGroup with bulk-generate.js.
 
 const crypto = require("crypto");
 
@@ -984,7 +979,7 @@ CRITICAL ADRENAL ANCHORS:
    - Plasma free metanephrines OR 24h urine fractionated metanephrines first-line.
    - ALPHA BLOCKADE (phenoxybenzamine or doxazosin) MUST PRECEDE BETA BLOCKADE by 10-14 days.
    - Starting beta-blocker first → unopposed alpha → hypertensive crisis. Never do this.
-   - Volume expansion preoperatively.
+   - Volume expansion preoperatively (high-salt diet, sometimes IV fluids).
    - Genetic testing in ALL patients: MEN2 (RET), VHL, SDH-related, NF1.
 
 5. ADRENAL INSUFFICIENCY:
@@ -1008,7 +1003,7 @@ function getGuidelineContext(topic, isNutrition) {
 }
 
 // ============================================================
-// NUTRITION & TOPIC HELPERS
+// NUTRITION & TOPIC DISTRIBUTIONS
 // ============================================================
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": ["Vitamin D deficiency — rickets vs. osteomalacia", "Thiamine (B1) deficiency — Wernicke encephalopathy", "Vitamin B12 deficiency", "Refeeding syndrome pathophysiology", "Starvation biochemistry"],
@@ -1018,11 +1013,108 @@ const NUTRITION_BY_LEVEL = {
   "ABIM Endocrinology": ["Medical nutrition therapy for T1DM/T2DM (ADA 2026)", "Nutritional causes of secondary osteoporosis", "Post-bariatric micronutrient protocol", "Ketogenic diet mechanisms", "Selenium/Zinc deficiency"]
 };
 
+const TOPIC_DISTRIBUTION = {
+  "ABIM Endocrinology": [
+    { topic: "Type 2 Diagnosis and Management",  weight: 8 },
+    { topic: "Type 1 Insulin Therapy",           weight: 6 },
+    { topic: "DKA and HHS",                      weight: 5 },
+    { topic: "Hypoglycemia",                     weight: 5 },
+    { topic: "GLP-1 Receptor Agonists",          weight: 5 },
+    { topic: "SGLT2 Inhibitors",                 weight: 4 },
+    { topic: "CGM and AID Systems",              weight: 3 },
+    { topic: "Hypothyroidism and Hashimotos",    weight: 5 },
+    { topic: "Hyperthyroidism and Graves",       weight: 5 },
+    { topic: "Thyroid Nodule Evaluation",        weight: 4 },
+    { topic: "Thyroid Cancer",                   weight: 3 },
+    { topic: "Thyroid Storm",                    weight: 3 },
+    { topic: "Cushing Syndrome",                 weight: 5 },
+    { topic: "Primary Aldosteronism",            weight: 4 },
+    { topic: "Pheochromocytoma",                 weight: 3 },
+    { topic: "Adrenal Insufficiency",            weight: 4 },
+    { topic: "Prolactinoma",                     weight: 4 },
+    { topic: "Acromegaly",                       weight: 3 },
+    { topic: "Hypopituitarism",                  weight: 3 },
+    { topic: "Diabetes Insipidus",               weight: 3 },
+    { topic: "Hyperparathyroidism",              weight: 4 },
+    { topic: "Hypercalcemia",                    weight: 3 },
+    { topic: "Osteoporosis",                     weight: 4 },
+    { topic: "PCOS",                             weight: 4 },
+    { topic: "Male Hypogonadism",                weight: 3 },
+    { topic: "MEN1",                             weight: 2 },
+    { topic: "MEN2A and MEN2B",                  weight: 2 },
+    { topic: "Insulinoma",                       weight: 2 },
+  ],
+  "ABIM Internal Medicine": [
+    { topic: "ACS STEMI NSTEMI",                 weight: 7 },
+    { topic: "Heart Failure",                    weight: 6 },
+    { topic: "Atrial Fibrillation",              weight: 6 },
+    { topic: "Hypertension",                     weight: 5 },
+    { topic: "Lipid Disorders",                  weight: 4 },
+    { topic: "Asthma and COPD",                  weight: 5 },
+    { topic: "Pneumonia",                        weight: 4 },
+    { topic: "Pulmonary Embolism",               weight: 5 },
+    { topic: "Acute Kidney Injury",              weight: 5 },
+    { topic: "CKD",                              weight: 4 },
+    { topic: "Electrolyte Disorders",            weight: 5 },
+    { topic: "Acid-Base Disorders",              weight: 4 },
+    { topic: "IBD Crohns and UC",                weight: 4 },
+    { topic: "Cirrhosis",                        weight: 4 },
+    { topic: "Sepsis and Septic Shock",          weight: 5 },
+    { topic: "HIV",                              weight: 3 },
+    { topic: "Anemia",                           weight: 4 },
+    { topic: "DVT and Anticoagulation",          weight: 4 },
+    { topic: "Rheumatoid Arthritis",             weight: 3 },
+    { topic: "SLE",                              weight: 3 },
+    { topic: "Type 2 Diagnosis and Management",  weight: 4 },
+    { topic: "Hypothyroidism and Hashimotos",    weight: 3 },
+    { topic: "Informed Consent",                 weight: 2 },
+    { topic: "End-of-Life Care",                 weight: 2 },
+  ],
+  "USMLE Step 1": [
+    { topic: "Systemic Pathology and Pathophysiology",              weight: 10 },
+    { topic: "Pharmacology, Pharmacokinetics, and Adverse Effects", weight: 8 },
+    { topic: "Physiology and Clinical Biochemistry",                weight: 8 },
+    { topic: "Microbiology, Virology, and Immunology",              weight: 7 },
+    { topic: "Anatomy, Neuroanatomy, and Embryology",               weight: 4 },
+    { topic: "Behavioral Science, Medical Ethics, and Biostatistics", weight: 5 },
+    { topic: "Vitamin D deficiency — rickets vs. osteomalacia",     weight: 3 },
+    { topic: "Thiamine (B1) deficiency — Wernicke encephalopathy",  weight: 3 },
+  ],
+  "USMLE Step 2 CK": [
+    { topic: "ACS STEMI NSTEMI",                                    weight: 6 },
+    { topic: "Heart Failure",                                       weight: 5 },
+    { topic: "Pneumonia",                                           weight: 5 },
+    { topic: "Sepsis and Septic Shock",                             weight: 5 },
+    { topic: "Acute Kidney Injury",                                 weight: 5 },
+    { topic: "Type 2 Diagnosis and Management",                     weight: 5 },
+    { topic: "Gestational Diabetes",                                weight: 4 },
+    { topic: "Obstetrics and Gynecology",                           weight: 5 },
+    { topic: "Pediatrics and Congenital Issues",                    weight: 5 },
+    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 5 },
+    { topic: "Psychiatry and Substance Abuse",                      weight: 4 },
+    { topic: "General Surgery and Trauma Management",               weight: 5 },
+  ],
+  "USMLE Step 3": [
+    { topic: "ACS STEMI NSTEMI",                                    weight: 5 },
+    { topic: "Sepsis and Septic Shock",                             weight: 5 },
+    { topic: "Pulmonary Embolism",                                  weight: 4 },
+    { topic: "CKD",                                                 weight: 4 },
+    { topic: "Type 2 Diagnosis and Management",                     weight: 4 },
+    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 6 },
+    { topic: "Psychiatry and Substance Abuse",                      weight: 4 },
+    { topic: "Obstetrics and Gynecology",                           weight: 4 },
+    { topic: "ICU nutrition — ASPEN/ESPEN 2023",                    weight: 3 },
+    { topic: "Chronic disease nutrition management",                weight: 3 },
+  ]
+};
+
 const NUTRITION_INJECTION_RATE = 0.12;
 
 function pickTopicForLevel(level, rawTopic) {
   const nutritionTopics = NUTRITION_BY_LEVEL[level];
-  if (nutritionTopics && !rawTopic.includes("Random") && Math.random() < NUTRITION_INJECTION_RATE) {
+  // BUG FIXED: Removed '!' before rawTopic.includes("Random").
+  // Now nutrition is correctly injected ONLY on a Random pull.
+  if (nutritionTopics && rawTopic.includes("Random") && Math.random() < NUTRITION_INJECTION_RATE) {
     const idx = Math.floor(Math.random() * nutritionTopics.length);
     return { topic: nutritionTopics[idx], isNutrition: true };
   }
@@ -1056,27 +1148,22 @@ function hashStem(stem) {
 function deriveSpecialtyGroup(level, resolvedTopic) {
   if (level === "ABIM Endocrinology") return "Endocrinology";
   const t = (resolvedTopic || "").toLowerCase();
-  if (t.includes("cardio")) return "Cardiology";
+  if (t.includes("cardio") || t.includes("acs") || t.includes("heart failure") || t.includes("atrial")) return "Cardiology";
   if (t.includes("endocrin") || t.includes("diabetes") || t.includes("thyroid") || t.includes("pituitary") || t.includes("adrenal") || t.includes("bone") || t.includes("calcium")) return "Endocrinology";
-  if (t.includes("nephro") || t.includes("renal")) return "Nephrology";
-  if (t.includes("pulm")) return "Pulmonology";
-  if (t.includes("gastro") || t.includes("hepat")) return "Gastroenterology";
-  if (t.includes("hematol") || t.includes("oncolog")) return "Hematology/Oncology";
-  if (t.includes("rheumatol")) return "Rheumatology";
-  if (t.includes("infectious")) return "Infectious Disease";
-  if (t.includes("neurolog")) return "Neurology";
-  if (t.includes("ethics") || t.includes("hipaa") || t.includes("palliative") || t.includes("end-of-life")) return "Ethics/Communication";
-  if (t.includes("psychi")) return "Psychiatry";
-  if (t.includes("pediat")) return "Pediatrics";
-  if (t.includes("obstet") || t.includes("gynec")) return "OB/GYN";
+  if (t.includes("nephro") || t.includes("renal") || t.includes("ckd") || t.includes("kidney")) return "Nephrology";
+  if (t.includes("pulm") || t.includes("copd") || t.includes("asthma") || t.includes("pneumonia")) return "Pulmonology";
+  if (t.includes("gastro") || t.includes("hepat") || t.includes("cirrhosis") || t.includes("ibd")) return "Gastroenterology";
+  if (t.includes("hematol") || t.includes("oncolog") || t.includes("anemia") || t.includes("dvt")) return "Hematology/Oncology";
+  if (t.includes("rheumatol") || t.includes("arthritis") || t.includes("sle") || t.includes("lupus")) return "Rheumatology";
+  if (t.includes("infectious") || t.includes("sepsis") || t.includes("hiv") || t.includes("antibiotic")) return "Infectious Disease";
+  if (t.includes("neurolog") || t.includes("stroke") || t.includes("seizure")) return "Neurology";
+  if (t.includes("ethics") || t.includes("hipaa") || t.includes("palliative") || t.includes("end-of-life") || t.includes("consent")) return "Ethics/Communication";
+  if (t.includes("psychi") || t.includes("substance")) return "Psychiatry";
+  if (t.includes("pediat") || t.includes("congenital")) return "Pediatrics";
+  if (t.includes("obstet") || t.includes("gynec") || t.includes("gestational")) return "OB/GYN";
   if (t.includes("surg") || t.includes("trauma")) return "Surgery";
   if (t.includes("pharmac")) return "Pharmacology";
-  if (t.includes("patholog")) return "Pathology";
-  if (t.includes("microbiol") || t.includes("virol") || t.includes("immunolog")) return "Microbiology/Immunology";
-  if (t.includes("anatom") || t.includes("embryol")) return "Anatomy";
-  if (t.includes("physiolog") || t.includes("biochem")) return "Physiology/Biochemistry";
-  if (t.includes("behav") || t.includes("biostat")) return "Behavioral/Biostatistics";
-  if (t.includes("nutrition")) return "Nutrition";
+  if (t.includes("nutrition") || t.includes("vitamin") || t.includes("thiamine") || t.includes("refeeding")) return "Nutrition";
   return "General Internal Medicine";
 }
 
@@ -1311,16 +1398,13 @@ async function saveMcqToSupabase(p, level, meta) {
 // ============================================================
 function buildPrompt(level, topic, isNutrition) {
   let promptTopic = topic;
+  
+  // BUG FIXED: We now pull from the granular TOPIC_DISTRIBUTION object rather than 
+  // relying on broad strings that caused keyword collisions.
   if (topic.includes("Random")) {
-    if (level === "ABIM Endocrinology" || topic === "Random -- Endocrinology Only") {
-      promptTopic = pickWeighted([{s:"Diabetes Mellitus and Hypoglycemia Management",w:25}, {s:"Thyroid Disorders and Thyroid Cancer",w:20}, {s:"Pituitary and Neuroendocrine Tumors",w:15}, {s:"Bone, Calcium, and Parathyroid Disorders",w:15}, {s:"Adrenal Disorders and Hypertension",w:10}, {s:"Reproductive Endocrinology, PCOS, and Hypogonadism",w:10}, {s:"Lipid Disorders and Multiple Endocrine Neoplasia",w:5}]);
-    } else if (level === "USMLE Step 1") {
-      promptTopic = pickWeighted([{s:"Systemic Pathology and Pathophysiology",w:30}, {s:"Pharmacology, Pharmacokinetics, and Adverse Effects",w:20}, {s:"Physiology and Clinical Biochemistry",w:20}, {s:"Microbiology, Virology, and Immunology",w:15}, {s:"Anatomy, Neuroanatomy, and Embryology",w:5}, {s:"Behavioral Science, Medical Ethics, and Biostatistics",w:10}]);
-    } else if (level === "USMLE Step 2 CK" || level === "USMLE Step 3") {
-      promptTopic = pickWeighted([{s:"Internal Medicine (Cardio, Pulm, GI, Renal, Endo, ID)",w:45}, {s:"General Surgery and Trauma Management",w:15}, {s:"Pediatrics and Congenital Issues",w:10}, {s:"Obstetrics and Gynecology",w:10}, {s:"Psychiatry and Substance Abuse",w:10}, {s:"Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care",w:10}]);
-    } else {
-      promptTopic = pickWeighted([{s:"Cardiology (e.g., ACS, Heart Failure, Arrhythmias)",w:14}, {s:"Hematology and Oncology",w:12}, {s:"Pulmonology",w:9}, {s:"Gastroenterology and Hepatology",w:9}, {s:"Infectious Disease",w:9}, {s:"Rheumatology",w:9}, {s:"Endocrinology",w:9}, {s:"Nephrology",w:9}, {s:"General Internal Medicine",w:10}]);
-    }
+    const dist = TOPIC_DISTRIBUTION[level] || TOPIC_DISTRIBUTION["ABIM Internal Medicine"];
+    const mappedBlueprint = dist.map(t => ({ s: t.topic, w: t.weight }));
+    promptTopic = pickWeighted(mappedBlueprint);
   }
 
   const isABIM_Endo = level === "ABIM Endocrinology";
@@ -1329,7 +1413,7 @@ function buildPrompt(level, topic, isNutrition) {
   const isStep1     = level === "USMLE Step 1";
 
   let qTypePool = [];
-  if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA")) {
+  if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
   } else if (isStep1) {
     qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
