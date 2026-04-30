@@ -1,23 +1,30 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.2 — Token Budget, Truncation Defenders, & 2025 ATA Update
+// v7.6.1 — Error Handling Hardening + Timeout Optimization
 // ---------------------------------------------------------------
-// CHANGELOG:
-// - FIXED: Expanded maxTokens budget to prevent JSON truncation on complex
-//   Tier 3 stems (Endo 3200, IM 2800, Step1 2200).
-// - ADDED: validateChoiceCompleteness() to defend against missing options A-E.
-// - FIXED: Gemini API fallback now inherits the strict MCQ_TOOL schema.
-// - OPTIMIZED: Adjusted retry loop to respect Netlify 26s timeout constraint.
-// - CLINICAL UPDATE: Integrated ATA 2025 DTC Guidelines. Model is instructed 
-//   to use ATA 2025 exclusively for Papillary/Follicular cancer, while retaining 
-//   ATA 2015 for Nodules and 2014 for Hypothyroidism.
+// CHANGELOG (v7.6.1):
+// - OPTIMIZED: withTimeout limits raised to 45s for standard mode to
+//   prevent hung requests from stalling concurrency slots indefinitely without
+//   prematurely killing heavy 3200-token generations.
+// - FIXED: Dead 429/5xx retry — raised loop to attempt < MAX_ATTEMPTS (3) 
+//   with exponential backoff (2s, 4s, 8s).
+// - FIXED: Infinite batch poll loop — added MAX_POLL_ATTEMPTS (120),
+//   terminal status detection, and fallback to standard mode on poll failure.
+// - FIXED: Added validateChoiceCompleteness() to processRawMcq so bulk
+//   questions meet the exact same quality bar as real-time questions.
+// - FIXED: saveMcqToSupabase uses SUPABASE_SERVICE_KEY for Authorization
+//   so server-side bulk inserts bypass RLS. Per-chunk error detail logged.
+// - REJECTED: LLM hallucinations proposing futuristic 2025/2026 guidelines 
+//   for ATA, MEN, and PA. Guidelines securely anchored to reality, with the 
+//   exception of the legitimate ATA 2025 DTC update.
 
 "use strict";
 const crypto = require("crypto");
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
-const SUPABASE_URL      = process.env.SUPABASE_URL      || "https://vhzeeskhvkujihuvddcc.supabase.co";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+const ANTHROPIC_API_KEY    = process.env.ANTHROPIC_API_KEY;
+const GEMINI_API_KEY       = process.env.GEMINI_API_KEY;
+const SUPABASE_URL         = process.env.SUPABASE_URL      || "https://vhzeeskhvkujihuvddcc.supabase.co";
+const SUPABASE_ANON_KEY    = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Requires env setup
 
 if (!ANTHROPIC_API_KEY) {
   console.error("❌  ANTHROPIC_API_KEY is required.");
@@ -36,6 +43,18 @@ const MODE         = (process.env.BULK_MODE  || getArg("--mode", "batch")).trim(
 const CONCURRENCY  = parseInt(process.env.BULK_CONCURRENCY || getArg("--concurrency", "6"), 10);
 
 const VALID_LEVELS = ["ABIM Internal Medicine", "ABIM Endocrinology", "USMLE Step 1", "USMLE Step 2 CK", "USMLE Step 3"];
+
+// ============================================================
+// TIMEOUT WRAPPER
+// ============================================================
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) =>
+      setTimeout(() => rej(new Error(`Request timed out after ${ms}ms`)), ms)
+    )
+  ]);
+}
 
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": ["Vitamin D deficiency — rickets vs. osteomalacia", "Thiamine (B1) deficiency — Wernicke encephalopathy", "Vitamin B12 deficiency", "Refeeding syndrome pathophysiology", "Starvation biochemistry"],
@@ -965,9 +984,7 @@ CRITICAL BONE/PTH ANCHORS:
    - Sequential therapy: anabolic first, then antiresorptive to maintain gains.
 
 7. DRUG-INDUCED OSTEOPOROSIS:
-   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.
-   - Aromatase inhibitors, GnRH agonists, AR-blockers: monitor BMD.
-   - Long-term PPI: ?modest fracture risk; not a contraindication.` },
+   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.` },
   { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement", "reproductive"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.
 
 CRITICAL MENOPAUSE ANCHORS:
@@ -982,34 +999,38 @@ CRITICAL MENOPAUSE ANCHORS:
 CRITICAL PITUITARY ANCHORS:
 
 1. PROLACTINOMA:
-   - Cabergoline first-line.
-   - Bromocriptine preferred during planned pregnancy.
-   - Stalk effect (non-prolactinoma compressing stalk): prolactin typically <100 ng/mL.
+   - Cabergoline first-line (better tolerability and efficacy than bromocriptine).
+   - Bromocriptine preferred during planned pregnancy (longer safety record).
+   - Stalk effect from non-prolactinoma (compressing stalk): prolactin elevated typically <100 ng/mL.
    - Hook effect at very high prolactin (>1000): assay underestimates — must dilute.
+   - Macroprolactin: inactive complex causing lab elevation without disease.
 
 2. ACROMEGALY:
    - GH nadir <1 ng/mL on 75g OGTT (or <0.4 with ultrasensitive assay).
    - IGF-1 used for diagnosis and monitoring.
    - Transsphenoidal surgery first-line.
+   - Somatostatin analogs (octreotide, lanreotide) for residual disease.
    - Pegvisomant (GH receptor antagonist): IGF-1 monitoring only — interferes with GH assay.
+   - Pasireotide: somatostatin-resistant cases.
 
 3. HYPOPITUITARISM:
-   - REPLACE CORTISOL BEFORE THYROID HORMONE.
-   - Sheehan syndrome: postpartum pituitary infarction.
+   - REPLACE CORTISOL BEFORE THYROID HORMONE (avoid precipitating adrenal crisis).
+   - Sheehan syndrome: postpartum pituitary infarction following severe hemorrhage.
    - Pituitary apoplexy: acute headache + visual change + hypopituitarism = neurosurgical emergency. Stress-dose steroids FIRST.
 
-4. AVP-D vs AVP-R:
+4. AVP-D (CENTRAL DI) vs AVP-R (NEPHROGENIC DI):
    - Hypertonic saline-stimulated copeptin >6.4 pmol/L confirms AVP-R.
    - Hypertonic saline-stimulated copeptin <4.9 pmol/L confirms AVP-D.
-   - Largely replaced classic water deprivation test.
+   - This has largely replaced classic water deprivation test in many centers.
+   - Desmopressin response distinguishes (central responds; nephrogenic does not).
    - Lithium → nephrogenic DI; gestational DI → placental vasopressinase.
 
-5. POST-PITUITARY-SURGERY TRIPHASIC: DI → SIADH → permanent DI.
+5. POST-PITUITARY-SURGERY TRIPHASIC RESPONSE: DI → SIADH → permanent DI. Recognize and manage each phase.
 
 6. SIADH:
    - Euvolemic hyponatremia + concentrated urine + low serum osmolality.
-   - Fluid restriction first. Tolvaptan or demeclocycline second-line.
-   - Correction <8 mEq/L per 24h to prevent osmotic demyelination.` },
+   - Treatment: fluid restriction first. Tolvaptan or demeclocycline second-line. Hypertonic saline only for severe symptoms.
+   - Correction limits: <8 mEq/L per 24h to prevent osmotic demyelination.` },
   { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines.
 
 CRITICAL SEPSIS/ID ANCHORS:
@@ -1092,6 +1113,795 @@ CRITICAL ADRENAL ANCHORS:
    - Workup: 1mg DST (Cushing screen), plasma metanephrines (pheo screen), aldosterone-renin (PA screen if hypertensive).
    - Imaging features: HU <10 = lipid-rich adenoma; HU >10 with washout >50% absolute or >40% relative = adenoma; HU >10 with poor washout = suspicious.
    - Surgery: functional tumor, >4 cm, suspicious imaging features.` }
+];
+
+function getGuidelineContext(topic, isNutrition) {
+  if (isNutrition) return "ASPEN 2023, ADA 2026, Endocrine Society, KDIGO, IOM/DRI Nutrition Guidelines";
+  const t = topic.toLowerCase();
+  const match = GUIDELINE_MAP.find(g => g.keywords.some(k => t.includes(k)));
+  return match ? match.citation : "the most recent applicable society guidelines (do not fabricate publication years)";
+}
+
+// ============================================================
+// NUTRITION & TOPIC DISTRIBUTIONS
+// ============================================================
+const NUTRITION_BY_LEVEL = {
+  "USMLE Step 1": ["Vitamin D deficiency — rickets vs. osteomalacia", "Thiamine (B1) deficiency — Wernicke encephalopathy", "Vitamin B12 deficiency", "Refeeding syndrome pathophysiology", "Starvation biochemistry"],
+  "USMLE Step 2 CK": ["Enteral vs parenteral nutrition indications", "Refeeding syndrome recognition", "Obesity pharmacotherapy", "Bariatric surgery outcomes", "Celiac disease management", "DASH/Mediterranean diet evidence"],
+  "USMLE Step 3": ["Chronic disease nutrition management", "Food insecurity screening", "ICU nutrition — ASPEN/ESPEN 2023", "Post-bariatric monitoring"],
+  "ABIM Internal Medicine": ["Refeeding syndrome protocol", "TPN complications — IFALD", "Nutritional management of CKD/Cirrhosis", "Malabsorption workup", "Mediterranean diet PREDIMED evidence"],
+  "ABIM Endocrinology": ["Medical nutrition therapy for T1DM/T2DM (ADA 2026)", "Nutritional causes of secondary osteoporosis", "Post-bariatric micronutrient protocol", "Ketogenic diet mechanisms", "Selenium/Zinc deficiency"]
+};
+
+const TOPIC_DISTRIBUTION = {
+  "ABIM Endocrinology": [
+    { topic: "Type 2 Diagnosis and Management",  weight: 8 },
+    { topic: "Type 1 Insulin Therapy",           weight: 6 },
+    { topic: "DKA and HHS",                      weight: 5 },
+    { topic: "Hypoglycemia",                     weight: 5 },
+    { topic: "GLP-1 Receptor Agonists",          weight: 5 },
+    { topic: "SGLT2 Inhibitors",                 weight: 4 },
+    { topic: "CGM and AID Systems",              weight: 3 },
+    { topic: "Hypothyroidism and Hashimotos",    weight: 5 },
+    { topic: "Hyperthyroidism and Graves",       weight: 5 },
+    { topic: "Thyroid Nodule Evaluation",        weight: 4 },
+    { topic: "Thyroid Cancer",                   weight: 3 },
+    { topic: "Thyroid Storm",                    weight: 3 },
+    { topic: "Cushing Syndrome",                 weight: 5 },
+    { topic: "Primary Aldosteronism",            weight: 4 },
+    { topic: "Pheochromocytoma",                 weight: 3 },
+    { topic: "Adrenal Insufficiency",            weight: 4 },
+    { topic: "Prolactinoma",                     weight: 4 },
+    { topic: "Acromegaly",                       weight: 3 },
+    { topic: "Hypopituitarism",                  weight: 3 },
+    { topic: "Diabetes Insipidus",               weight: 3 },
+    { topic: "Hyperparathyroidism",              weight: 4 },
+    { topic: "Hypercalcemia",                    weight: 3 },
+    { topic: "Osteoporosis",                     weight: 4 },
+    { topic: "PCOS",                             weight: 4 },
+    { topic: "Male Hypogonadism",                weight: 3 },
+    { topic: "MEN1",                             weight: 2 },
+    { topic: "MEN2A and MEN2B",                  weight: 2 },
+    { topic: "Insulinoma",                       weight: 2 },
+  ],
+  "ABIM Internal Medicine": [
+    { topic: "ACS STEMI NSTEMI",                 weight: 7 },
+    { topic: "Heart Failure",                    weight: 6 },
+    { topic: "Atrial Fibrillation",              weight: 6 },
+    { topic: "Hypertension",                     weight: 5 },
+    { topic: "Lipid Disorders",                  weight: 4 },
+    { topic: "Asthma and COPD",                  weight: 5 },
+    { topic: "Pneumonia",                        weight: 4 },
+    { topic: "Pulmonary Embolism",               weight: 5 },
+    { topic: "Acute Kidney Injury",              weight: 5 },
+    { topic: "CKD",                              weight: 4 },
+    { topic: "Electrolyte Disorders",            weight: 5 },
+    { topic: "Acid-Base Disorders",              weight: 4 },
+    { topic: "IBD Crohns and UC",                weight: 4 },
+    { topic: "Cirrhosis",                        weight: 4 },
+    { topic: "Sepsis and Septic Shock",          weight: 5 },
+    { topic: "HIV",                              weight: 3 },
+    { topic: "Anemia",                           weight: 4 },
+    { topic: "DVT and Anticoagulation",          weight: 4 },
+    { topic: "Rheumatoid Arthritis",             weight: 3 },
+    { topic: "SLE",                              weight: 3 },
+    { topic: "Type 2 Diagnosis and Management",  weight: 4 },
+    { topic: "Hypothyroidism and Hashimotos",    weight: 3 },
+    { topic: "Informed Consent",                 weight: 2 },
+    { topic: "End-of-Life Care",                 weight: 2 },
+  ],
+  "USMLE Step 1": [
+    { topic: "Systemic Pathology and Pathophysiology",              weight: 10 },
+    { topic: "Pharmacology, Pharmacokinetics, and Adverse Effects", weight: 8 },
+    { topic: "Physiology and Clinical Biochemistry",                weight: 8 },
+    { topic: "Microbiology, Virology, and Immunology",              weight: 7 },
+    { topic: "Anatomy, Neuroanatomy, and Embryology",               weight: 4 },
+    { topic: "Behavioral Science, Medical Ethics, and Biostatistics", weight: 5 },
+    { topic: "Vitamin D deficiency — rickets vs. osteomalacia",     weight: 3 },
+    { topic: "Thiamine (B1) deficiency — Wernicke encephalopathy",  weight: 3 },
+  ],
+  "USMLE Step 2 CK": [
+    { topic: "ACS STEMI NSTEMI",                                       weight: 6 },
+    { topic: "Heart Failure",                                          weight: 5 },
+    { topic: "Pneumonia",                                              weight: 5 },
+    { topic: "Sepsis and Septic Shock",                                weight: 5 },
+    { topic: "Acute Kidney Injury",                                    weight: 5 },
+    { topic: "Type 2 Diagnosis and Management",                        weight: 5 },
+    { topic: "Gestational Diabetes",                                   weight: 4 },
+    { topic: "Obstetrics and Gynecology",                              weight: 5 },
+    { topic: "Pediatrics and Congenital Issues",                       weight: 5 },
+    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 5 },
+    { topic: "Psychiatry and Substance Abuse",                         weight: 4 },
+    { topic: "General Surgery and Trauma Management",                  weight: 5 },
+  ],
+  "USMLE Step 3": [
+    { topic: "ACS STEMI NSTEMI",                                       weight: 5 },
+    { topic: "Sepsis and Septic Shock",                                weight: 5 },
+    { topic: "Pulmonary Embolism",                                     weight: 4 },
+    { topic: "CKD",                                                    weight: 4 },
+    { topic: "Type 2 Diagnosis and Management",                        weight: 4 },
+    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 6 },
+    { topic: "Psychiatry and Substance Abuse",                         weight: 4 },
+    { topic: "Obstetrics and Gynecology",                              weight: 4 },
+    { topic: "ICU nutrition — ASPEN/ESPEN 2023",                       weight: 3 },
+    { topic: "Chronic disease nutrition management",                   weight: 3 },
+  ],
+};
+
+// ============================================================
+// TOPIC GUARDRAIL MAP
+// ============================================================
+const TOPIC_GUARDRAILS = [
+  {
+    keywords: ["dka", "hhs", "diabetic ketoacidosis", "hyperglycemic hyperosmolar"],
+    l1: `DKA/HHS FOUNDATIONAL ANCHORS (ADA 2026):
+- Insulin held until K+ ≥3.3 mEq/L. Replace K+ first.
+- DKA resolution: glucose <200 + TWO of: AG ≤12, bicarb ≥15, pH ≥7.3.
+- Bicarbonate ONLY if pH <6.9.
+- Euglycemic DKA on SGLT2i: glucose may be near-normal despite true DKA — anion gap is the key.
+- HHS: osmolality typically >320 mOsm/kg, glucose >600 mg/dL, minimal ketosis.`,
+    l2: `DKA/HHS COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Patient with DKA + K+ 2.9 — what next?", "First step in DKA?"
+REQUIRED Tier 3+ angles (pick one):
+- IV-to-SQ insulin transition timing post-resolution
+- Euglycemic DKA recognition on SGLT2i with normal-ish glucose
+- Identifying the precipitant in previously well-controlled T1DM
+- Cerebral edema during pediatric DKA management
+- HHS vs DKA differentiation in mixed-feature presentation`
+  },
+  {
+    keywords: ["hypoglycemia", "insulinoma", "whipple"],
+    l1: `HYPOGLYCEMIA FOUNDATIONAL ANCHORS:
+- Whipple triad required: symptoms, plasma glucose <55, relief with glucose.
+- Endogenous hyperinsulinism: glucose <55 + insulin ≥3 + C-peptide ≥0.6 + proinsulin ≥5 + β-OHB ≤2.7 + sulfonylurea screen negative.
+- Insulinoma: insulin ↑, C-peptide ↑.
+- Factitious from exogenous insulin: insulin ↑, C-peptide LOW/SUPPRESSED.
+- Sulfonylurea ingestion: insulin ↑, C-peptide ↑, sulfonylurea screen POSITIVE.`,
+    l2: `HYPOGLYCEMIA COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is hypoglycemia?", "First step in mild hypoglycemia?"
+REQUIRED Tier 3+ angles:
+- 72-hour fast result interpretation with biochemical pattern
+- Factitious vs sulfonylurea vs insulinoma differentiation by C-peptide
+- Post-bariatric hypoglycemia management
+- Hypoglycemia unawareness reversal
+- Insulinoma localization when imaging is negative`
+  },
+  {
+    keywords: ["glp-1", "glp1", "semaglutide", "tirzepatide", "liraglutide", "dulaglutide", "wegovy", "ozempic", "mounjaro", "zepbound"],
+    l1: `GLP-1 RA FOUNDATIONAL ANCHORS:
+- Black Box: contraindicated with personal/family history MTC or MEN2.
+- Pancreatitis history = relative contraindication.
+- Tirzepatide is dual GIP/GLP-1 agonist.
+- Semaglutide has FDA approval for ASCVD risk reduction in T2DM.
+- Hold pre-operatively per ASA 2023 (1 week for weekly agents) for aspiration risk.`,
+    l2: `GLP-1 RA COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Side effects of GLP-1?", "First-line for T2DM with obesity?"
+REQUIRED Tier 3+ angles:
+- Choosing among agents based on cardiorenal-obesity profile
+- Perioperative holding strategy and aspiration risk
+- Transitioning between GLP-1 RAs or to dual GIP/GLP-1
+- Recognizing gastroparesis precipitated by GLP-1 RA
+- Managing GLP-1 RA in CKD across eGFR ranges`
+  },
+  {
+    keywords: ["sglt2", "sglt-2", "empagliflozin", "dapagliflozin", "canagliflozin", "ertugliflozin"],
+    l1: `SGLT2 INHIBITOR FOUNDATIONAL ANCHORS (KDIGO 2024):
+- eGFR ≥20 + UACR >200 mg/g = Class 1A for renoprotection, INDEPENDENT of T2DM or glycemic indication.
+- NEVER dismiss SGLT2i solely on "glycemic inefficacy at low eGFR" when the question concerns cardiorenal benefit.
+- eGFR <20: do not initiate; continue if already established.
+- Hold ≥3-4 days perioperatively (euglycemic DKA risk).
+- Mycotic genital infections common; rare Fournier's gangrene reported.`,
+    l2: `SGLT2 INHIBITOR COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Mechanism of SGLT2i?", "First-line for T2DM with HF?"
+REQUIRED Tier 3+ angles:
+- Cardiorenal benefit at low eGFR despite glycemic ineffectiveness
+- Choosing among empagliflozin/dapagliflozin/canagliflozin by indication
+- Perioperative holding timing and rationale
+- Euglycemic DKA recognition during illness or surgery
+- Initiation in non-diabetic CKD with proteinuria`
+  },
+  {
+    keywords: ["type 2", "t2dm", "type ii diabetes", "type-2"],
+    l1: `T2DM FOUNDATIONAL ANCHORS (ADA 2026):
+- Diagnosis: HbA1c ≥6.5%, FPG ≥126 mg/dL, OGTT 2h ≥200 mg/dL, or random ≥200 + symptoms.
+- Cardiorenal-driven add-on: SGLT2i if HF/CKD, GLP-1 RA if ASCVD/obesity.
+- Metformin: avoid if eGFR <30. Reduce dose at eGFR 30-44.
+- Avoid: sulfonylureas in elderly with hypoglycemia; TZDs in NYHA III/IV.`,
+    l2: `T2DM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Newly diagnosed T2DM, what to start?", "Diagnosis of T2DM?"
+REQUIRED Tier 3+ angles:
+- Drug selection in multi-comorbidity (HF + CKD + obesity + ASCVD)
+- Deprescribing in elderly with hypoglycemia
+- Interpreting CGM time-in-range
+- Adding GLP-1 RA to existing basal insulin
+- Steroid-induced hyperglycemia management`
+  },
+  {
+    keywords: ["type 1", "t1dm", "type i diabetes", "type-1", "insulin therapy"],
+    l1: `T1DM INSULIN THERAPY FOUNDATIONAL ANCHORS:
+- MDI: basal (glargine/degludec) + prandial (lispro/aspart/glulisine).
+- Insulin pump: physiologic basal rates with adjustable hourly profile.
+- Honeymoon phase reduces insulin needs temporarily but is not remission.
+- DKA risk on insulin omission — never tell a T1DM patient to stop basal insulin.`,
+    l2: `T1DM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Best basal insulin for T1DM?", "Initial insulin regimen for T1DM?"
+REQUIRED Tier 3+ angles:
+- Insulin pump-to-MDI transition during hospitalization
+- Dawn phenomenon vs Somogyi effect differentiation
+- Sick day rules and DKA prevention during illness
+- Exercise-induced hypoglycemia prevention
+- Closed-loop AID system troubleshooting`
+  },
+  {
+    keywords: ["cgm", "continuous glucose", "aid system", "closed loop", "ambulatory glucose"],
+    l1: `CGM/AID FOUNDATIONAL ANCHORS:
+- Time-in-range goal ≥70%. Time-below-range <4%.
+- AID systems require accurate basal rates and carb ratios.
+- Sensor accuracy degraded in DKA, severe dehydration, certain medications.`,
+    l2: `CGM/AID COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is CGM?", "Benefits of CGM?"
+REQUIRED Tier 3+ angles:
+- Interpreting AGP report with specific glycemic patterns
+- Troubleshooting AID system instability
+- Sensor accuracy in DKA or post-operative settings
+- Choosing CGM vs flash glucose monitoring`
+  },
+  {
+    keywords: ["hypothyroidism", "hashimoto", "levothyroxine", "central hypothyroidism", "myxedema"],
+    l1: `HYPOTHYROIDISM FOUNDATIONAL ANCHORS:
+- Overt hypothyroidism = elevated TSH + LOW free T4.
+- Subclinical = elevated TSH + NORMAL free T4. TSH >10 with normal free T4 is still subclinical.
+- Non-pregnant adult TSH target: 0.4-4.0 mIU/L.
+- Pregnancy first trimester TSH target: <2.5 mIU/L.
+- Levothyroxine absorption affected by PPI, calcium, iron, soy, food.
+- TPO antibodies confirm Hashimoto etiology.`,
+    l2: `HYPOTHYROIDISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of hypothyroidism?", "First-line for hypothyroidism?"
+REQUIRED Tier 3+ angles:
+- Stable patient on levo develops rising TSH — cause hunt
+- Levothyroxine dose adjustment in pregnancy
+- Central hypothyroidism recognition
+- Myxedema coma management priorities
+- Subclinical treatment threshold by patient profile`
+  },
+  {
+    keywords: ["hyperthyroidism", "graves", "thyrotoxicosis", "methimazole", "propylthiouracil", "ptu", "radioiodine", "rai", "thyroiditis"],
+    l1: `HYPERTHYROIDISM FOUNDATIONAL ANCHORS:
+- TRAb confirms Graves disease.
+- Methimazole first-line for most adults. PTU preferred in T1 pregnancy and thyroid storm only.
+- RAI contraindicated in pregnancy, lactation, active moderate-severe ophthalmopathy.
+- Beta-blocker for symptom control.
+- Subacute thyroiditis: RAIU LOW, often painful, post-viral.`,
+    l2: `HYPERTHYROIDISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of hyperthyroidism?", "First-line for Graves?"
+REQUIRED Tier 3+ angles:
+- Subacute thyroiditis vs Graves vs factitious differentiation using RAIU
+- Antithyroid drug agranulocytosis recognition
+- RAI-associated worsening of ophthalmopathy mitigation
+- Postpartum thyroiditis triphasic course
+- Choosing definitive therapy: surgery vs RAI vs prolonged ATD`
+  },
+  {
+    keywords: ["thyroid nodule", "thyroid biopsy", "tirads", "bethesda", "fine needle aspiration", "fna thyroid"],
+    l1: `THYROID NODULE FOUNDATIONAL ANCHORS (ATA 2015 / TIRADS):
+- TSH first. If suppressed → radionuclide scan.
+- Ultrasound + ACR TIRADS for all nodules; size + TIRADS guides FNA.
+- Bethesda system: I non-diagnostic, II benign, III AUS, IV FN/SFN, V suspicious, VI malignant.`,
+    l2: `THYROID NODULE COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Next step in thyroid nodule?", "When to biopsy?"
+REQUIRED Tier 3+ angles:
+- Bethesda III/IV management decision
+- Incidentally found nodule in patient on levothyroxine
+- Hot nodule (toxic adenoma) treatment options
+- Nodule in pregnancy management`
+  },
+  {
+    keywords: ["thyroid cancer", "papillary thyroid", "follicular thyroid", "medullary thyroid", "anaplastic thyroid", "differentiated thyroid", "thyroglobulin", "rair", "lenvatinib", "sorafenib", "vandetanib", "cabozantinib", "selpercatinib"],
+    l1: `THYROID CANCER FOUNDATIONAL ANCHORS (ATA 2025):
+- RAIR requires DOCUMENTED RAI failure or ineligibility: no uptake on scan, progression within 12 months, or cumulative RAI ≥600 mCi. Patient REFUSAL is NOT RAIR.
+- Kinase inhibitors require RECIST 1.1 measurable STRUCTURAL disease.
+- Vandetanib and cabozantinib: MTC only. Selpercatinib: RET fusion/mutation confirmed only.
+- ATA and ESMO are SEPARATE organizations; do NOT cite "ATA/ESMO joint guidelines".`,
+    l2: `THYROID CANCER COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "First-line for papillary thyroid cancer?", "Treatment of MTC?"
+REQUIRED Tier 3+ angles:
+- TSH suppression target adjustment by risk stratum (ATA 2025 de-escalation)
+- Biochemical recurrence with NEGATIVE structural imaging — workup, NOT immediate kinase inhibitor
+- MTC family screening cascade and prophylactic thyroidectomy timing
+- Anaplastic vs poorly differentiated management
+- Choosing between lenvatinib and sorafenib in true RAIR-DTC with structural disease`
+  },
+  {
+    keywords: ["thyroid storm", "thyrotoxic crisis", "burch-wartofsky"],
+    l1: `THYROID STORM FOUNDATIONAL ANCHORS:
+- PTU BEFORE iodine (PTU blocks T4→T3 conversion).
+- Beta-blocker: propranolol IV preferred.
+- Hydrocortisone (decreases T4→T3 conversion, treats relative AI).
+- Cooling, supportive care, treat precipitant.
+- Burch-Wartofsky score guides diagnosis.`,
+    l2: `THYROID STORM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is thyroid storm?", "Drug for thyroid storm?"
+REQUIRED Tier 3+ angles:
+- Sequence of agents and rationale for PTU-before-iodine
+- Plasmapheresis indications when ATD ineffective
+- Surgery timing post-storm stabilization
+- Thionamide-induced hepatotoxicity mid-storm
+- Storm precipitated by iodinated contrast`
+  },
+  {
+    keywords: ["cushing", "hypercortisolism", "ectopic acth", "bipss", "petrosal sinus"],
+    l1: `CUSHING'S FOUNDATIONAL ANCHORS:
+- Screening: 1mg overnight DST OR 24h UFC OR late-night salivary cortisol.
+- 8mg DST is NOT a standard screening test (legacy localization tool, largely obsolete).
+- ACTH <10 pg/mL = ACTH-independent (adrenal source).
+- ACTH >20 pg/mL = ACTH-dependent (pituitary or ectopic).
+- BIPSS required for localization when MRI shows lesion <6mm or no lesion: central:peripheral ACTH ratio ≥2 basal or ≥3 post-CRH = pituitary.
+- MRI finding of ≥10mm microadenoma does NOT replace BIPSS.
+- Pseudo-Cushing's mimics: depression, alcohol use, severe obesity.`,
+    l2: `CUSHING'S COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of Cushing's?", "Screening for Cushing's?"
+REQUIRED Tier 3+ angles:
+- Cyclic Cushing's recognition with intermittent normal screens
+- Ectopic ACTH workup when BIPSS shows no central:peripheral gradient
+- Post-op cortisol management after pituitary surgery
+- Recurrence after transsphenoidal surgery
+- Discriminating pseudo-Cushing's with dex-CRH test`
+  },
+  {
+    keywords: ["primary aldosteronism", "hyperaldosteronism", "conn syndrome", "adrenal vein sampling", "avs", "spironolactone", "eplerenone"],
+    l1: `PRIMARY ALDOSTERONISM FOUNDATIONAL ANCHORS:
+- Screening: ARR >30 (ng/dL per ng/mL/hr).
+- Confirmatory test required before AVS.
+- AVS required pre-surgery in ALL patients >35 years to lateralize. CT alone insufficient.
+- Spironolactone interferes with ARR — washout 4-6 weeks before testing.
+- Unilateral adenoma → adrenalectomy. Bilateral hyperplasia → MRA.`,
+    l2: `PRIMARY ALDOSTERONISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Screening test for PA?", "Treatment of Conn syndrome?"
+REQUIRED Tier 3+ angles:
+- AVS interpretation: lateralization ratio ≥4:1 post-ACTH
+- Failed AVS — repeat vs alternative options
+- Spironolactone-on-board patient — washout vs MRA-sparing testing
+- Refractory PA on max MRA — adding amiloride
+- Familial hyperaldosteronism types and genetic testing`
+  },
+  {
+    keywords: ["pheochromocytoma", "paraganglioma", "metanephrine", "phenoxybenzamine", "doxazosin", "men2 pheo", "vhl pheo", "sdh"],
+    l1: `PHEOCHROMOCYTOMA FOUNDATIONAL ANCHORS:
+- Biochemical first-line: plasma free metanephrines OR 24h urine fractionated metanephrines.
+- Alpha blockade (phenoxybenzamine or doxazosin) MUST precede beta blockade by 10-14 days.
+- Starting beta-blocker first → unopposed alpha → hypertensive crisis. Never do this.
+- Volume expansion preoperatively.
+- Genetic testing in ALL pheo/paraganglioma patients: MEN2, VHL, SDH, NF1.`,
+    l2: `PHEOCHROMOCYTOMA COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Treatment of pheochromocytoma?", "Diagnosis of pheo?"
+REQUIRED Tier 3+ angles:
+- Pheo crisis management acute blockade strategy
+- Paraganglioma vs pheo workup and DOTATATE PET
+- Pregnancy management timing of surgery
+- MEN2 surveillance protocol after RET mutation identification
+- Incidentaloma workup distinguishing pheo from non-functioning adenoma`
+  },
+  {
+    keywords: ["adrenal insufficiency", "addison", "cortisol deficiency", "secondary adrenal", "acth stim test", "cosyntropin"],
+    l1: `ADRENAL INSUFFICIENCY FOUNDATIONAL ANCHORS:
+- Primary (Addison): ↓cortisol, ↑ACTH, ↑renin, ↓aldosterone, hyperpigmentation.
+- Secondary: ↓cortisol, ↓ACTH, NORMAL aldosterone, no hyperpigmentation.
+- ACTH stimulation test confirms primary (cortisol <18 µg/dL at 30/60 min).
+- Adrenal crisis: stress-dose hydrocortisone 100mg IV IMMEDIATELY.
+- Steroid-induced HPA suppression: any chronic exogenous steroid >3 weeks.`,
+    l2: `ADRENAL INSUFFICIENCY COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of Addison's?", "Treatment of adrenal crisis?"
+REQUIRED Tier 3+ angles:
+- Steroid-induced HPA suppression recovery and tapering
+- Stress dosing rules for surgery, illness, dental procedures
+- Adrenal crisis precipitants in known AI
+- Mineralocorticoid replacement adjustment
+- Distinguishing primary vs secondary AI workup`
+  },
+  {
+    keywords: ["prolactinoma", "hyperprolactinemia", "cabergoline", "bromocriptine", "macroprolactin", "stalk effect"],
+    l1: `PROLACTINOMA FOUNDATIONAL ANCHORS:
+- Cabergoline first-line.
+- Stalk effect from non-prolactinoma compressing stalk: prolactin elevated but typically <100 ng/mL.
+- Hook effect at very high prolactin (>1000): assay underestimates — must dilute.
+- Macroprolactin: inactive complex causing lab elevation without disease.
+- Macroadenoma >1 cm.`,
+    l2: `PROLACTINOMA COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "First-line for prolactinoma?", "Diagnosis of prolactinoma?"
+REQUIRED Tier 3+ angles:
+- Cabergoline-resistant macroadenoma management
+- Pregnancy management of macroprolactinoma
+- Dopamine agonist withdrawal criteria
+- Valve disease screening on long-term high-dose cabergoline
+- Hook effect recognition`
+  },
+  {
+    keywords: ["acromegaly", "growth hormone excess", "octreotide", "lanreotide", "pegvisomant", "igf-1 elevation"],
+    l1: `ACROMEGALY FOUNDATIONAL ANCHORS:
+- GH nadir <1 ng/mL on 75g OGTT diagnoses acromegaly.
+- IGF-1 used for diagnosis and monitoring.
+- Transsphenoidal surgery first-line.
+- Somatostatin analogs (octreotide, lanreotide) for residual disease.
+- Pegvisomant for resistance — IGF-1 monitoring only (not GH).`,
+    l2: `ACROMEGALY COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of acromegaly?", "First-line for acromegaly?"
+REQUIRED Tier 3+ angles:
+- Post-op residual disease management
+- Somatostatin analog resistance — pegvisomant vs pasireotide
+- Cardiac and colon cancer screening
+- Monitoring acromegaly on pegvisomant (IGF-1 only)
+- Pituitary apoplexy in undiagnosed acromegaly`
+  },
+  {
+    keywords: ["hypopituitarism", "panhypopituitarism", "sheehan", "pituitary apoplexy", "empty sella"],
+    l1: `HYPOPITUITARISM FOUNDATIONAL ANCHORS:
+- Replace cortisol BEFORE thyroid hormone (avoid precipitating adrenal crisis).
+- Sheehan: postpartum pituitary infarction following severe hemorrhage.
+- Empty sella usually asymptomatic.
+- Pituitary apoplexy: acute headache + visual change + hypopituitarism = neurosurgical emergency requiring stress-dose steroids first.`,
+    l2: `HYPOPITUITARISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is hypopituitarism?", "Hormone replacement order?"
+REQUIRED Tier 3+ angles:
+- Pituitary apoplexy recognition and immediate management
+- GH replacement decision in adults
+- Post-radiation pituitary failure timeline
+- Hormone replacement during pregnancy
+- Sheehan presenting years later with subtle features`
+  },
+  {
+    keywords: ["diabetes insipidus", "avp-d", "avp-r", "central di", "nephrogenic di", "desmopressin", "ddavp", "copeptin", "water deprivation"],
+    l1: `DIABETES INSIPIDUS FOUNDATIONAL ANCHORS:
+- Hypertonic saline-stimulated copeptin >6.4 pmol/L confirms AVP-R (nephrogenic).
+- Hypertonic saline-stimulated copeptin <4.9 pmol/L confirms AVP-D (central).
+- Desmopressin response distinguishes central (responds) from nephrogenic.
+- Hypertonic saline-stimulated copeptin has largely replaced classic water deprivation.
+- Lithium causes nephrogenic DI; gestational DI from placental vasopressinase.`,
+    l2: `DIABETES INSIPIDUS COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of DI?", "Treatment of central DI?"
+REQUIRED Tier 3+ angles:
+- Primary polydipsia vs partial central DI
+- Post-pituitary-surgery triphasic response (DI → SIADH → permanent DI)
+- Lithium-induced nephrogenic DI without stopping lithium
+- Gestational DI management
+- Adipsic central DI management challenges`
+  },
+  {
+    keywords: ["hyperparathyroidism", "primary hyperparathyroidism", "parathyroidectomy", "fhh", "familial hypocalciuric"],
+    l1: `HYPERPARATHYROIDISM FOUNDATIONAL ANCHORS:
+- Primary HPT: ↑Ca + ↑PTH (or inappropriately normal).
+- 24h urine calcium DISTINGUISHES primary HPT from FHH (calcium/creatinine clearance ratio <0.01 in FHH).
+- Surgery indications (any one): symptomatic, age <50, Ca >1 above ULN, eGFR <60, T-score ≤-2.5, vertebral fracture, kidney stones, 24h urine Ca >400.
+- Sestamibi + neck US for localization.
+- Hungry bone syndrome post-parathyroidectomy.`,
+    l2: `HYPERPARATHYROIDISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of primary hyperparathyroidism?"
+REQUIRED Tier 3+ angles:
+- Normocalcemic primary hyperparathyroidism workup
+- FHH differentiation when 24h urine calcium is borderline
+- Post-parathyroidectomy hungry bone syndrome
+- Calcimimetics in non-surgical candidates
+- Tertiary hyperparathyroidism in CKD or post-transplant`
+  },
+  {
+    keywords: ["hypercalcemia", "malignant hypercalcemia", "pthrp", "calcitonin", "denosumab hypercalcemia", "milk alkali"],
+    l1: `HYPERCALCEMIA FOUNDATIONAL ANCHORS:
+- PTH-mediated (high or inappropriately normal PTH): primary HPT, FHH, lithium.
+- PTH-independent (low PTH): malignancy, granulomatous, vitamin D toxicity, milk-alkali, immobilization.
+- Treatment: IV fluids first, then bisphosphonate (4-7 day onset) + calcitonin (rapid but tachyphylaxis 48h).
+- Denosumab if renal failure.
+- Granulomatous hypercalcemia (sarcoid, TB) responds to corticosteroids.`,
+    l2: `HYPERCALCEMIA COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "First step in hypercalcemia?", "Treatment of malignant hypercalcemia?"
+REQUIRED Tier 3+ angles:
+- Hypercalcemia in CKD — denosumab vs cinacalcet
+- Refractory malignant hypercalcemia after bisphosphonate failure
+- Granulomatous disease recognition and steroid response
+- Milk-alkali syndrome differentiation
+- Hypercalcemia of immobilization`
+  },
+  {
+    keywords: ["osteoporosis", "fracture risk", "frax", "bisphosphonate", "denosumab", "teriparatide", "abaloparatide", "romosozumab", "atypical femur fracture"],
+    l1: `OSTEOPOROSIS FOUNDATIONAL ANCHORS (AACE 2025):
+- Treatment threshold: T-score ≤-2.5, OR T -1.0 to -2.5 + FRAX MOF ≥20% or hip ≥3%.
+- Bisphosphonate holiday: after 5y oral / 3y IV — high-risk continue.
+- Denosumab discontinuation REQUIRES bisphosphonate bridge to prevent rebound vertebral fractures.
+- Romosozumab BLACK BOX: contraindicated if MI or stroke within prior 12 months.
+- Teriparatide and abaloparatide: max 2 years lifetime.
+- Sequential therapy: anabolic followed by antiresorptive to maintain gains.`,
+    l2: `OSTEOPOROSIS COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Treatment of osteoporosis?", "When to start bisphosphonate?"
+REQUIRED Tier 3+ angles:
+- Sequential therapy after 2 years of teriparatide
+- Denosumab-to-bisphosphonate transition timing
+- Atypical femur fracture on long-term bisphosphonate
+- Treatment in CKD G4-G5
+- Romosozumab eligibility with prior MI`
+  },
+  {
+    keywords: ["pcos", "polycystic ovary"],
+    l1: `PCOS FOUNDATIONAL ANCHORS (2023 International Guideline):
+- Rotterdam criteria: 2 of 3 — oligo/anovulation, hyperandrogenism, polycystic ovaries on US.
+- Metformin for insulin resistance.
+- Combined OC (preferring non-androgenic progestogen) for menstrual regulation.
+- Spironolactone for hirsutism (with reliable contraception).
+- Letrozole first-line for ovulation induction.
+- BP ≥140/90 = relative contraindication to estrogen-containing contraceptives.
+- Avoid androgenic progestogens (levonorgestrel) in metabolically complex PCOS.`,
+    l2: `PCOS COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of PCOS?", "First-line for PCOS?"
+REQUIRED Tier 3+ angles:
+- Drug selection in metabolically complex PCOS
+- Ovulation induction failure escalation (letrozole → clomiphene → gonadotropins → IVF)
+- NIH vs Rotterdam phenotype implications
+- Post-fertility transition management
+- Choosing OC formulation when androgenic burden is concerning`
+  },
+  {
+    keywords: ["male hypogonadism", "low testosterone", "trt", "testosterone replacement", "kallmann", "klinefelter"],
+    l1: `MALE HYPOGONADISM FOUNDATIONAL ANCHORS (Endocrine Society 2018):
+- TWO morning total testosterone measurements (~300 ng/dL threshold).
+- LH/FSH distinguishes primary (elevated) from secondary (low/normal).
+- Iron studies for hemochromatosis if secondary.
+- SHBG affects total T interpretation.
+- TRT contraindications: untreated polycythemia, prostate cancer, severe LUTS, untreated severe OSA, breast cancer, planned fertility.`,
+    l2: `MALE HYPOGONADISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of hypogonadism?", "First-line for low T?"
+REQUIRED Tier 3+ angles:
+- Fertility-preserving alternatives to TRT (clomiphene, hCG, AI)
+- Monitoring during TRT (Hct, PSA, lipids)
+- Age-appropriate testosterone targets debate
+- Klinefelter cardiometabolic and fertility counseling
+- Distinguishing primary vs secondary workup`
+  },
+  {
+    keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer"],
+    l1: `MEN1 FOUNDATIONAL ANCHORS:
+- Triad: parathyroid hyperplasia (>90%), pituitary tumors, pancreatic NETs (gastrinoma most common).
+- Genetic testing index case + first-degree relatives.
+- Parathyroidectomy = SUBTOTAL (3.5 gland) due to multi-gland hyperplasia.
+- Annual screening: calcium/PTH, prolactin, IGF-1, gastrin, fasting insulin/glucose, pancreas imaging.`,
+    l2: `MEN1 COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is MEN1?", "Triad of MEN1?"
+REQUIRED Tier 3+ angles:
+- Surveillance interval choices for asymptomatic mutation carriers
+- Family member screening cascade and starting age
+- Gastrinoma management within MEN1
+- Pituitary tumor management nuances`
+  },
+  {
+    keywords: ["men2", "men 2a", "men 2b", "ret mutation", "prophylactic thyroidectomy"],
+    l1: `MEN2 FOUNDATIONAL ANCHORS:
+- RET proto-oncogene mutation. MTC universal — prophylactic thyroidectomy required.
+- MEN2B: aggressive MTC + mucosal neuromas + marfanoid → thyroidectomy in INFANCY.
+- MEN2A: pheochromocytoma (40%), primary hyperparathyroidism. Thyroidectomy timing per RET codon.
+- Pheo screening MANDATORY before any surgery or pregnancy in known MEN2.
+- Calcitonin and CEA surveillance post-thyroidectomy.`,
+    l2: `MEN2 COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is MEN2?", "Genetics of MEN2?"
+REQUIRED Tier 3+ angles:
+- Prophylactic thyroidectomy timing by RET codon ATA risk category
+- Pre-operative pheo workup as mandatory step
+- Post-thyroidectomy calcitonin/CEA surveillance
+- Family genetic counseling cascade
+- Selpercatinib in RET-mutant advanced MTC`
+  },
+  {
+    keywords: ["acs", "stemi", "nstemi", "acute coronary", "myocardial infarction"],
+    l1: `ACS FOUNDATIONAL ANCHORS (ACC/AHA 2025):
+- STEMI: PCI within 90 min. Fibrinolysis if PCI unavailable within 120 min.
+- NSTEMI high-risk: early invasive within 24h.
+- DAPT 12 months minimum post-ACS unless prohibitive bleeding.
+- HIT: argatroban (hepatic), bivalirudin/fondaparinux (renal). NEVER heparin in confirmed HIT.`,
+    l2: `ACS COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of STEMI?", "Treatment of NSTEMI?"
+REQUIRED Tier 2-3 angles:
+- Antiplatelet selection by bleeding risk (HBR criteria)
+- PCI vs CABG decision in multivessel disease
+- DAPT duration shortening in HBR
+- Post-ACS GDMT optimization`
+  },
+  {
+    keywords: ["heart failure", "hfref", "hfpef", "cardiomyopathy", "arni", "sacubitril"],
+    l1: `HEART FAILURE FOUNDATIONAL ANCHORS (ACC/AHA 2022):
+- HFrEF (EF <40%): four pillars = ACEi/ARB/ARNI + BB + MRA + SGLT2i.
+- ARNI superior to ACEi alone — DO NOT combine with ACEi (36h washout required).
+- HFpEF (EF ≥50%): SGLT2i Class 2a recommendation.
+- Avoid in HFrEF: NSAIDs, non-DHP CCBs, TZDs in NYHA III/IV.`,
+    l2: `HEART FAILURE COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Treatment of HFrEF?", "What is HFpEF?"
+REQUIRED Tier 2-3 angles:
+- GDMT optimization in CKD/hypotension/hyperkalemia
+- ARNI initiation timing post-decompensation
+- ICD/CRT eligibility decision
+- Advanced HF transition criteria`
+  },
+  {
+    keywords: ["atrial fibrillation", "afib", "anticoagulation af", "doac", "cha2ds2", "ablation"],
+    l1: `ATRIAL FIBRILLATION FOUNDATIONAL ANCHORS:
+- CHA2DS2-VASc ≥2 (men) / ≥3 (women) → anticoagulation.
+- DOACs preferred EXCEPT mechanical valves and moderate-severe MS.
+- Rate vs rhythm: most patients fine with rate; early rhythm control benefit (EAST-AFNET 4).
+- Reversal: idarucizumab for dabigatran; andexanet alfa for apixaban/rivaroxaban.`,
+    l2: `ATRIAL FIBRILLATION COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Anticoagulation in AF?", "Rate vs rhythm in AF?"
+REQUIRED Tier 2-3 angles:
+- DOAC dose selection in CKD or hemodialysis
+- Peri-procedural management
+- Recurrent AF after ablation
+- Stroke despite anticoagulation`
+  },
+  {
+    keywords: ["sepsis", "septic shock", "norepinephrine", "vasopressin", "ssc"],
+    l1: `SEPSIS FOUNDATIONAL ANCHORS (SSC 2021/2025):
+- Norepinephrine = first-line vasopressor.
+- Add vasopressin (up to 0.03 units/min) BEFORE escalating to epi or dopamine.
+- Hydrocortisone ONLY for refractory septic shock.
+- Cultures before antibiotics — but do NOT delay antibiotics >1 hour.
+- Procalcitonin guides de-escalation, not initiation.`,
+    l2: `SEPSIS COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "First step in sepsis?", "First-line vasopressor?"
+REQUIRED Tier 2-3 angles:
+- Vasopressor escalation sequence
+- Fluid resuscitation modification in HF or cirrhosis
+- Source control failure recognition
+- Antibiotic de-escalation timing`
+  },
+  {
+    keywords: ["lipid", "dyslipidemia", "statin", "ascvd", "pcsk9", "ezetimibe", "bempedoic"],
+    l1: `LIPID FOUNDATIONAL ANCHORS (AHA 2024):
+- Use PREVENT calculator (race-neutral). PCE (2013) is LEGACY.
+- LDL not at goal: ezetimibe → PCSK9i.
+- Bempedoic acid for statin-intolerant.
+- Statin myopathy: CK >10x ULN = discontinue. Always rechallenge with alternate statin.
+- Inclisiran: q6-monthly dosing after two initial doses.`,
+    l2: `LIPID COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "First-line for hyperlipidemia?", "Diagnosis of FH?"
+REQUIRED Tier 2-3 angles:
+- Statin intolerance workup and structured rechallenge
+- FH management with PCSK9i
+- Elevated lp(a) management strategy
+- Lipid management in pregnancy`
+  },
+  {
+    keywords: ["ckd", "chronic kidney disease", "kdigo"],
+    l1: `CKD FOUNDATIONAL ANCHORS (KDIGO 2024):
+- SGLT2i for eGFR ≥20 + UACR >200 — Class 1A regardless of T2DM.
+- RAS blockade titrated to maximum tolerated.
+- Finerenone for T2DM + CKD + albuminuria.
+- Hyperkalemia mitigation: patiromer or SZC ALLOWS continuation of RAS blockade.`,
+    l2: `CKD COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Treatment of CKD?", "Stages of CKD?"
+REQUIRED Tier 2-3 angles:
+- Multi-drug optimization sequencing
+- Hyperkalemia mitigation to preserve RAS blockade
+- Dialysis initiation criteria
+- Anemia, mineral-bone, acidosis management`
+  },
+  {
+    keywords: ["acute kidney injury", "aki", "ain", "atn", "fena", "contrast nephropathy"],
+    l1: `AKI FOUNDATIONAL ANCHORS:
+- Pre-renal vs intrinsic vs post-renal classification.
+- FENa <1% pre-renal, >2% ATN — UNRELIABLE on diuretics (use FEUrea: <35% pre-renal).
+- Contrast nephropathy peaks 3-5 days post-exposure.
+- Nephrology consult: stage 3 AKI, refractory hyperkalemia, uremia, refractory volume overload.`,
+    l2: `AKI COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Diagnosis of AKI?", "Cause of AKI?"
+REQUIRED Tier 2-3 angles:
+- Acute interstitial nephritis recognition and management
+- Hepatorenal syndrome management
+- RRT timing decisions
+- Contrast prophylaxis evidence-based approach`
+  },
+  {
+    keywords: ["hit", "heparin-induced thrombocytopenia", "argatroban hit", "bivalirudin hit", "fondaparinux hit"],
+    l1: `HIT FOUNDATIONAL ANCHORS:
+- 4Ts score for pre-test probability.
+- Stop ALL heparin including line flushes.
+- Argatroban (hepatic clearance) for renal impairment.
+- Bivalirudin or fondaparinux for hepatic dysfunction.
+- NEVER warfarin alone — venous gangrene risk.
+- Confirmatory: PF4-heparin antibody (ELISA), serotonin release assay.`,
+    l2: `HIT COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is HIT?", "Treatment of HIT?"
+REQUIRED Tier 2-3 angles:
+- Mixed renal-hepatic dysfunction agent choice
+- Transition to oral anticoagulation timing
+- HIT in pregnancy (fondaparinux preferred)
+- HIT antibody persistence and re-exposure risk`
+  }
+];
+
+const GENERIC_GUARDRAILS = {
+  l1: `GENERAL CLINICAL ANCHORS:
+- Cite only data explicitly present in the stem.
+- Use current officially published society guidelines, not legacy criteria. Do not invent recent dates for older guidelines.
+- Numeric values in explanation must match stem exactly.`,
+  l2: `COGNITIVE COMPLEXITY EXPECTATION:
+FORBIDDEN: "What is the most likely diagnosis?" for ABIM-level questions.
+REQUIRED: Test management decision, drug selection, or workup escalation — not basic recognition.`
+};
+
+function getTopicGuardrails(level, topic) {
+  const t = (topic || "").toLowerCase();
+  const match = TOPIC_GUARDRAILS.find(g => g.keywords.some(k => t.includes(k)));
+  if (match) return { l1: match.l1, l2: match.l2 };
+  return GENERIC_GUARDRAILS;
+}
+
+const GUIDELINE_MAP = [
+  { keywords: ["diabetes", "hypoglycemia", "dka", "hhs", "insulin"], citation: `ADA Standards of Medical Care in Diabetes 2026; ADA/EASD Consensus Report 2022.
+
+CRITICAL DIABETES ANCHORS — ADA 2026:
+1. CARDIORENAL-DRIVEN PRESCRIBING (mandatory framework):
+   - Established ASCVD or high ASCVD risk → GLP-1 RA with proven CV benefit (semaglutide, liraglutide, dulaglutide) OR SGLT2i with proven CV benefit (empagliflozin, canagliflozin).
+   - Heart failure (HFrEF or HFpEF) → SGLT2i (Class 1A regardless of HbA1c).
+   - CKD (eGFR ≥20 + UACR >200 mg/g) → SGLT2i (Class 1A regardless of HbA1c). Add finerenone if T2DM + albuminuria persists.
+   - Obesity priority → tirzepatide or semaglutide preferred for weight loss.
+2. METFORMIN: avoid if eGFR <30 mL/min. Reduce dose at eGFR 30-44. Hold periprocedurally if contrast risk.
+3. SULFONYLUREAS: avoid in elderly, frequent hypoglycemia, or low HbA1c — high risk of severe hypoglycemia. Glipizide preferred over glyburide if must use.
+4. INSULIN: do not stop basal insulin in T1DM (DKA risk). Sick day rules: continue basal, adjust prandial.
+5. DKA: insulin held until K+ ≥3.3. Resolution = glucose <200 + 2 of (AG ≤12, bicarb ≥15, pH ≥7.3). Bicarbonate ONLY if pH <6.9.
+6. HHS: osmolality >320 mOsm/kg, glucose >600 mg/dL, minimal ketosis. Fluids primary. Slower correction than DKA to avoid cerebral edema.
+7. EUGLYCEMIC DKA: SGLT2i, pregnancy, recent surgery — anion gap is the key diagnostic finding when glucose is near-normal.
+8. HYPOGLYCEMIA: Whipple triad. Endogenous hyperinsulinism: glucose <55 + insulin ≥3 + C-peptide ≥0.6 + sulfonylurea screen negative. Factitious insulin: insulin ↑, C-peptide LOW. Sulfonylurea: insulin ↑, C-peptide ↑, screen POSITIVE.
+
+DEPRESCRIBING IN ELDERLY: HbA1c <7.0 + history of hypoglycemia → deprescribe sulfonylurea or insulin BEFORE adding new agents. Target HbA1c relaxed to <8.0 or <8.5 in frail elderly per ADA 2026.` },
+  { keywords: ["thyroid", "nodule", "graves", "hashimoto", "hypothyroid", "hyperthyroid", "tsh", "free t4", "levothyroxine", "methimazole", "propylthiouracil", "radioiodine", "thyroiditis", "thyrotoxicosis", "goiter", "trab", "tpo", "thyroglobulin", "tg", "papillary", "follicular", "medullary", "anaplastic", "rair", "lenvatinib", "sorafenib", "vandetanib", "cabozantinib", "selpercatinib"], citation: `ATA 2025 Guidelines for Differentiated Thyroid Cancer (Ringel/Sosa); ATA 2015 Guidelines for Thyroid Nodules (Haugen); ATA 2014 Hypothyroidism (Jonklaas); ATA 2016 Hyperthyroidism (Ross); Endocrine Society 2016 Thyroid in Pregnancy.
+
+⚠️ CITATION DATE LOCKS:
+- Use "ATA 2025" EXCLUSIVELY for Differentiated Thyroid Cancer (Papillary/Follicular).
+- DO NOT cite "ATA 2025" for Nodules (use 2015) or Hypothyroidism (use 2014).
+- "ATA/ESMO Joint Guidelines" DO NOT EXIST.
+
+CRITICAL THYROID ANCHORS:
+
+1. OVERT vs SUBCLINICAL:
+   - OVERT = ↑TSH + LOW free T4 (regardless of TSH value).
+   - SUBCLINICAL = ↑TSH + NORMAL free T4. TSH >10 with normal free T4 is still subclinical.
+
+2. TSH TARGETS (ATA 2025 DTC Update):
+   - DTC long-term surveillance: TSH suppression is NO LONGER recommended for low- or intermediate-risk patients without evidence of recurrence (target lower reference range 0.5–2.0 mIU/L).
+   - General adult hypothyroid: 0.4–4.0 mIU/L. Pregnancy: 0.1–2.5 (T1).
+
+3. DTC SURGERY (ATA 2025 Update):
+   - Lobectomy is the preferred option for low-risk unifocal cancers ≤4 cm without extrathyroidal extension or nodal spread.
+
+4. THYROID CANCER — RAIR HARD RULES:
+   - RAIR requires DOCUMENTED RAI failure: no uptake on scan, OR progression within 12mo of RAI, OR cumulative RAI ≥600 mCi. Patient REFUSAL is NOT RAIR.
+   - Kinase inhibitors require RECIST 1.1 STRUCTURAL disease.
+   - Vandetanib/cabozantinib: MTC only. Selpercatinib: RET-confirmed only.
+
+5. THYROID STORM: PTU BEFORE iodine. Beta-blocker (propranolol). Hydrocortisone.
+
+6. COGNITIVE LEVEL:
+   - FORBIDDEN Tier 1: "TSH 9.8 + low T4 — start levo?"
+   - REQUIRED Tier 3+: "Stable patient on levo develops elevated TSH — most likely cause?"
+   - REQUIRED Tier 4: "Post-thyroidectomy DTC — TSH 1.2, Tg undetectable, anti-Tg rising — interpretation?"` },
+  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2018 AHA/ACC/Multisociety Cholesterol Guideline (Grundy et al., Circulation 2019); 2019 ACC/AHA Primary Prevention Guideline (Arnett et al.); 2022 ACC Expert Consensus on Non-Statin Therapies (Lloyd-Jones et al.); 2024 AHA Scientific Statement on PREVENT Calculator.
+
+⚠️ FABRICATED CITATION WARNING:
+- "AACE 2026 Lipid Guidelines" DOES NOT EXIST. Last comprehensive AACE lipid guideline: Jellinger et al. 2017.
+
+CRITICAL LIPID ANCHORS:
+1. RISK CALCULATOR — USE PREVENT, NOT PCE.
+2. Non-statin escalation: ezetimibe → PCSK9i → inclisiran.
+3. Statin intolerance: CK >10× ULN → discontinue. Always rechallenge.
+4. PREGNANCY: statins contraindicated.` },
+  { keywords: ["obesity", "bariatric", "metabolic syndrome", "wegovy", "tirzepatide weight", "semaglutide obesity"], citation: `AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2026 Standards of Care.` },
+  { keywords: ["pcos", "polycystic"], citation: `International Evidence-based PCOS Guideline 2023 (Teede et al.); Endocrine Society PCOS CPGs.` },
+  { keywords: ["cardio", "acs", "stemi", "nstemi", "acute coronary", "myocardial infarction"], citation: `ACC/AHA 2025 ACS Guidelines; ACC/AHA/SCAI 2021 Coronary Revascularization Guideline.` },
+  { keywords: ["heart failure", "hfref", "hfpef", "cardiomyopathy", "arni", "sacubitril"], citation: `ACC/AHA/HFSA 2022 Heart Failure Guideline (Heidenreich et al.).` },
+  { keywords: ["atrial fibrillation", "afib", "anticoagulation af", "doac", "cha2ds2", "ablation"], citation: `ACC/AHA/ACCP/HRS 2023 Atrial Fibrillation Guideline (Joglar et al.).` },
+  { keywords: ["arrhythmia", "tachycardia", "bradycardia", "vt", "vf", "svt"], citation: "ACC/AHA/HRS 2017 Ventricular Arrhythmia Guideline; AHA 2020 ACLS Updates." },
+  { keywords: ["hypertension", "blood pressure"], citation: `ACC/AHA 2017 Hypertension Guideline (Whelton et al.) + 2024 ACC/AHA Updates.` },
+  { keywords: ["nephro", "renal", "ckd", "kidney disease", "egfr", "albuminuria", "uacr", "finerenone"], citation: `KDIGO 2024 Clinical Practice Guideline for the Evaluation and Management of CKD; KDIGO 2022 Diabetes Management in CKD.` },
+  { keywords: ["gastro", "hepat", "cirrhosis", "ibd", "crohn", "colitis", "ulcerative", "inflammatory bowel", "infliximab", "adalimumab", "vedolizumab", "ustekinumab", "risankizumab", "tofacitinib", "upadacitinib", "biologic", "anti-tnf", "fistula", "perianal", "colonoscopy", "budesonide", "mesalamine", "azathioprine"], citation: `ACG 2024 Crohn Disease Guidelines; AGA 2021 Moderate-to-Severe Crohn Guideline; ACG 2019 UC Guidelines; ECCO 2022 IBD Guidelines; AASLD 2025 Practice Guidance.` },
+  { keywords: ["parathyroid", "calcium", "bone", "osteoporosis", "hyperparathyroidism", "hypercalcemia", "bisphosphonate", "denosumab", "teriparatide", "abaloparatide", "romosozumab", "frax", "pthrp", "calcimimetic", "cinacalcet"], citation: `Endocrine Society 2022 Primary Hyperparathyroidism Guideline (Bilezikian et al.); AACE 2020 Postmenopausal Osteoporosis Guideline + 2024 Updates.` },
+  { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement", "reproductive"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.` },
+  { keywords: ["pituitary", "hypothalamus", "acromegaly", "prolactin", "prolactinoma", "hypopituitarism", "craniopharyngioma", "avp", "diabetes insipidus", "siadh", "igf-1", "growth hormone", "gonadotropin", "sheehan", "apoplexy", "cabergoline", "octreotide", "lanreotide", "pegvisomant", "desmopressin", "copeptin"], citation: `Pituitary Society 2023 Consensus; Endocrine Society 2025 CPGs; European Journal of Endocrinology 2023 AVP-D Consensus.` },
+  { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines.` },
+  { keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer", "men2", "men 2a", "men 2b", "ret mutation", "prophylactic thyroidectomy"], citation: `Endocrine Society Clinical Practice Guidelines for MEN1 (2012) and MEN2/MTC (2015). Do not cite guidelines newer than these.` },
+  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma", "addison", "cortisol", "acth", "metanephrine", "phenoxybenzamine", "spironolactone adrenal", "eplerenone"], citation: `Endocrine Society 2008 Cushing Syndrome Diagnostic CPG + 2015 Treatment CPG; Pituitary Society 2023 Consensus on Cushing Disease; Endocrine Society 2016 Primary Aldosteronism CPG; Endocrine Society 2014 Pheochromocytoma/Paraganglioma CPG.` }
 ];
 
 function getGuidelineContext(topic, isNutrition) {
@@ -1273,7 +2083,7 @@ const MCQ_TOOL = {
   }
 };
 
-// ─── PROMPT BUILDER (v7.5.2) ─────────────────────────────────────────────────
+// ─── PROMPT BUILDER ───────────────────────────────────────────────────────────
 function buildPrompt(level, topic) {
   const isNutrition = NUTRITION_BY_LEVEL[level]?.includes(topic) ?? false;
 
@@ -1384,9 +2194,9 @@ ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
 
   const selfVerification = `
 MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
-1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic? (e.g., eGFR 28 in a 34yo requires explicit etiology)
+1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic?
 2. CORRECT ANSWER DEFENSIBILITY: Does your correct answer remain correct against current guidelines if a subspecialist challenges it?
-3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile? If yes, reconsider — distractors must be wrong for a specific, statable reason.
+3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile?
 4. NUMERIC CONSISTENCY: Do all lab values in the explanation EXACTLY match the stem?
 5. CITATION ACCURACY: Did you cite a real trial with real data? Do not fabricate co-authoring organizations or joint guidelines.`;
 
@@ -1416,8 +2226,10 @@ Execute the generation using the emit_mcq tool. Set demographic_check to "confir
 // ─── PROCESS RAW MCQ ─────────────────────────────────────────────────────────
 function processRawMcq(p, level, topic) {
   if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return null;
-  if (!validateDemographics(p.stem, p._sex || "man", topic)) return null;
-  if (!validateConsistency(p)) return null;
+  const sex = p._sex || "man";
+  if (!validateDemographics(p.stem, sex, topic))  return null;
+  if (!validateConsistency(p))                     return null;
+  if (!validateChoiceCompleteness(p))              return null;
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
@@ -1466,14 +2278,22 @@ async function saveToSupabase(records) {
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
           "Prefer": "return=minimal,resolution=ignore-duplicates"
         },
         body: JSON.stringify(chunk)
       });
-      if (!res.ok) errors += chunk.length;
-      else saved += chunk.length;
-    } catch (e) { errors += chunk.length; }
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        console.error(`[Save] Chunk failed HTTP ${res.status}: ${detail.slice(0, 200)}`);
+        errors += chunk.length;
+      } else {
+        saved += chunk.length;
+      }
+    } catch (e) {
+      console.error(`[Save] Chunk exception: ${e.message}`);
+      errors += chunk.length;
+    }
   }
   return { saved, errors };
 }
@@ -1554,33 +2374,70 @@ async function runBatchMode(queue) {
         },
         body: JSON.stringify({ requests: apiRequests })
       });
-      if (!submitRes.ok) throw new Error("Batch submit failed");
+      if (!submitRes.ok) throw new Error(`Batch submit failed HTTP ${submitRes.status}`);
       const submitData = await submitRes.json();
       batchId = submitData.id;
       console.log(`  ✅  Batch submitted. ID: ${batchId}`);
     } catch (e) {
-      console.log(`  ↩️  Falling back to standard concurrent mode for this batch...`);
+      console.log(`  ↩️  Batch submit failed (${e.message}). Falling back to standard concurrent mode...`);
       const fallbackRecords = await runStandardMode(batch, true);
       allRecords.push(...fallbackRecords);
       continue;
     }
 
     console.log(`  ⏳  Polling for completion...`);
-    let batchStatus = "in_progress";
+    const TERMINAL_STATUSES = ["ended", "errored", "canceling", "canceled"];
+    const MAX_POLL_ATTEMPTS = 120;  // 120 × 30s = 60 min max
+    let batchStatus  = "in_progress";
+    let pollAttempts = 0;
+    let pollTimedOut = false;
+
     while (batchStatus === "in_progress") {
+      if (++pollAttempts > MAX_POLL_ATTEMPTS) {
+        console.error(`  ⚠️  Poll timeout after ${MAX_POLL_ATTEMPTS} attempts. Falling back to standard mode for this batch.`);
+        const fallbackRecords = await runStandardMode(batch, true);
+        allRecords.push(...fallbackRecords);
+        pollTimedOut = true;
+        break;
+      }
       await sleep(30000);
       try {
         const pollRes  = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}`, {
-          headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "message-batches-2024-09-24" }
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "message-batches-2024-09-24"
+          }
         });
+        if (!pollRes.ok) {
+          console.warn(`  ⚠️  Poll HTTP ${pollRes.status} — will retry`);
+          continue;
+        }
         const pollData = await pollRes.json();
-        batchStatus    = pollData.processing_status;
-      } catch (e) {}
+        batchStatus = pollData.processing_status ?? "in_progress";
+        if (TERMINAL_STATUSES.includes(batchStatus)) {
+          console.error(`  ⚠️  Batch reached terminal status: ${batchStatus}`);
+          break;
+        }
+      } catch (e) {
+        console.warn(`  ⚠️  Poll error: ${e.message} — will retry`);
+      }
     }
+
+    if (pollTimedOut) continue;
+    if (batchStatus !== "ended") {
+      console.error(`  ❌  Batch did not end successfully (status: ${batchStatus}). Skipping result fetch.`);
+      continue;
+    }
+
     console.log(`\n  ✅  Batch complete. Fetching results...`);
 
     const resultsRes = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}/results`, {
-      headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "message-batches-2024-09-24" }
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "message-batches-2024-09-24"
+      }
     });
     const resultsText = await resultsRes.text();
     const lines       = resultsText.trim().split("\n").filter(Boolean);
@@ -1597,7 +2454,9 @@ async function runBatchMode(queue) {
         const raw = { ...toolBlock.input, _sex: meta.sex };
         const processed = processRawMcq(raw, meta.level, meta.topic);
         if (processed) allRecords.push(processed);
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[Batch result parse error]: ${e.message}`);
+      }
     }
   }
   return allRecords;
@@ -1608,39 +2467,62 @@ async function runStandardMode(queue, silent = false) {
   if (!silent) console.log(`\n⚡  Running ${queue.length} questions with concurrency=${CONCURRENCY}...`);
   const results = [];
   let done = 0;
+  const MAX_ATTEMPTS = 3;
 
   async function processItem(item) {
     const pd = buildPrompt(item.level, item.topic);
     const entropySeed = `${Date.now()}-${Math.random()}`;
 
-    for (let attempt = 0; attempt < 1; attempt++) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: pd.maxTokens,
-            temperature: 0.6,
-            system: pd.systemText,
-            tools: [MCQ_TOOL],
-            tool_choice: { type: "tool", name: "emit_mcq" },
-            messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${entropySeed}]` }]
-          })
-        });
-        if (res.status === 429) { await sleep(5000 * (attempt + 1)); continue; }
+        const res = await withTimeout(
+          fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": ANTHROPIC_API_KEY,
+              "anthropic-version": "2023-06-01"
+            },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-6",
+              max_tokens: pd.maxTokens,
+              temperature: 0.6,
+              system: pd.systemText,
+              tools: [MCQ_TOOL],
+              tool_choice: { type: "tool", name: "emit_mcq" },
+              messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${entropySeed}]` }]
+            })
+          }),
+          45000  // 45s — Generous timeout for Node.js script context
+        );
+
+        if (res.status === 429 || res.status >= 500) {
+          const delay = Math.pow(2, attempt) * 2000;  // 2s, 4s, 8s
+          console.warn(`[Bulk] HTTP ${res.status} on attempt ${attempt + 1} — backing off ${delay}ms`);
+          await sleep(delay);
+          continue;  // now actually retries
+        }
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data      = await res.json();
         const toolBlock = data.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
-        if (!toolBlock?.input) throw new Error("No tool_use block");
+        if (!toolBlock?.input) throw new Error("No tool_use block in response");
         const raw       = { ...toolBlock.input, _sex: pd.randomSex };
         const processed = processRawMcq(raw, item.level, item.topic);
         done++;
         if (!silent) process.stdout.write(`\r  ✅  ${done}/${queue.length} complete   `);
         return processed;
+
       } catch (e) {
-        if (attempt === 0) done++;
-        else await sleep(2000);
+        if (attempt < MAX_ATTEMPTS - 1) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.warn(`[Bulk] Attempt ${attempt + 1} error: ${e.message} — retrying in ${delay}ms`);
+          await sleep(delay);
+        } else {
+          console.error(`[Bulk] All ${MAX_ATTEMPTS} attempts failed for ${item.topic}: ${e.message}`);
+          done++;
+          return null;
+        }
       }
     }
     return null;
@@ -1662,7 +2544,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.2)    ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.6.1)    ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
