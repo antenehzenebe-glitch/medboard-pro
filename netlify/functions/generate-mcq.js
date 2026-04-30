@@ -1,24 +1,28 @@
 // generate-mcq.js — MedBoard Pro
-// v7.6.1 — Error Handling Hardening + Timeout Optimization
+// v7.6.0 — Error Handling Hardening
 // ---------------------------------------------------------------
-// CHANGELOG (v7.6.1):
-// - OPTIMIZED: withTimeout limits intelligently split for Netlify 26s limit
-//   (18s for Claude primary, 7s for Gemini rescue).
-// - FIXED: Network failures from callClaude now continue the retry
+// CHANGELOG (v7.6.0):
+// - FIXED (Critical): Network failures from callClaude now continue the retry
 //   loop instead of re-throwing and bypassing retries and Gemini fallback.
-// - FIXED: Simplified callClaude to single-shot — the outer while-loop in 
-//   the handler owns all retry logic.
-// - FIXED: saveMcqToSupabase uses SUPABASE_SERVICE_KEY to bypass RLS.
-// - FIXED: Outer catch sanitizes outbound error messages so internal
-//   details (stack traces, provider names, HTTP codes) stay private.
-// - FIXED: Exhausted retries return a 503 + retryAfter:10 instead of 500.
-// - PRESERVED: validateChoiceCompleteness(), ATA 2025 DTC lock, and all 
-//   Integrity Rules.
+// - FIXED (Critical): Added withTimeout() wrapper (8500ms) to callClaude and
+//   callGemini so Netlify's 10s hard-kill never fires without a graceful 503.
+// - FIXED (High): Simplified callClaude to single-shot — inner for-loop
+//   removed. The outer while-loop in the handler owns all retry logic.
+// - FIXED (High): saveMcqToSupabase now uses SUPABASE_SERVICE_KEY for the
+//   Authorization header so server-side writes bypass RLS correctly.
+//   Hardcoded anon-key fallback strings removed from env var declarations.
+// - FIXED (Medium): Outer catch sanitizes outbound error messages so internal
+//   details (stack traces, provider names, HTTP codes) never reach the client.
+// - FIXED (Medium): Exhausted retries now return a 503 + retryAfter:10 instead
+//   of throwing, giving the frontend a structured signal to back off.
 
 const crypto = require("crypto");
 
 const ANTHROPIC_API_KEY    = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY       = process.env.GEMINI_API_KEY;
+
+// FIX (High): removed hardcoded fallback strings — all keys from env only.
+// FIX (High): added SUPABASE_SERVICE_KEY for server-side writes.
 const SUPABASE_URL         = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY    = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -26,7 +30,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TIMEOUT WRAPPER
+// FIX (Critical): Timeout wrapper — prevents Netlify hard-kill
 // ============================================================
 function withTimeout(promise, ms) {
   const timer = new Promise((_, rej) =>
@@ -39,6 +43,7 @@ function withTimeout(promise, ms) {
 // TOPIC GUARDRAIL MAP (Layer 1 + Layer 2 per topic)
 // ============================================================
 const TOPIC_GUARDRAILS = [
+  // ─── ENDOCRINOLOGY: DIABETES CLUSTER ──────────────────────────────────────
   {
     keywords: ["dka", "hhs", "diabetic ketoacidosis", "hyperglycemic hyperosmolar"],
     l1: `DKA/HHS FOUNDATIONAL ANCHORS (ADA 2026):
@@ -155,6 +160,8 @@ REQUIRED Tier 3+ angles:
 - Sensor accuracy concerns in DKA or post-operative settings
 - Choosing CGM vs flash glucose monitoring by clinical scenario`
   },
+
+  // ─── ENDOCRINOLOGY: THYROID CLUSTER ───────────────────────────────────────
   {
     keywords: ["hypothyroidism", "hashimoto", "levothyroxine", "central hypothyroidism", "myxedema"],
     l1: `HYPOTHYROIDISM FOUNDATIONAL ANCHORS:
@@ -243,6 +250,8 @@ REQUIRED Tier 3+ angles:
 - Thionamide-induced hepatotoxicity management mid-storm
 - Storm precipitated by iodinated contrast in known Graves`
   },
+
+  // ─── ENDOCRINOLOGY: ADRENAL CLUSTER ───────────────────────────────────────
   {
     keywords: ["cushing", "hypercortisolism", "ectopic acth", "bipss", "petrosal sinus"],
     l1: `CUSHING'S FOUNDATIONAL ANCHORS:
@@ -313,6 +322,8 @@ REQUIRED Tier 3+ angles:
 - Mineralocorticoid replacement adjustment with hot weather/exercise
 - Distinguishing primary vs secondary AI in newly diagnosed patient`
   },
+
+  // ─── ENDOCRINOLOGY: PITUITARY CLUSTER ─────────────────────────────────────
   {
     keywords: ["prolactinoma", "hyperprolactinemia", "cabergoline", "bromocriptine", "macroprolactin", "stalk effect"],
     l1: `PROLACTINOMA FOUNDATIONAL ANCHORS:
@@ -380,6 +391,8 @@ REQUIRED Tier 3+ angles:
 - Gestational DI management and postpartum resolution
 - Adipsic central DI (osmoreceptor dysfunction) management challenges`
   },
+
+  // ─── ENDOCRINOLOGY: BONE & CALCIUM CLUSTER ────────────────────────────────
   {
     keywords: ["hyperparathyroidism", "primary hyperparathyroidism", "parathyroidectomy", "fhh", "familial hypocalciuric"],
     l1: `HYPERPARATHYROIDISM FOUNDATIONAL ANCHORS:
@@ -432,6 +445,8 @@ REQUIRED Tier 3+ angles:
 - Treatment in CKD G4-G5 (denosumab vs reduced-dose bisphosphonate)
 - Romosozumab eligibility decision in patient with prior MI`
   },
+
+  // ─── ENDOCRINOLOGY: REPRODUCTIVE CLUSTER ──────────────────────────────────
   {
     keywords: ["pcos", "polycystic ovary"],
     l1: `PCOS FOUNDATIONAL ANCHORS (2023 International Guideline):
@@ -468,6 +483,8 @@ REQUIRED Tier 3+ angles:
 - Klinefelter management beyond testosterone (cardiometabolic, fertility counseling)
 - Distinguishing primary vs secondary hypogonadism workup`
   },
+
+  // ─── ENDOCRINOLOGY: MEN & NET CLUSTER ─────────────────────────────────────
   {
     keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer"],
     l1: `MEN1 FOUNDATIONAL ANCHORS:
@@ -500,6 +517,8 @@ REQUIRED Tier 3+ angles:
 - Family genetic counseling cascade and pediatric screening
 - Selpercatinib in RET-mutant advanced MTC`
   },
+
+  // ─── INTERNAL MEDICINE CLUSTER (high-error topics) ────────────────────────
   {
     keywords: ["acs", "stemi", "nstemi", "acute coronary", "myocardial infarction"],
     l1: `ACS FOUNDATIONAL ANCHORS (ACC/AHA 2025):
@@ -627,6 +646,7 @@ REQUIRED Tier 2-3 angles:
   }
 ];
 
+// Generic fallback for topics without specific guardrails
 const GENERIC_GUARDRAILS = {
   l1: `GENERAL CLINICAL ANCHORS:
 - Cite only data explicitly present in the stem.
@@ -869,7 +889,9 @@ CRITICAL BONE/PTH ANCHORS:
    - Sequential therapy: anabolic first, then antiresorptive to maintain gains.
 
 7. DRUG-INDUCED OSTEOPOROSIS:
-   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.` },
+   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.
+   - Aromatase inhibitors, GnRH agonists, AR-blockers: monitor BMD.
+   - Long-term PPI: ?modest fracture risk; not a contraindication.` },
   { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement", "reproductive"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.
 
 CRITICAL MENOPAUSE ANCHORS:
@@ -1167,6 +1189,38 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
 }
 
 // ============================================================
+// MCQ TOOL SCHEMA
+// ============================================================
+const MCQ_TOOL = {
+  name: "emit_mcq",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
+  input_schema: {
+    type: "object",
+    properties: {
+      demographic_check: { type: "string" },
+      stem: { type: "string", description: "The clinical vignette. Must end with the interrogative sentence." },
+      choices: {
+        type: "object",
+        properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
+        required: ["A", "B", "C", "D", "E"]
+      },
+      correct: { type: "string", enum: ["A", "B", "C", "D", "E"] },
+      explanation: { type: "string", description: "Use provided formatting rules for the explanation." }
+    },
+    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
+  }
+};
+
+function extractJSONSimple(raw) {
+  if (!raw || typeof raw !== "string") throw new Error("extractJSONSimple received empty input.");
+  try { return JSON.parse(raw); } catch (_) {}
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found.");
+  let candidate = match[0].replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'").replace(/\u2013/g, "-").replace(/\u2014/g, "-").replace(/\u00A0/g, " ").replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(candidate); } catch (e) { throw new Error(`Gemini JSON malformed: ${e.message}`); }
+}
+
+// ============================================================
 // VALIDATORS
 // ============================================================
 function validateDemographics(stem, sex, topic) {
@@ -1253,193 +1307,11 @@ function validateChoiceCompleteness(p) {
   return true;
 }
 
-function rewriteExplanationLetters(explanation, letterMap) {
-  if (!explanation || typeof explanation !== "string") return explanation;
-  let out = explanation;
-  const placeholders = {};
-  Object.keys(letterMap).forEach((oldLetter, idx) => {
-    const placeholder = `§§LETTER_${idx}§§`;
-    placeholders[placeholder] = letterMap[oldLetter];
-    const patterns = [
-      { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
-      { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
-      { re: new RegExp(`(\\banswer\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
-      { re: new RegExp(`\\(${oldLetter}\\)`, "g"),              wrap: 2 },
-      { re: new RegExp(`(•\\s*)${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 },
-      { re: new RegExp(`(^|\\n)\\s*${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 }
-    ];
-    patterns.forEach(({ re, wrap }) => {
-      if (wrap === 1) out = out.replace(re, `$1${placeholder}`);
-      else if (wrap === 2) out = out.replace(re, `(${placeholder})`);
-      else if (wrap === 3) out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`);
-    });
-  });
-  Object.keys(placeholders).forEach(p => { out = out.split(p).join(placeholders[p]); });
-  return out;
-}
-
-// ─── MCQ TOOL SCHEMA ──────────────────────────────────────────────────────────
-const MCQ_TOOL = {
-  name: "emit_mcq",
-  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
-  input_schema: {
-    type: "object",
-    properties: {
-      demographic_check: { type: "string" },
-      stem:              { type: "string" },
-      choices: {
-        type: "object",
-        properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
-        required: ["A", "B", "C", "D", "E"]
-      },
-      correct:      { type: "string", enum: ["A","B","C","D","E"] },
-      explanation:  { type: "string" }
-    },
-    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
-  }
-};
-
-// ─── PROMPT BUILDER ───────────────────────────────────────────────────────────
-function buildPrompt(level, topic) {
-  const isNutrition = NUTRITION_BY_LEVEL[level]?.includes(topic) ?? false;
-
-  const isABIM_Endo = level === "ABIM Endocrinology";
-  const isStep3     = level === "USMLE Step 3";
-  const isABIM_IM   = level === "ABIM Internal Medicine";
-  const isStep1     = level === "USMLE Step 1";
-
-  const maxTokens   = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
-
-  let qTypePool = [];
-  if (topic.includes("Ethics") || topic.includes("Behavioral") || topic.includes("HIPAA") || topic.includes("end-of-life") || topic.includes("consent")) {
-    qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
-  } else if (isStep1) {
-    qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
-  } else if (isStep3) {
-    qTypePool = [
-      {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
-      {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
-      {s:"MOST APPROPRIATE DISPOSITION OR TRANSITION OF CARE decision",w:20},
-      {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
-      {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
-    ];
-  } else if (isABIM_IM) {
-    qTypePool = [
-      {s:"MOST APPROPRIATE NEXT TREATMENT STEP given organ dysfunction, intolerance, or comorbidity conflict",w:40},
-      {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:35},
-      {s:"MOST APPROPRIATE DRUG CHOICE given specific comorbidity profile (CKD, HF, DM, prior ASCVD)",w:20},
-      {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
-    ];
-  } else if (isABIM_Endo) {
-    qTypePool = [
-      {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:35},
-      {s:"MOST APPROPRIATE PHARMACOLOGIC CHOICE based on cardiorenal or comorbidity profile",w:30},
-      {s:"NEXT STEP IN DIAGNOSTIC WORKUP (e.g., dynamic testing, imaging, or genetic screening) to confirm a complex subtype",w:25},
-      {s:"MOST APPROPRIATE MODIFICATION to current therapy given a new complication or side effect",w:10}
-    ];
-  } else {
-    qTypePool = [{s:"NEXT STEP IN DIAGNOSIS",w:25}, {s:"MOST LIKELY DIAGNOSIS",w:25}, {s:"NEXT STEP IN MANAGEMENT",w:40}, {s:"STRONGEST RISK FACTOR",w:10}];
-  }
-  const promptQType = pickWeighted(qTypePool);
-  const randomSex   = pickSexForTopic(topic);
-
-  const isUSMLE     = level.includes("USMLE");
-  const systemRole  = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
-
-  const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
-STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
-1. MAXIMUM 130 WORDS for the stem.
-2. ZERO INTRODUCTORY FLUFF. Start immediately with age, sex, and chief complaint.
-3. HIGH-DENSITY DATA. Combine vitals and physical exam into single sentences. 
-4. DO NOT interpret labs. State the raw value.
-5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem.`;
-
-  const levelRules  = isStep1
-    ? "USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1."
-    : isABIM_IM
-    ? "ABIM IM RULES: Generalist level. Internist synthesis for complex comorbidities."
-    : "ABIM ENDOCRINOLOGY RULES: Full subspecialty level.";
-
-  const integrityRules = `INTEGRITY RULES:
-A. Evidence discipline: cite only data explicitly in stem.
-B. "glucose" never "sugar".
-C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL.
-D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis.
-E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS):
-   - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE.
-   - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc.
-F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.
-G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. Re-read your stem before calling emit_mcq.`;
-
-  const guardrails = getTopicGuardrails(level, topic);
-
-  const explanationNote = `EXPLANATION FORMAT — use these exact headers:
-🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite the most recent officially published guideline (do not fabricate dates if older)].
-🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
-💎 Board Pearl: [one high-yield fact].`;
-
-  const topicGuideline = getGuidelineContext(topic, isNutrition);
-
-  const systemText = `You are ${systemRole}. Output confident, accurate facts.
-${levelRules}
-${VIGNETTE_STYLE_GUIDE}
-${integrityRules}
-
-TOPIC-SPECIFIC HARD RULES (CLINICAL ACCURACY ANCHORS):
-${guardrails.l1}
-
-CLINICAL EVIDENCE STANDARD: You MUST base the diagnosis, management, and explanation citations strictly on: ${topicGuideline}. Do not use outdated criteria.
-${explanationNote}
-UNIVERSAL HARD RULES: HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine.
-RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
-
-  const step3TierPrompt = isStep3 ? `
-USMLE STEP 3 TIER 3-5 REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Must present management decision, disposition, or intervention.` : "";
-
-  const abimIMTierPrompt = isABIM_IM ? `
-ABIM INTERNAL MEDICINE TIER 3-4 REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.` : "";
-
-  const endoTier3Prompt = isABIM_Endo ? `
-ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Question must test subspecialty management, complex diagnostic workup, or therapy modification.
-- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.` : "";
-
-  const selfVerification = `
-MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
-1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic?
-2. CORRECT ANSWER DEFENSIBILITY: Does your correct answer remain correct against current guidelines if a subspecialist challenges it?
-3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile?
-4. NUMERIC CONSISTENCY: Do all lab values in the explanation EXACTLY match the stem?
-5. CITATION ACCURACY: Did you cite a real trial with real data? Do not fabricate co-authoring organizations or joint guidelines.`;
-
-  const userText = isStep1
-  ? `Write 1 vignette on: ${topic}.
-- Question asks for: ${promptQType}.
-- Patient Demographics & Setting: Patient is a ${randomSex}.
-- Pertinent Negatives: Include a pertinent negative ONLY if it helps rule out a competing answer choice. Do NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, etc.) unless directly relevant to the diagnosis.
-- The stem MUST end with the interrogative sentence.
-${selfVerification}
-Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
-  : `Construct a Tier 3 Board-style puzzle on: ${topic}.
-- Lead-in asks for: ${promptQType}.
-- Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
-- Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing answer choice. DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
-- The stem MUST end with the interrogative sentence.
-
-${guardrails.l2}
-
-${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
-${selfVerification}
-Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
-
-  return { systemText, userText, randomSex, maxTokens, topic };
-}
-
-// ─── CLAUDE & GEMINI CLIENTS (Optimized Timeouts) ────────────────────────────
+// ============================================================
+// CLAUDE & GEMINI CLIENTS
+// FIX (Critical + High): withTimeout added; inner for-loop removed from
+// callClaude — the handler's while-loop owns all retry logic.
+// ============================================================
 async function callClaude(systemText, userText, maxTokens) {
   const entropySeed   = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
   const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
@@ -1462,7 +1334,7 @@ async function callClaude(systemText, userText, maxTokens) {
         messages: [{ role: "user", content: finalUserText }]
       })
     }),
-    18000 // 18s — Enough time for 3200 tokens, leaves room for fallback within 26s
+    8500  // 8.5s — leaves headroom within Netlify's 10s window
   );
 
   if (!response.ok) throw new Error(`Claude HTTP ${response.status}`);
@@ -1497,7 +1369,7 @@ async function callGemini(systemText, userText, maxTokens) {
         })
       }
     ),
-    7000 // 7s — Quick rescue attempt before Netlify kills the function
+    8500
   );
 
   if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
@@ -1507,359 +1379,323 @@ async function callGemini(systemText, userText, maxTokens) {
   return { parsed: extractJSONSimple(text), model: "gemini-2.0-flash" };
 }
 
-// ─── PROCESS RAW MCQ ─────────────────────────────────────────────────────────
-function processRawMcq(p, level, topic) {
-  if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return null;
-  const sex = p._sex || "man";
-  if (!validateDemographics(p.stem, sex, topic))  return null;
-  if (!validateConsistency(p))                     return null;
-  if (!validateChoiceCompleteness(p))              return null;
-
-  const letters      = ["A","B","C","D","E"];
-  const correctIndex = letters.indexOf(p.correct);
-  const optionsArray = letters
-    .map((letter, i) => ({ originalLetter: letter, text: p.choices[letter], isCorrect: i === correctIndex }))
-    .filter(opt => opt.text != null);
-
-  for (let i = optionsArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [optionsArray[i], optionsArray[j]] = [optionsArray[j], optionsArray[i]];
-  }
-
-  const shuffledChoices = {};
-  const letterMap       = {};
-  let newCorrectLetter  = "A";
-  optionsArray.forEach((item, index) => {
-    const newLetter = letters[index];
-    shuffledChoices[newLetter] = item.text;
-    letterMap[item.originalLetter] = newLetter;
-    if (item.isCorrect) newCorrectLetter = newLetter;
+// ============================================================
+// SHUFFLE & DB SAVER
+// ============================================================
+function rewriteExplanationLetters(explanation, letterMap) {
+  if (!explanation || typeof explanation !== "string") return explanation;
+  let out = explanation;
+  const placeholders = {};
+  Object.keys(letterMap).forEach((oldLetter, idx) => {
+    const placeholder = `§§LETTER_${idx}§§`;
+    placeholders[placeholder] = letterMap[oldLetter];
+    const patterns = [
+      { re: new RegExp(`(\\bChoice\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
+      { re: new RegExp(`(\\bOption\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
+      { re: new RegExp(`(\\banswer\\s+)${oldLetter}\\b`, "ig"), wrap: 1 },
+      { re: new RegExp(`\\(${oldLetter}\\)`, "g"),              wrap: 2 },
+      { re: new RegExp(`(•\\s*)${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 },
+      { re: new RegExp(`(^|\\n)\\s*${oldLetter}(\\s*[.:\\-\\)]|\\s+\\()`, "g"), wrap: 3 }
+    ];
+    patterns.forEach(({ re, wrap }) => {
+      if (wrap === 1) out = out.replace(re, `$1${placeholder}`);
+      else if (wrap === 2) out = out.replace(re, `(${placeholder})`);
+      else if (wrap === 3) out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`);
+    });
   });
-
-  return {
-    topic,
-    stem:            p.stem,
-    choices:         shuffledChoices,
-    correct_answer:  newCorrectLetter,
-    explanation:     rewriteExplanationLetters(p.explanation, letterMap),
-    content_hash:    hashStem(p.stem),
-    exam_level:      level,
-    specialty_group: deriveSpecialtyGroup(level, topic),
-    blueprint_tag:   topic,
-  };
+  Object.keys(placeholders).forEach(placeholder => { out = out.split(placeholder).join(placeholders[placeholder]); });
+  return out;
 }
 
-// ─── SUPABASE SAVER ───────────────────────────────────────────────────────────
-async function saveToSupabase(records) {
-  if (!records.length) return { saved: 0, errors: 0 };
-  let saved = 0, errors = 0;
-  const CHUNK = 10;
-  for (let i = 0; i < records.length; i += CHUNK) {
-    const chunk = records.slice(i, i + CHUNK);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/mcqs`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-          "Prefer": "return=minimal,resolution=ignore-duplicates"
-        },
-        body: JSON.stringify(chunk)
-      });
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        console.error(`[Save] Chunk failed HTTP ${res.status}: ${detail.slice(0, 200)}`);
-        errors += chunk.length;
-      } else {
-        saved += chunk.length;
-      }
-    } catch (e) {
-      console.error(`[Save] Chunk exception: ${e.message}`);
-      errors += chunk.length;
-    }
-  }
-  return { saved, errors };
-}
-
-// ─── BUILD WORK QUEUE ─────────────────────────────────────────────────────────
-function buildWorkQueue(count) {
-  const levels = FILTER_LEVEL ? [FILTER_LEVEL] : Object.keys(TOPIC_DISTRIBUTION);
-  const queue  = [];
-
-  if (FILTER_TOPIC && FILTER_LEVEL) {
-    for (let i = 0; i < count; i++) queue.push({ level: FILTER_LEVEL, topic: FILTER_TOPIC });
-    return queue;
-  }
-
-  const flat = [];
-  for (const level of levels) {
-    const topics = TOPIC_DISTRIBUTION[level] || [];
-    for (const t of topics) flat.push({ level, topic: t.topic, w: t.weight });
-  }
-  const totalWeight = flat.reduce((s, f) => s + f.w, 0);
-
-  for (let i = 0; i < count; i++) {
-    let rand = Math.random() * totalWeight;
-    for (const item of flat) {
-      rand -= item.w;
-      if (rand < 0) { queue.push({ level: item.level, topic: item.topic }); break; }
-    }
-  }
-  return queue;
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// ─── BATCH MODE ───────────────────────────────────────────────────────────────
-async function runBatchMode(queue) {
-  console.log(`\n📦  Submitting ${queue.length} requests to Anthropic Batch API...`);
-  const BATCH_LIMIT = 10000;
-  const batches = [];
-  for (let i = 0; i < queue.length; i += BATCH_LIMIT) batches.push(queue.slice(i, i + BATCH_LIMIT));
-
-  const allRecords = [];
-
-  for (let bi = 0; bi < batches.length; bi++) {
-    const batch = batches[bi];
-    console.log(`\n  🔵  Batch ${bi + 1}/${batches.length} — ${batch.length} questions`);
-
-    const requests = batch.map((item, idx) => {
-      const pd = buildPrompt(item.level, item.topic);
-      return {
-        custom_id: `mbp-${Date.now()}-${bi}-${idx}`,
-        params: {
-          model: "claude-sonnet-4-6",
-          max_tokens: pd.maxTokens,
-          system: pd.systemText,
-          tools: [MCQ_TOOL],
-          tool_choice: { type: "tool", name: "emit_mcq" },
-          messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${Date.now()}-${idx}]` }],
-        },
-        _meta: { level: item.level, topic: item.topic, sex: pd.randomSex }
-      };
-    });
-
-    const metaMap = {};
-    const apiRequests = requests.map(r => {
-      metaMap[r.custom_id] = r._meta;
-      return { custom_id: r.custom_id, params: r.params };
-    });
-
-    let batchId;
-    try {
-      const submitRes = await fetch("https://api.anthropic.com/v1/messages/batches", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-beta": "message-batches-2024-09-24"
-        },
-        body: JSON.stringify({ requests: apiRequests })
-      });
-      if (!submitRes.ok) throw new Error(`Batch submit failed HTTP ${submitRes.status}`);
-      const submitData = await submitRes.json();
-      batchId = submitData.id;
-      console.log(`  ✅  Batch submitted. ID: ${batchId}`);
-    } catch (e) {
-      console.log(`  ↩️  Batch submit failed (${e.message}). Falling back to standard concurrent mode...`);
-      const fallbackRecords = await runStandardMode(batch, true);
-      allRecords.push(...fallbackRecords);
-      continue;
-    }
-
-    console.log(`  ⏳  Polling for completion...`);
-    const TERMINAL_STATUSES = ["ended", "errored", "canceling", "canceled"];
-    const MAX_POLL_ATTEMPTS = 120;  // 120 × 30s = 60 min max
-    let batchStatus  = "in_progress";
-    let pollAttempts = 0;
-    let pollTimedOut = false;
-
-    while (batchStatus === "in_progress") {
-      if (++pollAttempts > MAX_POLL_ATTEMPTS) {
-        console.error(`  ⚠️  Poll timeout after ${MAX_POLL_ATTEMPTS} attempts. Falling back to standard mode for this batch.`);
-        const fallbackRecords = await runStandardMode(batch, true);
-        allRecords.push(...fallbackRecords);
-        pollTimedOut = true;
-        break;
-      }
-      await sleep(30000);
-      try {
-        const pollRes  = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}`, {
-          headers: {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "message-batches-2024-09-24"
-          }
-        });
-        if (!pollRes.ok) {
-          console.warn(`  ⚠️  Poll HTTP ${pollRes.status} — will retry`);
-          continue;
-        }
-        const pollData = await pollRes.json();
-        batchStatus = pollData.processing_status ?? "in_progress";
-        if (TERMINAL_STATUSES.includes(batchStatus)) {
-          console.error(`  ⚠️  Batch reached terminal status: ${batchStatus}`);
-          break;
-        }
-      } catch (e) {
-        console.warn(`  ⚠️  Poll error: ${e.message} — will retry`);
-      }
-    }
-
-    if (pollTimedOut) continue;
-    if (batchStatus !== "ended") {
-      console.error(`  ❌  Batch did not end successfully (status: ${batchStatus}). Skipping result fetch.`);
-      continue;
-    }
-
-    console.log(`\n  ✅  Batch complete. Fetching results...`);
-
-    const resultsRes = await fetch(`https://api.anthropic.com/v1/messages/batches/${batchId}/results`, {
+// FIX (High): Uses SUPABASE_SERVICE_KEY for Authorization so server-side
+// inserts bypass Row Level Security correctly.
+async function saveMcqToSupabase(p, level, meta) {
+  try {
+    const payload = {
+      exam_level: level, topic: p.topic, stem: p.stem, choices: p.choices, correct_answer: p.correct,
+      explanation: p.explanation, specialty_group: deriveSpecialtyGroup(level, meta && meta.resolvedTopic),
+      blueprint_tag: meta && meta.resolvedTopic ? meta.resolvedTopic : p.topic,
+      generation_model: meta && meta.generationModel ? meta.generationModel : null,
+      content_hash: hashStem(p.stem),
+    };
+    await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
+      method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "message-batches-2024-09-24"
-      }
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": "Bearer " + SUPABASE_SERVICE_KEY,
+        "Prefer": "return=minimal,resolution=ignore-duplicates"
+      },
+      body: JSON.stringify(payload)
     });
-    const resultsText = await resultsRes.text();
-    const lines       = resultsText.trim().split("\n").filter(Boolean);
+  } catch (e) { console.error("[DB Save Exception]:", e.message); }
+}
 
-    for (const line of lines) {
+// ============================================================
+// PROMPT BUILDER
+// ============================================================
+function buildPrompt(level, topic, isNutrition) {
+  let promptTopic = topic;
+  
+  if (topic.includes("Random")) {
+    const dist = TOPIC_DISTRIBUTION[level] || TOPIC_DISTRIBUTION["ABIM Internal Medicine"];
+    const mappedBlueprint = dist.map(t => ({ s: t.topic, w: t.weight }));
+    promptTopic = pickWeighted(mappedBlueprint);
+  }
+
+  const isABIM_Endo = level === "ABIM Endocrinology";
+  const isStep3     = level === "USMLE Step 3";
+  const isABIM_IM   = level === "ABIM Internal Medicine";
+  const isStep1     = level === "USMLE Step 1";
+
+  let qTypePool = [];
+  if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
+    qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
+  } else if (isStep1) {
+    qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
+  } else if (isStep3) {
+    qTypePool = [
+      {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
+      {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
+      {s:"MOST APPROPRIATE DISPOSITION OR TRANSITION OF CARE decision",w:20},
+      {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
+      {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
+    ];
+  } else if (isABIM_IM) {
+    qTypePool = [
+      {s:"MOST APPROPRIATE NEXT TREATMENT STEP given organ dysfunction, intolerance, or comorbidity conflict",w:40},
+      {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:35},
+      {s:"MOST APPROPRIATE DRUG CHOICE given specific comorbidity profile (CKD, HF, DM, prior ASCVD)",w:20},
+      {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
+    ];
+  } else if (isABIM_Endo) {
+    qTypePool = [
+      {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:35},
+      {s:"MOST APPROPRIATE PHARMACOLOGIC CHOICE based on cardiorenal or comorbidity profile",w:30},
+      {s:"NEXT STEP IN DIAGNOSTIC WORKUP (e.g., dynamic testing, imaging, or genetic screening) to confirm a complex subtype",w:25},
+      {s:"MOST APPROPRIATE MODIFICATION to current therapy given a new complication or side effect",w:10}
+    ];
+  } else {
+    qTypePool = [{s:"NEXT STEP IN DIAGNOSIS",w:25}, {s:"MOST LIKELY DIAGNOSIS",w:25}, {s:"NEXT STEP IN MANAGEMENT",w:40}, {s:"STRONGEST RISK FACTOR",w:10}];
+  }
+  const promptQType = pickWeighted(qTypePool);
+  const randomSex   = pickSexForTopic(promptTopic);
+
+  const isUSMLE   = level.includes("USMLE");
+  const maxTokens = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
+
+  const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
+
+  const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
+STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
+1. MAXIMUM 130 WORDS for the stem.
+2. ZERO INTRODUCTORY FLUFF. Start immediately with age, sex, and chief complaint.
+3. HIGH-DENSITY DATA. Combine vitals and physical exam into single sentences. 
+4. DO NOT interpret labs. State the raw value.
+5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem.`;
+
+  let levelRules = isStep1
+    ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1.`
+    : isABIM_IM
+    ? `ABIM IM RULES: Generalist level. Internist synthesis for complex comorbidities.`
+    : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level.`;
+
+  const integrityRules = `INTEGRITY RULES:
+A. Evidence discipline: cite only data explicitly in stem.
+B. "glucose" never "sugar".
+C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL.
+D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis. 
+E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS): 
+   - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE.
+   - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc.
+F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.
+G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. Re-read your stem before calling emit_mcq.`;
+
+  const guardrails = getTopicGuardrails(level, promptTopic);
+
+  const explanationNote = `EXPLANATION FORMAT — use these exact headers:
+🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite the most recent officially published guideline (do not fabricate dates if older)].
+🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
+💎 Board Pearl: [one high-yield fact].`;
+
+  const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
+
+  const systemText = `You are ${systemRole}. Output confident, accurate facts.
+${levelRules}
+${VIGNETTE_STYLE_GUIDE}
+${integrityRules}
+
+TOPIC-SPECIFIC HARD RULES (CLINICAL ACCURACY ANCHORS):
+${guardrails.l1}
+
+CLINICAL EVIDENCE STANDARD: You MUST base the diagnosis, management, and explanation citations strictly on: ${topicGuideline}. Do not use outdated criteria.
+${explanationNote}
+UNIVERSAL HARD RULES: HIT: argatroban hepatic, bivalirudin/fondaparinux renal; DKA/HHS: K+ >3.3 before insulin; thyroid storm: PTU before iodine.
+RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
+
+  const step3TierPrompt = isStep3 ? `
+USMLE STEP 3 TIER 3-5 REQUIREMENTS:
+- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
+- Must present management decision, disposition, or intervention.
+- Build in realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
+- Distractors must include the Tier 1/2 answer (what a MS3 would choose).` : "";
+
+  const abimIMTierPrompt = isABIM_IM ? `
+ABIM INTERNAL MEDICINE TIER 3-4 REQUIREMENTS:
+- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
+- Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.
+- Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
+
+  const endoTier3Prompt = isABIM_Endo ? `
+ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
+- FORBIDDEN: "What is the most likely diagnosis?". Question must test subspecialty management, complex diagnostic workup, or therapy modification.
+- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
+- Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
+
+  const selfVerification = `
+MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
+1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic? (e.g., eGFR 28 in a 34yo requires explicit etiology)
+2. CORRECT ANSWER DEFENSIBILITY: Does your correct answer remain correct against current guidelines if a subspecialist challenges it?
+3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile? If yes, reconsider — distractors must be wrong for a specific, statable reason.
+4. NUMERIC CONSISTENCY: Do all lab values in the explanation EXACTLY match the stem?
+5. CITATION ACCURACY: Did you cite a real trial with real data? Do not fabricate co-authoring organizations or joint guidelines.`;
+
+  const userText = isStep1
+  ? `Write 1 vignette on: ${promptTopic}.
+- Question asks for: ${promptQType}.
+- Patient Demographics & Setting: Patient is a ${randomSex}. 
+- Pertinent Negatives: Include a pertinent negative ONLY if it helps rule out a competing answer choice. Do NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, etc.) unless directly relevant to the diagnosis.
+- The stem MUST end with the interrogative sentence.
+${selfVerification}
+Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
+  : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
+- Lead-in asks for: ${promptQType}.
+- Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
+- Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing answer choice. DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
+- The stem MUST end with the interrogative sentence.
+
+${guardrails.l2}
+
+${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
+${selfVerification}
+Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
+
+  return { systemText, userText, randomSex, maxTokens, resolvedTopic: promptTopic };
+}
+
+// ============================================================
+// NETLIFY HANDLER
+// ============================================================
+exports.handler = async function (event) {
+  if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
+  try {
+    const b = JSON.parse(event.body);
+    if (b.warmup) return { statusCode: 200, body: "{}" };
+    if (!b.level || !b.topic) return { statusCode: 400, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
+
+    const topicResult   = pickTopicForLevel(b.level, b.topic);
+    const resolvedTopic = topicResult.topic;
+    const isNutrition   = topicResult.isNutrition;
+
+    const pd = buildPrompt(b.level, resolvedTopic, isNutrition);
+
+    let p;
+    let generationModel = null;
+    let isValid = false;
+    let attempts = 0;
+
+    // FIX (Critical): Network errors from callClaude now `continue` the loop
+    // instead of re-throwing, so retries and the Gemini fallback both work.
+    while (!isValid && attempts < 3) {
+      attempts++;
+      let callResult;
       try {
-        const result = JSON.parse(line);
-        if (result.result?.type !== "succeeded") continue;
-        const customId = result.custom_id;
-        const meta     = metaMap[customId];
-        if (!meta) continue;
-        const toolBlock = result.result.message?.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
-        if (!toolBlock?.input) continue;
-        const raw = { ...toolBlock.input, _sex: meta.sex };
-        const processed = processRawMcq(raw, meta.level, meta.topic);
-        if (processed) allRecords.push(processed);
+        callResult = await callClaude(pd.systemText, pd.userText, pd.maxTokens);
       } catch (e) {
-        console.warn(`[Batch result parse error]: ${e.message}`);
+        console.error(`[MCQ] Claude attempt ${attempts} failed: ${e.message}`);
+        if (attempts < 3) continue; // retry on network/timeout error
+        // attempt 3 exhausted — fall through to Gemini below
+      }
+
+      if (callResult) {
+        p = callResult.parsed;
+        generationModel = callResult.model;
+        if (p && p.stem && p.choices && p.correct && p.explanation) {
+          const demoOk        = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
+          const consistencyOk = validateConsistency(p);
+          const choicesOk     = validateChoiceCompleteness(p);
+          isValid = demoOk && consistencyOk && choicesOk;
+        }
+      }
+
+      if (!isValid && attempts === 3) {
+        try {
+          const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
+          p               = fbResult.parsed;
+          generationModel = fbResult.model;
+          isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic)
+                 && validateConsistency(p)
+                 && validateChoiceCompleteness(p);
+        } catch (gemErr) {
+          console.error("[MCQ] Gemini fallback failed:", gemErr.message);
+        }
       }
     }
-  }
-  return allRecords;
-}
 
-// ─── STANDARD MODE ───────────────────────────────────────────────────────────
-async function runStandardMode(queue, silent = false) {
-  if (!silent) console.log(`\n⚡  Running ${queue.length} questions with concurrency=${CONCURRENCY}...`);
-  const results = [];
-  let done = 0;
-  const MAX_ATTEMPTS = 3;
-
-  async function processItem(item) {
-    const pd = buildPrompt(item.level, item.topic);
-    const entropySeed = `${Date.now()}-${Math.random()}`;
-
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      try {
-        const res = await withTimeout(
-          fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": ANTHROPIC_API_KEY,
-              "anthropic-version": "2023-06-01"
-            },
-            body: JSON.stringify({
-              model: "claude-sonnet-4-6",
-              max_tokens: pd.maxTokens,
-              temperature: 0.6,
-              system: pd.systemText,
-              tools: [MCQ_TOOL],
-              tool_choice: { type: "tool", name: "emit_mcq" },
-              messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${entropySeed}]` }]
-            })
-          }),
-          45000  // 45s — Generous timeout for Node.js script context
-        );
-
-        if (res.status === 429 || res.status >= 500) {
-          const delay = Math.pow(2, attempt) * 2000;  // 2s, 4s, 8s
-          console.warn(`[Bulk] HTTP ${res.status} on attempt ${attempt + 1} — backing off ${delay}ms`);
-          await sleep(delay);
-          continue;  // now actually retries
-        }
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data      = await res.json();
-        const toolBlock = data.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
-        if (!toolBlock?.input) throw new Error("No tool_use block in response");
-        const raw       = { ...toolBlock.input, _sex: pd.randomSex };
-        const processed = processRawMcq(raw, item.level, item.topic);
-        done++;
-        if (!silent) process.stdout.write(`\r  ✅  ${done}/${queue.length} complete   `);
-        return processed;
-
-      } catch (e) {
-        if (attempt < MAX_ATTEMPTS - 1) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.warn(`[Bulk] Attempt ${attempt + 1} error: ${e.message} — retrying in ${delay}ms`);
-          await sleep(delay);
-        } else {
-          console.error(`[Bulk] All ${MAX_ATTEMPTS} attempts failed for ${item.topic}: ${e.message}`);
-          done++;
-          return null;
-        }
-      }
+    // FIX (Medium): Return structured 503 instead of throwing so the client
+    // receives a retryAfter signal rather than a raw 500.
+    if (!isValid) {
+      return {
+        statusCode: 503,
+        headers: { "Content-Type": "application/json", "Retry-After": "10" },
+        body: JSON.stringify({ error: "AI service busy. Please retry.", retryAfter: 10 })
+      };
     }
-    return null;
-  }
 
-  for (let i = 0; i < queue.length; i += CONCURRENCY) {
-    const window  = queue.slice(i, i + CONCURRENCY);
-    const settled = await Promise.allSettled(window.map(processItem));
-    for (const r of settled) {
-      if (r.status === "fulfilled" && r.value) results.push(r.value);
+    p.topic = pd.resolvedTopic;
+    const letters      = ['A', 'B', 'C', 'D', 'E'];
+    const correctIndex = letters.indexOf(p.correct);
+    const optionsArray = letters.map((letter, i) => ({ originalLetter: letter, text: p.choices[letter], isCorrect: i === correctIndex })).filter(opt => opt.text != null);
+
+    for (let i = optionsArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [optionsArray[i], optionsArray[j]] = [optionsArray[j], optionsArray[i]];
     }
-    if (i + CONCURRENCY < queue.length) await sleep(2000);
+
+    const shuffledChoices = {};
+    const letterMap       = {};
+    let newCorrectLetter  = 'A';
+    optionsArray.forEach((item, index) => {
+      const newLetter = letters[index];
+      shuffledChoices[newLetter] = item.text;
+      letterMap[item.originalLetter] = newLetter;
+      if (item.isCorrect) newCorrectLetter = newLetter;
+    });
+
+    p.choices     = shuffledChoices;
+    p.correct     = newCorrectLetter;
+    p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
+
+    saveMcqToSupabase(p, b.level, { resolvedTopic: pd.resolvedTopic, generationModel }).catch(() => {});
+    delete p.demographic_check;
+
+    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
+
+  } catch (e) {
+    // FIX (Medium): Sanitize outbound error message — log internally, return
+    // a generic string to the client so implementation details stay private.
+    console.error("[MCQ Handler Error]:", e.message, e.stack);
+    const isAIError  = e.message && (e.message.includes("Claude") || e.message.includes("Gemini") || e.message.includes("timed out"));
+    const statusCode = isAIError ? 503 : 500;
+    return {
+      statusCode,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: isAIError
+          ? "Question generation temporarily unavailable. Please try again."
+          : "An unexpected error occurred.",
+        retryAfter: isAIError ? 10 : undefined
+      })
+    };
   }
-
-  if (!silent) console.log("");
-  return results;
-}
-
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
-async function main() {
-  console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.6.1)    ║");
-  console.log("╚══════════════════════════════════════════════════╝");
-  console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
-  console.log(`  Target count: ${TARGET_COUNT}`);
-
-  const queue   = buildWorkQueue(TARGET_COUNT);
-  const startMs = Date.now();
-
-  let records;
-  if (MODE === "batch") records = await runBatchMode(queue);
-  else                  records = await runStandardMode(queue);
-
-  const validRecords = records.filter(Boolean);
-  console.log(`\n💾  Saving ${validRecords.length} valid questions to Supabase...`);
-
-  const { saved, errors } = await saveToSupabase(validRecords);
-
-  const elapsedSec = Math.round((Date.now() - startMs) / 1000);
-  const mins       = Math.floor(elapsedSec / 60);
-  const secs       = elapsedSec % 60;
-
-  console.log("\n╔══════════════════════════════════════════════════╗");
-  console.log("║                    SUMMARY                       ║");
-  console.log("╠══════════════════════════════════════════════════╣");
-  console.log(`║  Generated:   ${String(validRecords.length).padEnd(33)}║`);
-  console.log(`║  Saved to DB: ${String(saved).padEnd(33)}║`);
-  console.log(`║  DB errors:   ${String(errors).padEnd(33)}║`);
-  console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
-  console.log("╚══════════════════════════════════════════════════╝\n");
-}
-
-main().catch(e => {
-  console.error("\n❌  Fatal error:", e.message);
-  process.exit(1);
-});
+};
