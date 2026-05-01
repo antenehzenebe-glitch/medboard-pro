@@ -1,39 +1,26 @@
 // generate-mcq.js — MedBoard Pro
-// v7.6.2 — Strict Timeout Waterfall & CORS Hardening
+// v7.5.4 — Randomization Fix & Serverless Optimization
 // ---------------------------------------------------------------
-// CHANGELOG (v7.6.2):
-// - FIXED: Removed the while loop trap. Execution is now a strict waterfall: 
-//   1 Claude attempt (18s) -> 1 Gemini fallback (7s). Guarantees completion 
-//   before Netlify's 26s hard execution limit.
-// - FIXED: Built dedicated uppercase Enum responseSchema for Gemini to prevent 
-//   400 Bad Request crashes caused by cross-pollinating Anthropic schemas.
-// - ADDED: Explicit CORS headers and OPTIONS preflight handling to prevent 
-//   browser-level "Failed to fetch" blockades.
+// CHANGELOG:
+// - FIXED (v7.5.4): Restored missing NUTRITION_INJECTION_RATE variable to prevent ReferenceError.
+// - FIXED: Dynamic routing ensures no hallucination/repetition on "Random" topics.
+// - OPTIMIZED: Maintained "fire-and-forget" DB save to prevent Netlify 504 Timeouts.
 
 const crypto = require("crypto");
 
-const ANTHROPIC_API_KEY    = process.env.ANTHROPIC_API_KEY;
-const GEMINI_API_KEY       = process.env.GEMINI_API_KEY;
-const SUPABASE_URL         = process.env.SUPABASE_URL      || "https://vhzeeskhvkujihuvddcc.supabase.co";
-const SUPABASE_ANON_KEY    = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
+
+const SUPABASE_URL      = process.env.SUPABASE_URL      || "https://vhzeeskhvkujihuvddcc.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoemVlc2todmt1amlodXZkZGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTQ1MzIsImV4cCI6MjA5MDM5MDUzMn0.xfStX1rfwDc4LpuC--krAEuEFq2RHNac58OIbOm__d0";
 
 const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 1","USMLE Step 2 CK","USMLE Step 3"];
 
 // ============================================================
-// TIMEOUT WRAPPER
-// ============================================================
-function withTimeout(promise, ms) {
-  const timer = new Promise((_, rej) =>
-    setTimeout(() => rej(new Error(`Request timed out after ${ms}ms`)), ms)
-  );
-  return Promise.race([promise, timer]);
-}
-
-// ============================================================
-// TOPIC GUARDRAIL MAP
+// TOPIC GUARDRAIL MAP (Layer 1 + Layer 2 per topic)
 // ============================================================
 const TOPIC_GUARDRAILS = [
+  // ─── ENDOCRINOLOGY: DIABETES CLUSTER ──────────────────────────────────────
   {
     keywords: ["dka", "hhs", "diabetic ketoacidosis", "hyperglycemic hyperosmolar"],
     l1: `DKA/HHS FOUNDATIONAL ANCHORS (ADA 2026):
@@ -150,6 +137,8 @@ REQUIRED Tier 3+ angles:
 - Sensor accuracy concerns in DKA or post-operative settings
 - Choosing CGM vs flash glucose monitoring by clinical scenario`
   },
+
+  // ─── ENDOCRINOLOGY: THYROID CLUSTER ───────────────────────────────────────
   {
     keywords: ["hypothyroidism", "hashimoto", "levothyroxine", "central hypothyroidism", "myxedema"],
     l1: `HYPOTHYROIDISM FOUNDATIONAL ANCHORS:
@@ -238,6 +227,8 @@ REQUIRED Tier 3+ angles:
 - Thionamide-induced hepatotoxicity management mid-storm
 - Storm precipitated by iodinated contrast in known Graves`
   },
+
+  // ─── ENDOCRINOLOGY: ADRENAL CLUSTER ───────────────────────────────────────
   {
     keywords: ["cushing", "hypercortisolism", "ectopic acth", "bipss", "petrosal sinus"],
     l1: `CUSHING'S FOUNDATIONAL ANCHORS:
@@ -308,10 +299,12 @@ REQUIRED Tier 3+ angles:
 - Mineralocorticoid replacement adjustment with hot weather/exercise
 - Distinguishing primary vs secondary AI in newly diagnosed patient`
   },
+
+  // ─── ENDOCRINOLOGY: PITUITARY CLUSTER ─────────────────────────────────────
   {
     keywords: ["prolactinoma", "hyperprolactinemia", "cabergoline", "bromocriptine", "macroprolactin", "stalk effect"],
     l1: `PROLACTINOMA FOUNDATIONAL ANCHORS:
-- Cabergoline first-line.
+- Cabergoline first-line (better tolerability and efficacy than bromocriptine; bromocriptine preferred in pregnancy planning due to longer safety record).
 - Stalk effect from non-prolactinoma compressing stalk: prolactin elevated but typically <100 ng/mL.
 - Hook effect at very high prolactin (>1000): assay underestimates — must dilute sample.
 - Macroprolactin: inactive complex causing lab elevation without clinical disease.
@@ -375,6 +368,8 @@ REQUIRED Tier 3+ angles:
 - Gestational DI management and postpartum resolution
 - Adipsic central DI (osmoreceptor dysfunction) management challenges`
   },
+
+  // ─── ENDOCRINOLOGY: BONE & CALCIUM CLUSTER ────────────────────────────────
   {
     keywords: ["hyperparathyroidism", "primary hyperparathyroidism", "parathyroidectomy", "fhh", "familial hypocalciuric"],
     l1: `HYPERPARATHYROIDISM FOUNDATIONAL ANCHORS:
@@ -427,6 +422,8 @@ REQUIRED Tier 3+ angles:
 - Treatment in CKD G4-G5 (denosumab vs reduced-dose bisphosphonate)
 - Romosozumab eligibility decision in patient with prior MI`
   },
+
+  // ─── ENDOCRINOLOGY: REPRODUCTIVE CLUSTER ──────────────────────────────────
   {
     keywords: ["pcos", "polycystic ovary"],
     l1: `PCOS FOUNDATIONAL ANCHORS (2023 International Guideline):
@@ -463,6 +460,8 @@ REQUIRED Tier 3+ angles:
 - Klinefelter management beyond testosterone (cardiometabolic, fertility counseling)
 - Distinguishing primary vs secondary hypogonadism workup`
   },
+
+  // ─── ENDOCRINOLOGY: MEN & NET CLUSTER ─────────────────────────────────────
   {
     keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer"],
     l1: `MEN1 FOUNDATIONAL ANCHORS:
@@ -495,6 +494,8 @@ REQUIRED Tier 3+ angles:
 - Family genetic counseling cascade and pediatric screening
 - Selpercatinib in RET-mutant advanced MTC`
   },
+
+  // ─── INTERNAL MEDICINE CLUSTER (high-error topics) ────────────────────────
   {
     keywords: ["acs", "stemi", "nstemi", "acute coronary", "myocardial infarction"],
     l1: `ACS FOUNDATIONAL ANCHORS (ACC/AHA 2025):
@@ -865,7 +866,9 @@ CRITICAL BONE/PTH ANCHORS:
    - Sequential therapy: anabolic first, then antiresorptive to maintain gains.
 
 7. DRUG-INDUCED OSTEOPOROSIS:
-   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.` },
+   - Glucocorticoids: prednisone ≥5 mg/day ≥3 months → consider treatment.
+   - Aromatase inhibitors, GnRH agonists, AR-blockers: monitor BMD.
+   - Long-term PPI: ?modest fracture risk; not a contraindication.` },
   { keywords: ["menopause", "hrt", "hormone therapy", "vasomotor", "estrogen replacement", "reproductive"], citation: `Endocrine Society 2022 Menopause Guideline; NAMS 2022 Hormone Therapy Position Statement.
 
 CRITICAL MENOPAUSE ANCHORS:
@@ -880,38 +883,34 @@ CRITICAL MENOPAUSE ANCHORS:
 CRITICAL PITUITARY ANCHORS:
 
 1. PROLACTINOMA:
-   - Cabergoline first-line (better tolerability and efficacy than bromocriptine).
-   - Bromocriptine preferred during planned pregnancy (longer safety record).
-   - Stalk effect from non-prolactinoma (compressing stalk): prolactin elevated typically <100 ng/mL.
+   - Cabergoline first-line.
+   - Bromocriptine preferred during planned pregnancy.
+   - Stalk effect (non-prolactinoma compressing stalk): prolactin typically <100 ng/mL.
    - Hook effect at very high prolactin (>1000): assay underestimates — must dilute.
-   - Macroprolactin: inactive complex causing lab elevation without disease.
 
 2. ACROMEGALY:
    - GH nadir <1 ng/mL on 75g OGTT (or <0.4 with ultrasensitive assay).
    - IGF-1 used for diagnosis and monitoring.
    - Transsphenoidal surgery first-line.
-   - Somatostatin analogs (octreotide, lanreotide) for residual disease.
    - Pegvisomant (GH receptor antagonist): IGF-1 monitoring only — interferes with GH assay.
-   - Pasireotide: somatostatin-resistant cases.
 
 3. HYPOPITUITARISM:
-   - REPLACE CORTISOL BEFORE THYROID HORMONE (avoid precipitating adrenal crisis).
-   - Sheehan syndrome: postpartum pituitary infarction following severe hemorrhage.
+   - REPLACE CORTISOL BEFORE THYROID HORMONE.
+   - Sheehan syndrome: postpartum pituitary infarction.
    - Pituitary apoplexy: acute headache + visual change + hypopituitarism = neurosurgical emergency. Stress-dose steroids FIRST.
 
-4. AVP-D (CENTRAL DI) vs AVP-R (NEPHROGENIC DI):
+4. AVP-D vs AVP-R:
    - Hypertonic saline-stimulated copeptin >6.4 pmol/L confirms AVP-R.
    - Hypertonic saline-stimulated copeptin <4.9 pmol/L confirms AVP-D.
-   - This has largely replaced classic water deprivation test in many centers.
-   - Desmopressin response distinguishes (central responds; nephrogenic does not).
+   - Largely replaced classic water deprivation test.
    - Lithium → nephrogenic DI; gestational DI → placental vasopressinase.
 
-5. POST-PITUITARY-SURGERY TRIPHASIC RESPONSE: DI → SIADH → permanent DI. Recognize and manage each phase.
+5. POST-PITUITARY-SURGERY TRIPHASIC: DI → SIADH → permanent DI.
 
 6. SIADH:
    - Euvolemic hyponatremia + concentrated urine + low serum osmolality.
-   - Treatment: fluid restriction first. Tolvaptan or demeclocycline second-line. Hypertonic saline only for severe symptoms.
-   - Correction limits: <8 mEq/L per 24h to prevent osmotic demyelination.` },
+   - Fluid restriction first. Tolvaptan or demeclocycline second-line.
+   - Correction <8 mEq/L per 24h to prevent osmotic demyelination.` },
   { keywords: ["sepsis", "septic shock", "infectious", "antibiotic", "bacteremia", "pneumonia", "pyelonephritis", "meningitis", "endocarditis", "esbl", "carbapenem", "vasopressor", "norepinephrine", "vasopressin", "hydrocortisone", "source control", "lactate", "procalcitonin"], citation: `Surviving Sepsis Campaign (SSC) 2021 International Guidelines; IDSA 2024 Antibiotic Stewardship Guidelines.
 
 CRITICAL SEPSIS/ID ANCHORS:
@@ -980,7 +979,7 @@ CRITICAL ADRENAL ANCHORS:
    - Plasma free metanephrines OR 24h urine fractionated metanephrines first-line.
    - ALPHA BLOCKADE (phenoxybenzamine or doxazosin) MUST PRECEDE BETA BLOCKADE by 10-14 days.
    - Starting beta-blocker first → unopposed alpha → hypertensive crisis. Never do this.
-   - Volume expansion preoperatively.
+   - Volume expansion preoperatively (high-salt diet, sometimes IV fluids).
    - Genetic testing in ALL patients: MEN2 (RET), VHL, SDH-related, NF1.
 
 5. ADRENAL INSUFFICIENCY:
@@ -1003,12 +1002,134 @@ function getGuidelineContext(topic, isNutrition) {
   return match ? match.citation : "the most recent applicable society guidelines (do not fabricate publication years)";
 }
 
+// ============================================================
+// NUTRITION & TOPIC DISTRIBUTIONS
+// ============================================================
+const NUTRITION_INJECTION_RATE = 0.12;
+
+const NUTRITION_BY_LEVEL = {
+  "USMLE Step 1": ["Vitamin D deficiency — rickets vs. osteomalacia", "Thiamine (B1) deficiency — Wernicke encephalopathy", "Vitamin B12 deficiency", "Refeeding syndrome pathophysiology", "Starvation biochemistry"],
+  "USMLE Step 2 CK": ["Enteral vs parenteral nutrition indications", "Refeeding syndrome recognition", "Obesity pharmacotherapy", "Bariatric surgery outcomes", "Celiac disease management", "DASH/Mediterranean diet evidence"],
+  "USMLE Step 3": ["Chronic disease nutrition management", "Food insecurity screening", "ICU nutrition — ASPEN/ESPEN 2023", "Post-bariatric monitoring"],
+  "ABIM Internal Medicine": ["Refeeding syndrome protocol", "TPN complications — IFALD", "Nutritional management of CKD/Cirrhosis", "Malabsorption workup", "Mediterranean diet PREDIMED evidence"],
+  "ABIM Endocrinology": ["Medical nutrition therapy for T1DM/T2DM (ADA 2026)", "Nutritional causes of secondary osteoporosis", "Post-bariatric micronutrient protocol", "Ketogenic diet mechanisms", "Selenium/Zinc deficiency"]
+};
+
+const TOPIC_DISTRIBUTION = {
+  "ABIM Endocrinology": [
+    { topic: "Type 2 Diagnosis and Management",  weight: 8 },
+    { topic: "Type 1 Insulin Therapy",           weight: 6 },
+    { topic: "DKA and HHS",                      weight: 5 },
+    { topic: "Hypoglycemia",                     weight: 5 },
+    { topic: "GLP-1 Receptor Agonists",          weight: 5 },
+    { topic: "SGLT2 Inhibitors",                 weight: 4 },
+    { topic: "CGM and AID Systems",              weight: 3 },
+    { topic: "Hypothyroidism and Hashimotos",    weight: 5 },
+    { topic: "Hyperthyroidism and Graves",       weight: 5 },
+    { topic: "Thyroid Nodule Evaluation",        weight: 4 },
+    { topic: "Thyroid Cancer",                   weight: 3 },
+    { topic: "Thyroid Storm",                    weight: 3 },
+    { topic: "Cushing Syndrome",                 weight: 5 },
+    { topic: "Primary Aldosteronism",            weight: 4 },
+    { topic: "Pheochromocytoma",                 weight: 3 },
+    { topic: "Adrenal Insufficiency",            weight: 4 },
+    { topic: "Prolactinoma",                     weight: 4 },
+    { topic: "Acromegaly",                       weight: 3 },
+    { topic: "Hypopituitarism",                  weight: 3 },
+    { topic: "Diabetes Insipidus",               weight: 3 },
+    { topic: "Hyperparathyroidism",              weight: 4 },
+    { topic: "Hypercalcemia",                    weight: 3 },
+    { topic: "Osteoporosis",                     weight: 4 },
+    { topic: "PCOS",                             weight: 4 },
+    { topic: "Male Hypogonadism",                weight: 3 },
+    { topic: "MEN1",                             weight: 2 },
+    { topic: "MEN2A and MEN2B",                  weight: 2 },
+    { topic: "Insulinoma",                       weight: 2 },
+  ],
+  "ABIM Internal Medicine": [
+    { topic: "ACS STEMI NSTEMI",                 weight: 7 },
+    { topic: "Heart Failure",                    weight: 6 },
+    { topic: "Atrial Fibrillation",              weight: 6 },
+    { topic: "Hypertension",                     weight: 5 },
+    { topic: "Lipid Disorders",                  weight: 4 },
+    { topic: "Asthma and COPD",                  weight: 5 },
+    { topic: "Pneumonia",                        weight: 4 },
+    { topic: "Pulmonary Embolism",               weight: 5 },
+    { topic: "Acute Kidney Injury",              weight: 5 },
+    { topic: "CKD",                              weight: 4 },
+    { topic: "Electrolyte Disorders",            weight: 5 },
+    { topic: "Acid-Base Disorders",              weight: 4 },
+    { topic: "IBD Crohns and UC",                weight: 4 },
+    { topic: "Cirrhosis",                        weight: 4 },
+    { topic: "Sepsis and Septic Shock",          weight: 5 },
+    { topic: "HIV",                              weight: 3 },
+    { topic: "Anemia",                           weight: 4 },
+    { topic: "DVT and Anticoagulation",          weight: 4 },
+    { topic: "Rheumatoid Arthritis",             weight: 3 },
+    { topic: "SLE",                              weight: 3 },
+    { topic: "Type 2 Diagnosis and Management",  weight: 4 },
+    { topic: "Hypothyroidism and Hashimotos",    weight: 3 },
+    { topic: "Informed Consent",                 weight: 2 },
+    { topic: "End-of-Life Care",                 weight: 2 },
+  ],
+  "USMLE Step 1": [
+    { topic: "Systemic Pathology and Pathophysiology",              weight: 10 },
+    { topic: "Pharmacology, Pharmacokinetics, and Adverse Effects", weight: 8 },
+    { topic: "Physiology and Clinical Biochemistry",                weight: 8 },
+    { topic: "Microbiology, Virology, and Immunology",              weight: 7 },
+    { topic: "Anatomy, Neuroanatomy, and Embryology",               weight: 4 },
+    { topic: "Behavioral Science, Medical Ethics, and Biostatistics", weight: 5 },
+    { topic: "Vitamin D deficiency — rickets vs. osteomalacia",     weight: 3 },
+    { topic: "Thiamine (B1) deficiency — Wernicke encephalopathy",  weight: 3 },
+  ],
+  "USMLE Step 2 CK": [
+    { topic: "ACS STEMI NSTEMI",                                    weight: 6 },
+    { topic: "Heart Failure",                                       weight: 5 },
+    { topic: "Pneumonia",                                           weight: 5 },
+    { topic: "Sepsis and Septic Shock",                             weight: 5 },
+    { topic: "Acute Kidney Injury",                                 weight: 5 },
+    { topic: "Type 2 Diagnosis and Management",                     weight: 5 },
+    { topic: "Gestational Diabetes",                                weight: 4 },
+    { topic: "Obstetrics and Gynecology",                           weight: 5 },
+    { topic: "Pediatrics and Congenital Issues",                    weight: 5 },
+    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 5 },
+    { topic: "Psychiatry and Substance Abuse",                      weight: 4 },
+    { topic: "General Surgery and Trauma Management",               weight: 5 },
+  ],
+  "USMLE Step 3": [
+    { topic: "ACS STEMI NSTEMI",                                    weight: 5 },
+    { topic: "Sepsis and Septic Shock",                             weight: 5 },
+    { topic: "Pulmonary Embolism",                                  weight: 4 },
+    { topic: "CKD",                                                 weight: 4 },
+    { topic: "Type 2 Diagnosis and Management",                     weight: 4 },
+    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 6 },
+    { topic: "Psychiatry and Substance Abuse",                      weight: 4 },
+    { topic: "Obstetrics and Gynecology",                           weight: 4 },
+    { topic: "ICU nutrition — ASPEN/ESPEN 2023",                    weight: 3 },
+    { topic: "Chronic disease nutrition management",                weight: 3 },
+  ]
+};
+
+function pickTopicForLevel(level, rawTopic) {
+  const nutritionTopics = NUTRITION_BY_LEVEL[level];
+  if (nutritionTopics && rawTopic.includes("Random") && Math.random() < NUTRITION_INJECTION_RATE) {
+    const idx = Math.floor(Math.random() * nutritionTopics.length);
+    return { topic: nutritionTopics[idx], isNutrition: true };
+  }
+  return { topic: rawTopic, isNutrition: false };
+}
+
+const MALE_ONLY_TOPIC_KEYWORDS   = ["male hypogonadism", "prostate", "bph", "erectile dysfunction", "testicular"];
+const FEMALE_ONLY_TOPIC_KEYWORDS = ["pcos", "polycystic ovary", "menopause", "ovarian", "endometri", "pregnancy", "obstetric", "gynecolog", "turner syndrome"];
+
 function pickSexForTopic(promptTopic) {
   const t = promptTopic.toLowerCase();
   if (MALE_ONLY_TOPIC_KEYWORDS.some(k => t.includes(k)))   return "man";
   if (FEMALE_ONLY_TOPIC_KEYWORDS.some(k => t.includes(k))) return "woman";
   return Math.random() > 0.5 ? "man" : "woman";
 }
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function pickWeighted(blueprint) {
   const total = blueprint.reduce((acc, curr) => acc + curr.w, 0);
@@ -1040,16 +1161,45 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
   if (t.includes("obstet") || t.includes("gynec") || t.includes("gestational")) return "OB/GYN";
   if (t.includes("surg") || t.includes("trauma")) return "Surgery";
   if (t.includes("pharmac")) return "Pharmacology";
-  if (t.includes("patholog")) return "Pathology";
-  if (t.includes("microbiol") || t.includes("virol") || t.includes("immunolog")) return "Microbiology/Immunology";
-  if (t.includes("anatom") || t.includes("embryol")) return "Anatomy";
-  if (t.includes("physiolog") || t.includes("biochem")) return "Physiology/Biochemistry";
-  if (t.includes("behav") || t.includes("biostat")) return "Behavioral/Biostatistics";
-  if (t.includes("nutrition")) return "Nutrition";
+  if (t.includes("nutrition") || t.includes("vitamin") || t.includes("thiamine") || t.includes("refeeding")) return "Nutrition";
   return "General Internal Medicine";
 }
 
-// ─── VALIDATORS ───────────────────────────────────────────────────────────────
+// ============================================================
+// MCQ TOOL SCHEMA
+// ============================================================
+const MCQ_TOOL = {
+  name: "emit_mcq",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
+  input_schema: {
+    type: "object",
+    properties: {
+      demographic_check: { type: "string" },
+      stem: { type: "string", description: "The clinical vignette. Must end with the interrogative sentence." },
+      choices: {
+        type: "object",
+        properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
+        required: ["A", "B", "C", "D", "E"]
+      },
+      correct: { type: "string", enum: ["A", "B", "C", "D", "E"] },
+      explanation: { type: "string", description: "Use provided formatting rules for the explanation." }
+    },
+    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
+  }
+};
+
+function extractJSONSimple(raw) {
+  if (!raw || typeof raw !== "string") throw new Error("extractJSONSimple received empty input.");
+  try { return JSON.parse(raw); } catch (_) {}
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found.");
+  let candidate = match[0].replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'").replace(/\u2013/g, "-").replace(/\u2014/g, "-").replace(/\u00A0/g, " ").replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(candidate); } catch (e) { throw new Error(`Gemini JSON malformed: ${e.message}`); }
+}
+
+// ============================================================
+// VALIDATORS
+// ============================================================
 function validateDemographics(stem, sex, topic) {
   const lowerText  = stem.toLowerCase();
   const lowerTopic = (topic || "").toLowerCase();
@@ -1134,6 +1284,71 @@ function validateChoiceCompleteness(p) {
   return true;
 }
 
+// ============================================================
+// CLAUDE & GEMINI CLIENTS
+// ============================================================
+async function callClaude(systemText, userText, maxTokens) {
+  const maxRetries  = 1; 
+  const entropySeed = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
+  const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) await sleep(1000);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6", 
+        max_tokens: maxTokens,
+        temperature: 0.6,
+        system: systemText,
+        tools: [MCQ_TOOL],
+        tool_choice: { type: "tool", name: "emit_mcq" },
+        messages: [{ role: "user", content: finalUserText }]
+      })
+    });
+    if (!response.ok) throw new Error(`Claude HTTP Error: ${response.status}`);
+    const data = await response.json();
+    const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
+    if (!toolUseBlock || !toolUseBlock.input) throw new Error("Claude response missing expected tool_use block.");
+    return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
+  }
+}
+
+async function callGemini(systemText, userText, maxTokens) {
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemText }] },
+        contents: [{ role: "user", parts: [{ text: userText }] }],
+        safetySettings: [
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
+        ],
+        generationConfig: { 
+          responseMimeType: "application/json", 
+          responseSchema: MCQ_TOOL.input_schema,
+          temperature: 0.6, 
+          maxOutputTokens: maxTokens 
+        }
+      })
+    }
+  );
+  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini returned empty response.");
+  return { parsed: extractJSONSimple(text), model: "gemini-2.0-flash" };
+}
+
+// ============================================================
+// SHUFFLE & DB SAVER
+// ============================================================
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
   let out = explanation;
@@ -1155,44 +1370,50 @@ function rewriteExplanationLetters(explanation, letterMap) {
       else if (wrap === 3) out = out.replace(re, (match, p1, p2) => `${p1}${placeholder}${p2}`);
     });
   });
-  Object.keys(placeholders).forEach(p => { out = out.split(p).join(placeholders[p]); });
+  Object.keys(placeholders).forEach(placeholder => { out = out.split(placeholder).join(placeholders[placeholder]); });
   return out;
 }
 
-// ─── MCQ TOOL SCHEMA ──────────────────────────────────────────────────────────
-const MCQ_TOOL = {
-  name: "emit_mcq",
-  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
-  input_schema: {
-    type: "object",
-    properties: {
-      demographic_check: { type: "string" },
-      stem:              { type: "string" },
-      choices: {
-        type: "object",
-        properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
-        required: ["A", "B", "C", "D", "E"]
-      },
-      correct:      { type: "string", enum: ["A","B","C","D","E"] },
-      explanation:  { type: "string" }
-    },
-    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
-  }
-};
+async function saveMcqToSupabase(p, level, meta) {
+  try {
+    const payload = {
+      exam_level: level, topic: p.topic, stem: p.stem, choices: p.choices, correct_answer: p.correct,
+      explanation: p.explanation, specialty_group: deriveSpecialtyGroup(level, meta && meta.resolvedTopic),
+      blueprint_tag: meta && meta.resolvedTopic ? meta.resolvedTopic : p.topic,
+      generation_model: meta && meta.generationModel ? meta.generationModel : null,
+      content_hash: hashStem(p.stem),
+    };
+    await fetch(SUPABASE_URL + "/rest/v1/mcqs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Prefer": "return=minimal" },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) { console.error("DB Save Exception:", e.message); }
+}
 
-// ─── PROMPT BUILDER ───────────────────────────────────────────────────────────
-function buildPrompt(level, topic) {
-  const isNutrition = NUTRITION_BY_LEVEL[level]?.includes(topic) ?? false;
+// ============================================================
+// PROMPT BUILDER
+// ============================================================
+function buildPrompt(level, topic, isNutrition) {
+  let promptTopic = topic;
+  
+  if (topic.includes("Random")) {
+    // Safe fallback to route specific topic requests if frontend syntax is unique
+    let distLevel = level;
+    if (topic === "Random -- Endocrinology Only") distLevel = "ABIM Endocrinology";
+    
+    const dist = TOPIC_DISTRIBUTION[distLevel] || TOPIC_DISTRIBUTION["ABIM Internal Medicine"];
+    const mappedBlueprint = dist.map(t => ({ s: t.topic, w: t.weight }));
+    promptTopic = pickWeighted(mappedBlueprint);
+  }
 
   const isABIM_Endo = level === "ABIM Endocrinology";
   const isStep3     = level === "USMLE Step 3";
   const isABIM_IM   = level === "ABIM Internal Medicine";
   const isStep1     = level === "USMLE Step 1";
 
-  const maxTokens   = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
-
   let qTypePool = [];
-  if (topic.includes("Ethics") || topic.includes("Behavioral") || topic.includes("HIPAA") || topic.includes("end-of-life") || topic.includes("consent")) {
+  if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
   } else if (isStep1) {
     qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
@@ -1222,10 +1443,12 @@ function buildPrompt(level, topic) {
     qTypePool = [{s:"NEXT STEP IN DIAGNOSIS",w:25}, {s:"MOST LIKELY DIAGNOSIS",w:25}, {s:"NEXT STEP IN MANAGEMENT",w:40}, {s:"STRONGEST RISK FACTOR",w:10}];
   }
   const promptQType = pickWeighted(qTypePool);
-  const randomSex   = pickSexForTopic(topic);
+  const randomSex   = pickSexForTopic(promptTopic);
 
-  const isUSMLE     = level.includes("USMLE");
-  const systemRole  = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
+  const isUSMLE   = level.includes("USMLE");
+  const maxTokens = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
+
+  const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
 
   const VIGNETTE_STYLE_GUIDE = isStep1 ? "" : `
 STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
@@ -1235,31 +1458,31 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 4. DO NOT interpret labs. State the raw value.
 5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem.`;
 
-  const levelRules  = isStep1
-    ? "USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1."
+  let levelRules = isStep1
+    ? `USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1.`
     : isABIM_IM
-    ? "ABIM IM RULES: Generalist level. Internist synthesis for complex comorbidities."
-    : "ABIM ENDOCRINOLOGY RULES: Full subspecialty level.";
+    ? `ABIM IM RULES: Generalist level. Internist synthesis for complex comorbidities.`
+    : `ABIM ENDOCRINOLOGY RULES: Full subspecialty level.`;
 
   const integrityRules = `INTEGRITY RULES:
 A. Evidence discipline: cite only data explicitly in stem.
 B. "glucose" never "sugar".
 C. VLDL/LDL: You MUST accurately distinguish between VLDL and LDL.
-D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis.
-E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS):
+D. COMPETITIVE DISTRACTORS (TIER 3 REQUIREMENT): Every wrong choice MUST be a highly plausible action or mechanism for a related, competing diagnosis. 
+E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS): 
    - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE.
    - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc.
 F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.
 G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. Re-read your stem before calling emit_mcq.`;
 
-  const guardrails = getTopicGuardrails(level, topic);
+  const guardrails = getTopicGuardrails(level, promptTopic);
 
   const explanationNote = `EXPLANATION FORMAT — use these exact headers:
 🩺 Why this is the correct answer: [Explain clinical reasoning without naming the choice letter. Cite the most recent officially published guideline (do not fabricate dates if older)].
 🚫 Why the other choices fail: [Explain the 4 INCORRECT choices only, starting exactly with "Choice X:". DO NOT include the correct choice in this section].
 💎 Board Pearl: [one high-yield fact].`;
 
-  const topicGuideline = getGuidelineContext(topic, isNutrition);
+  const topicGuideline = getGuidelineContext(promptTopic, isNutrition);
 
   const systemText = `You are ${systemRole}. Output confident, accurate facts.
 ${levelRules}
@@ -1277,35 +1500,39 @@ RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
   const step3TierPrompt = isStep3 ? `
 USMLE STEP 3 TIER 3-5 REQUIREMENTS:
 - FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Must present management decision, disposition, or intervention.` : "";
+- Must present management decision, disposition, or intervention.
+- Build in realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
+- Distractors must include the Tier 1/2 answer (what a MS3 would choose).` : "";
 
   const abimIMTierPrompt = isABIM_IM ? `
 ABIM INTERNAL MEDICINE TIER 3-4 REQUIREMENTS:
 - FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.` : "";
+- Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.
+- Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
 
   const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
 - FORBIDDEN: "What is the most likely diagnosis?". Question must test subspecialty management, complex diagnostic workup, or therapy modification.
-- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.` : "";
+- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
+- Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
   const selfVerification = `
 MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
-1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic?
+1. SCENARIO PLAUSIBILITY: Is the patient age, sex, and diagnosis combination clinically realistic? (e.g., eGFR 28 in a 34yo requires explicit etiology)
 2. CORRECT ANSWER DEFENSIBILITY: Does your correct answer remain correct against current guidelines if a subspecialist challenges it?
-3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile?
+3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile? If yes, reconsider — distractors must be wrong for a specific, statable reason.
 4. NUMERIC CONSISTENCY: Do all lab values in the explanation EXACTLY match the stem?
 5. CITATION ACCURACY: Did you cite a real trial with real data? Do not fabricate co-authoring organizations or joint guidelines.`;
 
   const userText = isStep1
-  ? `Write 1 vignette on: ${topic}.
+  ? `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
-- Patient Demographics & Setting: Patient is a ${randomSex}.
+- Patient Demographics & Setting: Patient is a ${randomSex}. 
 - Pertinent Negatives: Include a pertinent negative ONLY if it helps rule out a competing answer choice. Do NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, etc.) unless directly relevant to the diagnosis.
 - The stem MUST end with the interrogative sentence.
 ${selfVerification}
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
-  : `Construct a Tier 3 Board-style puzzle on: ${topic}.
+  : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
 - Lead-in asks for: ${promptQType}.
 - Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
 - Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing answer choice. DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
@@ -1317,127 +1544,18 @@ ${step3TierPrompt}${abimIMTierPrompt}${endoTier3Prompt}
 ${selfVerification}
 Execute the generation using the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`;
 
-  return { systemText, userText, randomSex, maxTokens, topic };
+  return { systemText, userText, randomSex, maxTokens, resolvedTopic: promptTopic };
 }
 
-// ─── CLAUDE & GEMINI CLIENTS ──────────────────────────────────────────────────
-async function callClaude(systemText, userText, maxTokens) {
-  const entropySeed   = Date.now().toString() + "-" + Math.floor(Math.random() * 1000000);
-  const finalUserText = userText + "\n\n[Seed: " + entropySeed + "]";
-
-  const response = await withTimeout(
-    fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: maxTokens,
-        temperature: 0.6,
-        system: systemText,
-        tools: [MCQ_TOOL],
-        tool_choice: { type: "tool", name: "emit_mcq" },
-        messages: [{ role: "user", content: finalUserText }]
-      })
-    }),
-    18000 // 18s
-  );
-
-  if (!response.ok) throw new Error(`Claude HTTP ${response.status}`);
-  const data = await response.json();
-  const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
-  if (!toolUseBlock || !toolUseBlock.input) throw new Error("Claude response missing expected tool_use block.");
-  return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
-}
-
-function extractJSONSimple(raw) {
-  if (!raw || typeof raw !== "string") throw new Error("extractJSONSimple received empty input.");
-  try { return JSON.parse(raw); } catch (_) {}
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON object found.");
-  let candidate = match[0].replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'").replace(/\u2013/g, "-").replace(/\u2014/g, "-").replace(/\u00A0/g, " ").replace(/,(\s*[}\]])/g, "$1");
-  try { return JSON.parse(candidate); } catch (e) { throw new Error(`Gemini JSON malformed: ${e.message}`); }
-}
-
-async function callGemini(systemText, userText, maxTokens) {
-  const response = await withTimeout(
-    fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemText }] },
-          contents: [{ role: "user", parts: [{ text: userText }] }],
-          safetySettings: [
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                demographic_check: { type: "STRING" },
-                stem: { type: "STRING" },
-                choices: {
-                  type: "OBJECT",
-                  properties: {
-                    A: { type: "STRING" },
-                    B: { type: "STRING" },
-                    C: { type: "STRING" },
-                    D: { type: "STRING" },
-                    E: { type: "STRING" }
-                  },
-                  required: ["A", "B", "C", "D", "E"]
-                },
-                correct: { type: "STRING" },
-                explanation: { type: "STRING" }
-              },
-              required: ["demographic_check", "stem", "choices", "correct", "explanation"]
-            },
-            temperature: 0.6,
-            maxOutputTokens: maxTokens
-          }
-        })
-      }
-    ),
-    7000 // 7s
-  );
-
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini returned empty response.");
-  return { parsed: extractJSONSimple(text), model: "gemini-2.0-flash" };
-}
-
-// ─── NETLIFY HANDLER ──────────────────────────────────────────────────────────
+// ============================================================
+// NETLIFY HANDLER
+// ============================================================
 exports.handler = async function (event) {
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json"
-  };
-
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 200, headers, body: "" };
-  }
-
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: "Method Not Allowed" }) };
-  }
-
+  if (event.httpMethod !== "POST") return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   try {
     const b = JSON.parse(event.body);
-    if (b.warmup) return { statusCode: 200, headers, body: "{}" };
-    if (!b.level || !b.topic) return { statusCode: 400, headers, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
+    if (b.warmup) return { statusCode: 200, body: "{}" };
+    if (!b.level || !b.topic) return { statusCode: 400, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
 
     const topicResult   = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
@@ -1448,45 +1566,32 @@ exports.handler = async function (event) {
     let p;
     let generationModel = null;
     let isValid = false;
+    let attempts = 0;
 
-    // 1. PRIMARY: Claude (18s limit)
-    try {
-      const claudeResult = await callClaude(pd.systemText, pd.userText, pd.maxTokens);
-      if (claudeResult && claudeResult.parsed) {
-        p = claudeResult.parsed;
-        generationModel = claudeResult.model;
-        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) 
-               && validateConsistency(p) 
-               && validateChoiceCompleteness(p);
-      }
-    } catch (e) {
-      console.warn(`[MCQ] Claude primary failed: ${e.message}`);
-    }
+    while (!isValid && attempts < 3) {
+      attempts++;
+      let callResult;
+      try { callResult = await callClaude(pd.systemText, pd.userText, pd.maxTokens); }
+      catch (e) { throw new Error(`AI Network Failure: ${e.message}`); }
 
-    // 2. FALLBACK: Gemini (7s limit)
-    if (!isValid) {
-      console.log(`[MCQ] Pivoting to Gemini fallback...`);
-      try {
-        const geminiResult = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
-        if (geminiResult && geminiResult.parsed) {
-          p = geminiResult.parsed;
-          generationModel = geminiResult.model;
-          isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) 
-                 && validateConsistency(p) 
-                 && validateChoiceCompleteness(p);
-        }
-      } catch (e) {
-        console.error(`[MCQ] Gemini fallback failed: ${e.message}`);
+      p = callResult?.parsed;
+      generationModel = callResult?.model;
+      if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) continue;
+
+      const demoOk        = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic);
+      const consistencyOk = validateConsistency(p);
+      const choicesOk     = validateChoiceCompleteness(p);
+      isValid = demoOk && consistencyOk && choicesOk;
+
+      if (!isValid && attempts === 3) {
+        const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
+        p               = fbResult.parsed;
+        generationModel = fbResult.model;
+        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) && validateConsistency(p) && validateChoiceCompleteness(p);
       }
     }
 
-    if (!isValid) {
-      return {
-        statusCode: 503,
-        headers,
-        body: JSON.stringify({ error: "QBank is currently experiencing high load. Please retry." })
-      };
-    }
+    if (!isValid) throw new Error("Failed to generate a valid MCQ after maximum retries.");
 
     p.topic = pd.resolvedTopic;
     const letters      = ['A', 'B', 'C', 'D', 'E'];
@@ -1512,17 +1617,14 @@ exports.handler = async function (event) {
     p.correct     = newCorrectLetter;
     p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
 
+    // Kept as a fire-and-forget promise to prevent 502/504 Netlify execution timeouts
     saveMcqToSupabase(p, b.level, { resolvedTopic: pd.resolvedTopic, generationModel }).catch(() => {});
+    
     delete p.demographic_check;
 
-    return { statusCode: 200, headers, body: JSON.stringify([p]) };
-
+    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify([p]) };
   } catch (e) {
-    console.error("[MCQ Handler Error]:", e.message, e.stack);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: "An unexpected error occurred." })
-    };
+    console.error("Handler Error:", e.message);
+    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
   }
 };
