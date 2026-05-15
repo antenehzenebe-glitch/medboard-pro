@@ -165,20 +165,30 @@ REQUIRED Tier 3+ angles (pick one):
   },
   {
     keywords: ["hypoglycemia", "insulinoma", "whipple"],
-    l1: `HYPOGLYCEMIA FOUNDATIONAL ANCHORS:
-- Whipple triad required: symptoms, plasma glucose <55, relief with glucose.
-- Endogenous hyperinsulinism: glucose <55 + insulin ≥3 + C-peptide ≥0.6 + proinsulin ≥5 + β-OHB ≤2.7 + sulfonylurea screen negative.
-- Insulinoma: insulin ↑, C-peptide ↑.
-- Factitious from exogenous insulin: insulin ↑, C-peptide LOW/SUPPRESSED.
-- Sulfonylurea ingestion: insulin ↑, C-peptide ↑, sulfonylurea screen POSITIVE.`,
+    l1: `HYPOGLYCEMIA FOUNDATIONAL ANCHORS (Endocrine Society 2009 Hypoglycemia Guideline, still current):
+- Whipple triad required: symptoms + plasma glucose <55 mg/dL + relief with glucose.
+- Endogenous hyperinsulinism panel (drawn during a documented hypoglycemic episode, spontaneous or 72-hour fast):
+  * Glucose <55 mg/dL
+  * Insulin ≥3 µU/mL (≥18 pmol/L)
+  * C-peptide ≥0.6 ng/mL (≥0.2 nmol/L)
+  * Proinsulin ≥5 pmol/L  (UNITS ARE pmol/L, NOT ng/mL)
+  * β-hydroxybutyrate ≤2.7 mmol/L
+  * Sulfonylurea/meglitinide screen NEGATIVE
+- Insulinoma pattern: insulin ↑, C-peptide ↑, proinsulin ↑, β-OHB suppressed.
+- Surreptitious insulin (factitious): insulin ↑ BUT C-peptide SUPPRESSED.
+- Surreptitious sulfonylurea: biochemically mimics insulinoma EXCEPT sulfonylurea screen is POSITIVE.
+- Non-islet-cell tumor hypoglycemia (big-IGF-2): insulin low, C-peptide low, IGF-1 low, IGF-2 elevated, IGF-2:IGF-1 ratio >10 — usually a large mesenchymal tumor.
+- Insulinoma localization: pancreas-protocol CT/MRI first; endoscopic ultrasound if non-localizing; selective arterial calcium stimulation if imaging is negative.
+- Post-bariatric (post-RYGB) hypoglycemia is POSTPRANDIAL (not fasting); driven by exaggerated GLP-1 / nesidioblastosis; treat with low-carb diet, acarbose, or GLP-1 antagonist trials.`,
     l2: `HYPOGLYCEMIA COGNITIVE COMPLEXITY:
-FORBIDDEN basic stems: "What is hypoglycemia?", "First step in mild hypoglycemia?"
-REQUIRED Tier 3+ angles:
-- 72-hour fast result interpretation with biochemical pattern
-- Factitious vs sulfonylurea vs insulinoma differentiation by C-peptide
-- Post-bariatric hypoglycemia management
-- Hypoglycemia unawareness reversal
-- Insulinoma localization when imaging is negative`
+FORBIDDEN basic stems: "Patient with insulinoma — what is the diagnosis?", "Whipple triad — what does it mean?"
+REQUIRED Tier 3+ angles (pick one):
+- Insulinoma vs surreptitious sulfonylurea — both have ↑ insulin AND ↑ C-peptide. Sulfonylurea screen is the only test that separates them.
+- Insulinoma vs exogenous insulin — both have ↑ insulin. C-peptide separates them (suppressed in exogenous).
+- Post-RYGB postprandial hypoglycemia — timing (1–3 hr post meal) and reactive nature.
+- Non-islet-cell tumor hypoglycemia — large mesenchymal/hepatic tumor with hypoglycemia and SUPPRESSED insulin/C-peptide.
+- Localization sequence when first-line imaging is negative.
+- Whipple-triad documentation requirement before workup — patients with unconfirmed symptoms get a 72-hour fast, not a panel during a normoglycemic state.`
   },
   {
     keywords: ["glp-1", "glp1", "semaglutide", "tirzepatide", "liraglutide", "dulaglutide", "wegovy", "ozempic", "mounjaro", "zepbound"],
@@ -261,6 +271,36 @@ REQUIRED Tier 3+ angles:
 - Choosing CGM vs flash glucose monitoring`
   },
   {
+    keywords: ["subclinical hypothyroid", "subclinical hypothyroidism"],
+    l1: `SUBCLINICAL HYPOTHYROIDISM FOUNDATIONAL ANCHORS (ATA 2014 + TRUST trial, Stott NEJM 2017):
+- DEFINITION: TSH above the reference range with FREE T4 NORMAL.
+- CONFIRM WITH REPEAT TESTING in 2–3 months before treating — transient TSH elevations are common (recovery from non-thyroidal illness, recent infection, lab variation).
+- TREAT WITH LEVOTHYROXINE IF:
+  * TSH >10 mIU/L (any age), OR
+  * TSH 7–10 mIU/L AND any of: pregnant or planning pregnancy, hypothyroid symptoms, positive anti-TPO antibodies, age <70 with cardiovascular risk factors.
+- DO NOT ROUTINELY TREAT:
+  * TSH 4.5–7 mIU/L in adults >70 — TRUST trial showed no benefit, with risk of overtreatment, atrial fibrillation, and bone loss.
+  * Mildly elevated TSH during recovery from acute illness — recheck after recovery.
+- IN PREGNANCY: trimester-specific TSH targets.
+  * First trimester: <2.5 mIU/L.
+  * Second/third trimester: <3.0 mIU/L.
+  * Treat if TSH > trimester-specific upper limit (typically ~4.0) AND anti-TPO positive, OR TSH >10 regardless of antibodies.
+- LEVOTHYROXINE STARTING DOSE:
+  * Young, otherwise healthy: full replacement (~1.6 µg/kg/day lean body weight).
+  * Elderly or known coronary disease: low and slow (12.5–25 µg/day, titrate).
+- ABSORPTION INTERACTIONS (separate by ≥4 hours): PPIs, calcium, iron, soy, coffee. Take levothyroxine on empty stomach, 30–60 min before breakfast.
+- DOSE ADJUSTMENTS IN PREGNANCY: increase by ~30% as soon as pregnancy is confirmed in a known hypothyroid patient.`,
+    l2: `SUBCLINICAL HYPOTHYROIDISM COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "Patient with TSH 8 — start levothyroxine?" without nuance.
+REQUIRED Tier 3+ angles (pick one):
+- 75-YEAR-OLD WITH TSH 6.8 and vague fatigue: per TRUST, do NOT treat. Classic distractor: "Start low-dose levothyroxine."
+- PREGNANT PATIENT, TSH 3.2 + anti-TPO POSITIVE: treat to trimester-specific target.
+- 32-YEAR-OLD PLANNING PREGNANCY, TSH 4.8: treat to TSH <2.5 BEFORE conception.
+- KNOWN HYPOTHYROID PATIENT WITH NEWLY CONFIRMED PREGNANCY: increase dose ~30% immediately, don't wait for next TSH.
+- RECOVERY FROM NON-THYROIDAL ILLNESS: mild TSH elevation right after ICU stay — do NOT start replacement; recheck in 2–3 months.
+- LEVOTHYROXINE MALABSORPTION WORKUP when TSH won't normalize despite escalating dose: separate PPI/calcium/iron by 4 hours, check celiac and H. pylori, consider liquid or soft-gel formulation.`
+  },
+  {
     keywords: ["hypothyroidism", "hashimoto", "levothyroxine", "central hypothyroidism", "myxedema"],
     l1: `HYPOTHYROIDISM FOUNDATIONAL ANCHORS:
 - Overt hypothyroidism = elevated TSH + LOW free T4.
@@ -327,20 +367,33 @@ REQUIRED Tier 3+ angles:
   },
   {
     keywords: ["thyroid storm", "thyrotoxic crisis", "burch-wartofsky"],
-    l1: `THYROID STORM FOUNDATIONAL ANCHORS:
-- PTU BEFORE iodine (PTU blocks T4→T3 conversion).
-- Beta-blocker: propranolol IV preferred.
-- Hydrocortisone (decreases T4→T3 conversion, treats relative AI).
-- Cooling, supportive care, treat precipitant.
-- Burch-Wartofsky score guides diagnosis.`,
+    l1: `THYROID STORM FOUNDATIONAL ANCHORS (American Thyroid Association 2016 — still current):
+- DIAGNOSIS IS CLINICAL. Burch–Wartofsky score ≥45 highly suggestive; 25–44 suggestive. Do NOT delay treatment for confirmatory labs.
+- SEQUENCE OF PHARMACOLOGIC THERAPY — ORDER MATTERS BECAUSE OF MECHANISM:
+  1. BLOCK SYNTHESIS: thionamide first.
+     * PTU preferred in storm — 500–1000 mg load, then 250 mg PO/NG q4h. PTU also blocks peripheral T4→T3 conversion (D1 deiodinase inhibition).
+     * Methimazole acceptable if PTU unavailable (60–80 mg/day).
+  2. BLOCK RELEASE: iodine — SSKI 5 drops PO q6h or Lugol's solution. Give AT LEAST 30–60 MINUTES AFTER the thionamide.
+     RATIONALE: giving iodine before blocking synthesis triggers Jod-Basedow / paradoxical hormone release from preformed stores in the gland.
+  3. BLOCK ADRENERGIC TONE & PERIPHERAL CONVERSION:
+     * Propranolol IV 0.5–1 mg or PO 60–80 mg q4h (non-selective; also blocks T4→T3 conversion).
+     * Esmolol if hemodynamically tenuous or reduced LVEF.
+  4. CORTICOSTEROIDS: hydrocortisone 100 mg IV q8h. Covers possible relative adrenal insufficiency AND blocks peripheral T4→T3 conversion.
+  5. SUPPORTIVE & PRECIPITANT: cooling for hyperpyrexia; aggressive volume resuscitation; identify and treat precipitant (infection, surgery, iodine contrast, untreated DKA, missed thionamide).
+- PTU IS PREFERRED IN STORM AND IN FIRST-TRIMESTER PREGNANCY (methimazole → aplasia cutis / methimazole embryopathy).
+- METHIMAZOLE IS PREFERRED in non-storm second/third-trimester pregnancy and in non-pregnant outpatients (PTU has hepatotoxicity risk).`,
     l2: `THYROID STORM COGNITIVE COMPLEXITY:
-FORBIDDEN basic stems: "What is thyroid storm?", "Drug for thyroid storm?"
-REQUIRED Tier 3+ angles:
-- Sequence of agents and rationale for PTU-before-iodine
-- Plasmapheresis indications when ATD ineffective
-- Surgery timing post-storm stabilization
-- Thionamide-induced hepatotoxicity mid-storm
-- Storm precipitated by iodinated contrast`
+FORBIDDEN basic stems: "First step in thyroid storm?", "Best treatment for thyroid storm?"
+REQUIRED Tier 3+ angles (pick one):
+- THE SEQUENCE: thionamide BEFORE iodine — and WHY (synthesis must be blocked before release). Distractor: "Give SSKI immediately."
+- WHY PTU OVER METHIMAZOLE IN STORM: additional block of T4→T3 conversion.
+- APATHETIC THYROID STORM in the elderly: presents as cardiac decompensation (CHF, AF with RVR, weight loss) WITHOUT classic hyperthermia or agitation. Easy to miss.
+- AMIODARONE-INDUCED THYROTOXICOSIS:
+  * Type 1 (iodine-induced, underlying nodular disease, ↑ vascularity on Doppler) → thionamide.
+  * Type 2 (destructive thyroiditis, no vascularity) → corticosteroids.
+  * When uncertain, treat for BOTH.
+- BETA-BLOCKER CHOICE when LVEF is reduced: esmolol > propranolol; in decompensated HF, beta-blockade can precipitate cardiogenic shock.
+- REFRACTORY STORM: plasmapheresis or emergency thyroidectomy after at least 5–7 days of medical therapy.`
   },
   {
     keywords: ["cushing", "hypercortisolism", "ectopic acth", "bipss", "petrosal sinus"],
@@ -394,6 +447,34 @@ REQUIRED Tier 3+ angles:
 - Pregnancy management timing of surgery
 - MEN2 surveillance protocol after RET mutation identification
 - Incidentaloma workup distinguishing pheo from non-functioning adenoma`
+  },
+  {
+    keywords: ["adrenal incidentaloma", "adrenal mass", "adrenal nodule", "incidental adrenal"],
+    l1: `ADRENAL INCIDENTALOMA FOUNDATIONAL ANCHORS (AACE/ACE/ESE 2023 update):
+- Definition: ≥1 cm adrenal mass found on imaging done for another reason.
+- IMAGING CHARACTERIZATION (non-contrast CT):
+  * ≤10 Hounsfield units → lipid-rich benign adenoma. No further imaging.
+  * 11–20 HU → indeterminate; do absolute washout (>60% = benign) OR chemical-shift MRI.
+  * >20 HU + low washout → suspicious; pursue biochemical workup AND consider resection.
+- BIOCHEMICAL WORKUP — perform on EVERY adrenal incidentaloma regardless of HU:
+  * 1 mg overnight dexamethasone suppression test: cortisol >1.8 µg/dL = possible mild autonomous cortisol secretion (MACS); >5 µg/dL = autonomous secretion.
+  * Plasma free metanephrines OR 24-hour urine metanephrines — rule out pheochromocytoma.
+  * Plasma aldosterone-to-renin ratio — ONLY if patient is hypertensive or hypokalemic.
+  * DHEA-S — only when imaging suggests adrenocortical carcinoma (heterogeneous, >4 cm, high HU).
+- SURGICAL INDICATIONS (any one):
+  * Size >4 cm.
+  * Imaging features suspicious for malignancy: heterogeneous, >20 HU, washout <60%, growth >5 mm/year.
+  * Biochemically functional: pheo, primary aldosteronism, Cushing.
+- PHEOCHROMOCYTOMA PRE-OP RULE: ALPHA-blockade (phenoxybenzamine or doxazosin) for 7–14 days BEFORE beta-blockade and BEFORE surgery. NEVER beta-block first — unopposed alpha tone causes hypertensive crisis.
+- DO NOT biopsy an adrenal mass without ruling out pheochromocytoma first (catecholamine storm risk). Biopsy is generally reserved for suspected metastasis in a patient with a known extra-adrenal primary.`,
+    l2: `ADRENAL INCIDENTALOMA COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "What is the most likely diagnosis?" when the case obviously states "incidentaloma."
+REQUIRED Tier 3+ angles (pick one):
+- MILD AUTONOMOUS CORTISOL SECRETION (MACS): 1-mg DST cortisol 1.9–5.0 µg/dL. Decision to resect vs. monitor turns on cardiometabolic comorbidities (HTN, T2DM, osteoporosis, dyslipidemia).
+- PRE-OPERATIVE PHEOCHROMOCYTOMA BLOCKADE: sequence (alpha first), duration (7–14 days), volume expansion, target BP, role of calcium-channel blocker only if BP still high after adequate alpha-blockade.
+- BILATERAL adrenal masses → CAH, bilateral metastases, primary bilateral macronodular hyperplasia, infiltrative disease — different workup.
+- ADRENOCORTICAL CARCINOMA suspicion: >4 cm, heterogeneous, >20 HU, rapid growth, mixed functional pattern (cortisol + DHEA-S + androgens).
+- WHY NOT BIOPSY FIRST: rule out pheo first; biopsy almost never changes management in primary adrenal disease.`
   },
   {
     keywords: ["adrenal insufficiency", "addison", "cortisol deficiency", "secondary adrenal", "acth stim test", "cosyntropin"],
