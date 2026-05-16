@@ -1307,163 +1307,6 @@ function validateChoiceCompleteness(p) {
   return true;
 }
 
-// ─── ANTI-CUEING VALIDATOR ────────────────────────────────────────────────────
-// Detects pertinent-negative patterns in the stem that telegraph the correct
-// therapeutic choice. Returns true if cueing is detected (item should be rejected).
-//
-// This is a heuristic safety net. Rule H in the system prompt is the primary
-// defense; the validator catches slip-throughs. False positives are possible
-// (a pertinent negative may legitimately rule out a competing differential that
-// happens to share a contraindication with the correct answer); items it flags
-// should be human-reviewed rather than silently discarded.
-function detectAntiCueingViolation(p) {
-  if (!p || !p.stem || !p.choices || !p.correct) return false;
-
-  const stemLower   = p.stem.toLowerCase();
-  const correctText = (p.choices[p.correct] || "").toLowerCase();
-
-  const CUEING_PAIRS = [
-    {
-      label: "SGLT2 inhibitor",
-      drugPatterns: [
-        /\bsglt[\-\s]?2\b/i,
-        /\b(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|bexagliflozin)\b/i
-      ],
-      cuePatterns: [
-        /\bno\b.{0,40}\b(bladder cancer|recurrent uti|fournier|euglycemic dka)\b/i,
-        /\bdenies\b.{0,40}\b(bladder cancer|recurrent uti)\b/i,
-        /\bnegative\s+(history\s+)?for\b.{0,40}\bbladder cancer\b/i
-      ]
-    },
-    {
-      label: "GLP-1 receptor agonist",
-      drugPatterns: [
-        /\bglp[\-\s]?1\b/i,
-        /\b(liraglutide|semaglutide|dulaglutide|exenatide|tirzepatide|lixisenatide)\b/i
-      ],
-      cuePatterns: [
-        /\bno\b.{0,40}\b(history of pancreatitis|pancreatitis|medullary thyroid|men\s*2|men2)\b/i,
-        /\bdenies\b.{0,40}\b(pancreatitis|medullary thyroid)\b/i,
-        /\bnegative\s+family\s+history\b.{0,40}\b(medullary thyroid|men\s*2)\b/i
-      ]
-    },
-    {
-      label: "Metformin",
-      drugPatterns: [/\bmetformin\b/i, /\bglucophage\b/i],
-      cuePatterns: [
-        /\begfr\b.{0,30}\b(>|>=|greater than)\s*30\b/i,
-        /\bno\b.{0,30}\b(iv contrast|lactic acidosis|severe (renal|hepatic))\b/i
-      ]
-    },
-    {
-      label: "Thiazolidinedione (pioglitazone)",
-      drugPatterns: [/\bpioglitazone\b/i, /\brosiglitazone\b/i, /\bthiazolidinedione\b/i, /\btzd\b/i],
-      cuePatterns: [
-        /\bno\b.{0,40}\b(heart failure|peripheral edema|history of bladder cancer|history of fracture)\b/i,
-        /\bnyha\b.{0,10}\bclass\s*i\b/i
-      ]
-    },
-    {
-      label: "Sulfonylurea",
-      drugPatterns: [/\bsulfonylurea\b/i, /\b(glipizide|glyburide|glimepiride|gliclazide)\b/i],
-      cuePatterns: [
-        /\bregular meal pattern\b/i,
-        /\bno\b.{0,30}\bskipped meals\b/i,
-        /\breliable meal schedule\b/i
-      ]
-    },
-    {
-      label: "Insulin",
-      drugPatterns: [/\b(insulin glargine|insulin detemir|insulin degludec|basal insulin|nph|regular insulin|lispro|aspart|glulisine)\b/i],
-      cuePatterns: [
-        /\breliable.{0,30}(self.?care|injection|adherence)\b/i,
-        /\bable to\b.{0,20}\b(self.?monitor|inject|adhere)\b/i,
-        /\bgood understanding\b.{0,30}\binjection\b/i
-      ]
-    },
-    {
-      label: "Sacubitril/Valsartan or ACE-I/ARB",
-      drugPatterns: [
-        /\b(sacubitril|valsartan|entresto|lisinopril|enalapril|ramipril|losartan|olmesartan|candesartan)\b/i,
-        /\b(ace\s*inhibitor|arni|arb)\b/i
-      ],
-      cuePatterns: [
-        /\bno\b.{0,30}\b(angioedema|history of cough on ace)\b/i,
-        /\b36.?hour\s+washout\b/i
-      ]
-    },
-    {
-      label: "Mineralocorticoid receptor antagonist",
-      drugPatterns: [/\b(spironolactone|eplerenone|finerenone|mineralocorticoid receptor antagonist|mra)\b/i],
-      cuePatterns: [
-        /\bpotassium\b.{0,20}\b(normal|3\.[5-9]|4\.\d)\b/i,
-        /\bk\+?\b.{0,15}\b(3\.[5-9]|4\.\d)\b/i
-      ]
-    },
-    {
-      label: "Non-selective beta-blocker",
-      drugPatterns: [/\b(propranolol|nadolol|carvedilol|labetalol|timolol)\b/i],
-      cuePatterns: [/\bno\b.{0,30}\b(asthma|bronchospasm|reactive airway|copd exacerbation)\b/i]
-    },
-    {
-      label: "Thiazide or loop diuretic",
-      drugPatterns: [/\b(hydrochlorothiazide|hctz|chlorthalidone|indapamide|furosemide|bumetanide|torsemide|metolazone)\b/i],
-      cuePatterns: [/\bno\b.{0,30}\b(history of gout|hyperuricemia)\b/i]
-    },
-    {
-      label: "QT-prolonging agent",
-      drugPatterns: [/\b(methadone|ondansetron|haloperidol|sotalol|dofetilide|amiodarone|citalopram|escitalopram|azithromycin|levofloxacin|moxifloxacin)\b/i],
-      cuePatterns: [
-        /\bqtc\b.{0,15}\b[34]\d{2}\s*ms\b/i,
-        /\bno\b.{0,30}\b(qt prolongation|long qt|torsades)\b/i
-      ]
-    },
-    {
-      label: "DPP-4 inhibitor",
-      drugPatterns: [/\b(sitagliptin|saxagliptin|linagliptin|alogliptin|vildagliptin)\b/i, /\bdpp.?4\b/i],
-      cuePatterns: [/\bno\b.{0,30}\b(history of pancreatitis|heart failure)\b/i]
-    },
-    {
-      label: "Bisphosphonate",
-      drugPatterns: [/\b(alendronate|risedronate|ibandronate|zoledronic acid|pamidronate)\b/i, /\bbisphosphonate\b/i],
-      cuePatterns: [
-        /\bno\b.{0,30}\b(esophageal|gastroesophageal|gerd|dental work|jaw)\b/i,
-        /\begfr\b.{0,30}\b(>|>=|greater than)\s*35\b/i
-      ]
-    },
-    {
-      label: "Denosumab",
-      drugPatterns: [/\bdenosumab\b/i, /\bprolia\b/i, /\bxgeva\b/i],
-      cuePatterns: [
-        /\bcalcium\b.{0,20}\b(normal|9\.\d|10\.\d)\b/i,
-        /\bno\b.{0,30}\bhypocalcemia\b/i
-      ]
-    },
-    {
-      label: "Levothyroxine dose adjustment",
-      drugPatterns: [/\b(increase|decrease|adjust).{0,20}levothyroxine\b/i, /\blevothyroxine\s+dose\b/i],
-      cuePatterns: [
-        /\bgood adherence\b/i,
-        /\btakes (it|levothyroxine) on an empty stomach\b/i,
-        /\bno (calcium|iron|ppi|coffee).{0,20}(within|near|around).{0,10}(dose|administration)\b/i
-      ]
-    }
-  ];
-
-  for (const pair of CUEING_PAIRS) {
-    const correctMatches = pair.drugPatterns.some(pat => pat.test(correctText));
-    if (!correctMatches) continue;
-    for (const cuePat of pair.cuePatterns) {
-      if (cuePat.test(stemLower)) {
-        console.warn(`[detectAntiCueingViolation] CUEING — stem telegraphs "${pair.label}".`);
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-
 function rewriteExplanationLetters(explanation, letterMap) {
   if (!explanation || typeof explanation !== "string") return explanation;
   let out = explanation;
@@ -1575,21 +1418,11 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 4. DO NOT interpret labs. State the raw value.
 5. CONCEALMENT RULE: NEVER name the primary diagnosis or underlying mechanism in the stem.`;
 
-  let _lr;
-  if (isStep1) {
-    _lr = "USMLE STEP 1 RULES (M2 LEVEL — BASIC SCIENCE INTEGRATION):\n- Vignette order: Age/Sex/Setting → CC → HPI → PMH → Meds/Soc/Fam → Vitals → Exam → Labs.\n- Question type focus: mechanism of disease, pharmacology MOA, biochemistry pathways, genetics, microbiology, pathophysiology, histology, gross anatomy.\n- Acceptable lead-ins: 'most likely cause', 'best explanation for this finding', 'mechanism most likely responsible'.\n- AVOID management-style lead-ins — Step 1 tests UNDERSTANDING, not management decisions.\n- Distractors should target the most common student confusions (mechanistically adjacent enzymes/pathways/receptors).\n- Shorter stems acceptable (1–2 well-loaded sentences if the case turns on a single mechanism).";
-  } else if (level === "USMLE Step 2 CK") {
-    _lr = "USMLE STEP 2 CK RULES (M3/M4 LEVEL — CLINICAL REASONING):\n- Vignette order: Age/Sex/Setting → CC → HPI → PMH → Meds/Soc/Fam → Vitals → Exam → Labs/Imaging.\n- Question type focus: most likely diagnosis, best initial diagnostic test, best initial management, most likely cause of an acute clinical finding.\n- Test PATTERN RECOGNITION of common conditions over rare ones — bread-and-butter conditions on medicine, surgery, peds, OB/GYN, psych, family medicine rotations.\n- Distractors are competing diagnoses on the differential — wrong but plausible to a clerkship student.\n- Settings: outpatient clinic, ED, inpatient ward, urgent care.\n- Bayesian reasoning expected: prior probability + new test result → posterior decision.";
-  } else if (isStep3) {
-    _lr = "USMLE STEP 3 RULES (PGY-1 LEVEL — PRACTICE-READY PHYSICIAN):\n- Question type focus: management decisions, disposition (admit vs discharge, ICU vs floor), threshold decisions (treat vs observe), follow-up planning.\n- FORBIDDEN: 'What is the most likely diagnosis?' — diagnosis must be implied or stated in the stem.\n- Distractors should reflect real management forks where a PGY-1 might choose wrong (premature discharge, unnecessary admission, wrong tier of antibiotic, wrong agent in a stepped protocol).\n- Multi-system, complex patients are expected; address polypharmacy, comorbidity interactions, code status, goals of care where appropriate.\n- Public-health, ethics, and biostatistics integration acceptable when clinically relevant.";
-  } else if (isABIM_IM) {
-    _lr = "ABIM INTERNAL MEDICINE RULES (BOARD-CERTIFYING INTERNIST LEVEL):\n- Question type focus: multi-system synthesis, complex comorbidities, drug-drug interactions, treatment failure or intolerance, borderline risk scores requiring judgment.\n- FORBIDDEN: 'What is the most likely diagnosis?' — synthesis questions require management-level lead-ins.\n- Distractors must be options a guideline-aware internist might actually choose; 'obviously wrong' distractors are unacceptable at this level.\n- Address: when to refer to subspecialty, when to initiate vs withhold treatment, how to adjust for comorbidities (CKD, HF, cirrhosis, frailty).";
-  } else if (isABIM_Endo) {
-    _lr = "ABIM ENDOCRINOLOGY RULES (SUBSPECIALIST LEVEL):\n- Question type focus: atypical presentations, guideline-edge cases, complex diagnostic workups (CRH stimulation, IPSS, octreotide/68Ga-DOTATATE scan, genetic panels), therapy modification.\n- FORBIDDEN: 'What is the most likely diagnosis?' — the stem must test subspecialty management, complex diagnostic workup, or therapy modification.\n- Distractors must be options a subspecialty colleague might reasonably propose; items must discriminate between fellow-level and attending-level reasoning.\n- Address: dynamic testing protocols, surgical vs medical management, peri-procedural management (adrenalectomy, thyroidectomy), pregnancy considerations for endocrine disease.";
-  } else {
-    _lr = "BOARD-STYLE RULES: Generalist synthesis level.";
-  }
-  const levelRules = _lr;
+  const levelRules  = isStep1
+    ? "USMLE RULES: Age/Sex/Setting -> CC -> HPI -> PMH -> Meds/Soc/Fam -> Vitals -> Exam -> Labs. M2 for Step 1."
+    : isABIM_IM
+    ? "ABIM IM RULES: Generalist level. Internist synthesis for complex comorbidities."
+    : "ABIM ENDOCRINOLOGY RULES: Full subspecialty level.";
 
   const integrityRules = `INTEGRITY RULES:
 A. Evidence discipline: cite only data explicitly in stem.
@@ -1600,25 +1433,7 @@ E. EXPLANATION FORMATTING (MANDATORY TO AVOID SHUFFLE BUGS):
    - In the 🩺 section, YOU ARE FORBIDDEN FROM NAMING THE LETTER OF THE CORRECT CHOICE.
    - In the 🚫 section, YOU MUST start each explanation EXACTLY with "Choice A:", "Choice B:", etc.
 F. EXPLANATION-CHOICE CONSISTENCY: The explanation MUST strictly match the text of the corresponding choice.
-G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. Re-read your stem before calling emit_mcq.
-H. ANTI-CUEING (CRITICAL — VIOLATIONS DISQUALIFY THE ITEM):
-   A "pertinent negative" or descriptor in the stem MUST NOT pre-emptively clear a contraindication, side effect, or eligibility marker that is SPECIFIC to the correct answer. FORBIDDEN cueing examples:
-   - "no history of bladder cancer" / "no recurrent UTIs" when the correct answer is an SGLT2 inhibitor
-   - "no history of pancreatitis" / "no family history of medullary thyroid carcinoma or MEN 2" when the correct answer is a GLP-1 RA
-   - "eGFR > 30" stated without diagnostic purpose when the correct answer is metformin
-   - "no history of heart failure" / "no peripheral edema" when the correct answer is a TZD/pioglitazone
-   - "no history of angioedema" when the correct answer is sacubitril/valsartan or an ACE-I
-   - "potassium 4.2" stated without diagnostic purpose when the correct answer is spironolactone/eplerenone
-   - "QTc 410 ms" stated without diagnostic purpose when the correct answer is a QT-prolonging drug
-   - "no history of asthma or bronchospasm" when the correct answer is a non-selective beta-blocker
-   - "no history of gout" when the correct answer is a thiazide or loop diuretic
-   - "reliable medication adherence / injection technique" when the correct answer is insulin or a GLP-1 RA
-
-   REMOVAL TEST: For every pertinent negative, mentally remove it.
-   - If removing makes a DISTRACTOR more attractive (rules out competing differential) → KEEP.
-   - If removing makes only the CORRECT answer less attractive (clears its contraindication) → DELETE.
-
-   Pertinent negatives exist to differentiate among DIAGNOSES on the differential, NOT to clear the path to the THERAPEUTIC answer.`;
+G. STEM-EXPLANATION NUMERIC LOCK: Every lab value, vital sign, and numeric result cited in your explanation MUST be identical to the value stated in the stem. Re-read your stem before calling emit_mcq.`;
 
   const guardrails = getTopicGuardrails(level, promptTopic);
 
@@ -1669,14 +1484,14 @@ MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
   ? `Write 1 vignette on: ${promptTopic}.
 - Question asks for: ${promptQType}.
 - Patient Demographics & Setting: Patient is a ${randomSex}.
-- Pertinent Negatives: Include a pertinent negative ONLY if it helps rule out a competing DIAGNOSIS on the differential. A pertinent negative MUST NOT clear a contraindication, side effect, or eligibility marker for the correct THERAPEUTIC choice (see Rule H — Anti-Cueing). Do NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, etc.) unless directly relevant to the diagnosis.
+- Pertinent Negatives: Include a pertinent negative ONLY if it helps rule out a competing answer choice. Do NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, etc.) unless directly relevant to the diagnosis.
 - The stem MUST end with the interrogative sentence.
 ${selfVerification}
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
   : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
 - Lead-in asks for: ${promptQType}.
 - Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
-- Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing DIAGNOSIS on the differential. A pertinent negative MUST NOT clear a contraindication, side effect, or eligibility marker for the correct THERAPEUTIC choice (see Rule H — Anti-Cueing). DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
+- Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing answer choice. DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
 - The stem MUST end with the interrogative sentence.
 
 ${guardrails.l2}
@@ -1693,7 +1508,6 @@ function processRawMcq(p, level, topic, resolvedTopic) {
   if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return null;
   if (!validateDemographics(p.stem, p._sex || "man", resolvedTopic)) return null;
   if (!validateConsistency(p)) return null;
-  if (detectAntiCueingViolation(p)) return null;
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
