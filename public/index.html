@@ -590,6 +590,31 @@ function App() {
   }
 
   async function fetchOne(targetTopic, targetLvl) {
+    // ── DB-first path (sub-second when bank has unseen approved match) ──
+    try {
+      const user = (await sb.auth.getUser()).data?.user;
+      const { data: dbRows, error: rpcErr } = await sb.rpc('serve_next_mcq', {
+        p_exam_level: targetLvl,
+        p_topic:      targetTopic || null,
+        p_user_id:    user?.id || null,
+      });
+      if (!rpcErr && dbRows && dbRows.length > 0) {
+        const r = dbRows[0];
+        return {
+          id:             r.id,
+          stem:           r.stem,
+          choices:        r.choices,
+          correct_answer: r.correct_answer,
+          explanation:    r.explanation,
+          topic:          r.blueprint_tag,
+          exam_level:     r.exam_level,
+          _source:        "db"
+        };
+      }
+    } catch (dbEx) {
+      // Fall through to AI generation on any DB-side failure
+    }
+    // ── Fallback: AI generation (~22s, only when DB has no match) ──
     const res = await fetch("/.netlify/functions/generate-mcq", { 
       method: "POST", 
       headers: {"Content-Type": "application/json"},
@@ -597,7 +622,9 @@ function App() {
     });
     if (!res.ok) throw new Error("Connection failed");
     const items = await res.json();
-    return items[0];
+    const item = items[0];
+    item._source = "ai";
+    return item;
   }
 
   function handleLoadNext() {
