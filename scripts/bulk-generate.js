@@ -1980,7 +1980,9 @@ async function runStandardMode(queue, silent = false) {
     const pd = buildPrompt(item.level, item.topic);
     const entropySeed = `${Date.now()}-${Math.random()}`;
 
-    for (let attempt = 0; attempt < 1; attempt++) {
+    // v7.5.5 P1: 3-attempt Claude retry loop. Retries on network error OR
+    // validator rejection (processRawMcq returning null).
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -1992,7 +1994,7 @@ async function runStandardMode(queue, silent = false) {
             system: pd.systemText,
             tools: [MCQ_TOOL],
             tool_choice: { type: "tool", name: "emit_mcq" },
-            messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${entropySeed}]` }]
+            messages: [{ role: "user", content: pd.userText + `\n\n[Seed: ${entropySeed}-${attempt}]` }]
           })
         });
         if (res.status === 429) { await sleep(5000 * (attempt + 1)); continue; }
@@ -2002,17 +2004,39 @@ async function runStandardMode(queue, silent = false) {
         if (!toolBlock?.input) throw new Error("No tool_use block");
         const raw       = { ...toolBlock.input, _sex: pd.randomSex };
         const processed = processRawMcq(raw, item.level, item.topic, pd.resolvedTopic);
-        done++;
-        if (!silent) process.stdout.write(`\r  ✅  ${done}/${queue.length} complete   `);
-        return processed;
+        if (processed) {
+          done++;
+          if (!silent) process.stdout.write(`\r  ✅  ${done}/${queue.length} complete   `);
+          return processed;
+        }
+        // Validator rejected — fall through to next attempt
+        if (attempt < 2) await sleep(1500);
       } catch (e) {
-        if (attempt === 0) done++;
-        else await sleep(2000);
+        // Network / schema / tool_use error — fall through to next attempt
+        if (attempt < 2) await sleep(2000);
       }
     }
+
+    // v7.5.5 P5: Gemini 2.0 Flash fallback after 3 failed Claude attempts.
+    if (GEMINI_API_KEY) {
+      try {
+        const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
+        const raw       = { ...fbResult.parsed, _sex: pd.randomSex };
+        const processed = processRawMcq(raw, item.level, item.topic, pd.resolvedTopic);
+        if (processed) {
+          done++;
+          if (!silent) process.stdout.write(`\r  🔁  ${done}/${queue.length} complete (gemini)   `);
+          return processed;
+        }
+      } catch (_) {
+        // Both providers exhausted; the queued item is lost. Continue the run.
+      }
+    }
+
+    done++;
     return null;
   }
-
+  
   for (let i = 0; i < queue.length; i += CONCURRENCY) {
     const window  = queue.slice(i, i + CONCURRENCY);
     const settled = await Promise.allSettled(window.map(processItem));
