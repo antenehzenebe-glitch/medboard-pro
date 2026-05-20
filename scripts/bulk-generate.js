@@ -1674,17 +1674,21 @@ RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
   const step3TierPrompt = isStep3 ? `
 USMLE STEP 3 TIER 3-5 REQUIREMENTS:
 - FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Must present management decision, disposition, or intervention.` : "";
+- Must present management decision, disposition, or intervention.
+- Build in realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
+- Distractors must include the Tier 1/2 answer (what a MS3 would choose).` : "";
 
   const abimIMTierPrompt = isABIM_IM ? `
 ABIM INTERNAL MEDICINE TIER 3-4 REQUIREMENTS:
 - FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.` : "";
+- Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.
+- Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
 
   const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
 - FORBIDDEN: "What is the most likely diagnosis?". Question must test subspecialty management, complex diagnostic workup, or therapy modification.
-- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.` : "";
+- Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
+- Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
   const selfVerification = `
 MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
