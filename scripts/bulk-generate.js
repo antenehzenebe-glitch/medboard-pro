@@ -1,4 +1,30 @@
-// bulk-generate.js — MedBoard Pro
+// bulk-// bulk-generate.js — MedBoard Pro
+// v7.5.5 — Parity with generate-mcq.js v7.5.4
+// ---------------------------------------------------------------
+// CHANGELOG (v7.5.5 — 2026-05-20):
+// - FIXED (P0): processRawMcq now calls validateChoiceCompleteness.
+//   Closes the root-cause bug that admitted 34 rows with empty {} choices.
+//   Empty {} is truthy in JS, so the prior `if (!p.choices)` guard failed open;
+//   validateChoiceCompleteness requires all 5 letter keys (A-E), length >= 3,
+//   stem ending in '?', and the 🩺/🚫 markers in the explanation.
+// - FIXED (P1): runStandardMode retry loop now runs up to 3 attempts (was 1).
+//   Triggers on either network error OR validation failure (validator-driven
+//   retry — not just transport-error retry).
+// - SYNCED (P2): step3TierPrompt, abimIMTierPrompt, endoTier3Prompt now
+//   include the distractor-requirement lines previously stripped:
+//     • Step 3: "Distractors must include the Tier 1/2 answer (MS3 choice)."
+//     • ABIM IM: "Distractors must include the Tier 1 answer (MS4 choice)."
+//     • ABIM Endo: "Distractors must include the 'classic teaching' answer."
+//   Plus the Step 3 "realistic constraint" clause (facility/transfer/failure).
+// - ADDED (P5): callGemini + extractJSONSimple helpers. Gemini 2.0 Flash
+//   serves as fallback after 3 failed Claude attempts. No-op if
+//   GEMINI_API_KEY is unset.
+// ---------------------------------------------------------------
+// CHANGELOG (v7.5.3):
+// - SYNCED: Synchronized with generate-mcq.js v7.5.3 logic.
+// - FIXED: Added missing nutrition topic injection during bulk "Random" generation.
+// - OPTIMIZED: Synchronized deriveSpecialtyGroup with production API.
+// - CLINICAL UPDATE: Integrated ATA 2025 DTC Guidelines for Papillary/Follicular cancer.generate.js — MedBoard Pro
 // v7.5.3 — Randomization Loop & Nutrition Bug Fixes Sync
 // ---------------------------------------------------------------
 // CHANGELOG:
