@@ -1918,6 +1918,57 @@ async function runBatchMode(queue) {
   return allRecords;
 }
 
+// ─── GEMINI FALLBACK (v7.5.5 P5) ─────────────────────────────────────────────
+// Mirrors generate-mcq.js callGemini. Used only when 3 Claude attempts fail in
+// runStandardMode. No-op if GEMINI_API_KEY is unset.
+async function callGemini(systemText, userText, maxTokens) {
+  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not set; cannot fall back to Gemini.");
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemText }] },
+        contents: [{ role: "user", parts: [{ text: userText }] }],
+        safetySettings: [
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH",       threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: MCQ_TOOL.input_schema,
+          temperature: 0.6,
+          maxOutputTokens: maxTokens
+        }
+      })
+    }
+  );
+  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini returned empty response.");
+  return { parsed: extractJSONSimple(text), model: "gemini-2.0-flash" };
+}
+
+function extractJSONSimple(raw) {
+  if (!raw || typeof raw !== "string") throw new Error("extractJSONSimple received empty input.");
+  try { return JSON.parse(raw); } catch (_) {}
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found.");
+  const candidate = match[0]
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "-")
+    .replace(/\u00A0/g, " ")
+    .replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(candidate); }
+  catch (e) { throw new Error(`Gemini JSON malformed: ${e.message}`); }
+}
+
 // ─── STANDARD MODE ───────────────────────────────────────────────────────────
 async function runStandardMode(queue, silent = false) {
   if (!silent) console.log(`\n⚡  Running ${queue.length} questions with concurrency=${CONCURRENCY}...`);
