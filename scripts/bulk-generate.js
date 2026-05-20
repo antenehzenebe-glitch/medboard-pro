@@ -1722,6 +1722,7 @@ function processRawMcq(p, level, topic, resolvedTopic) {
   if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return null;
   if (!validateDemographics(p.stem, p._sex || "man", resolvedTopic)) return null;
   if (!validateConsistency(p)) return null;
+  if (!validateChoiceCompleteness(p)) return null;  // v7.5.5 P0: closes empty-{} bug
   if (detectAntiCueingViolation(p)) return null;
 
   const letters      = ["A","B","C","D","E"];
