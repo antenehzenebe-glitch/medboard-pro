@@ -1969,6 +1969,15 @@ function processRawMcq(p, level, topic, resolvedTopic) {
   if (!validateDemographics(p.stem, p._sex || "man", resolvedTopic)) return null;
   if (!validateConsistency(p)) return null;
   if (!validateChoiceCompleteness(p)) return null;  // v7.5.5 P0: closes empty-{} bug
+  // v7.5.6 — ABIM/NBME canon enforcement (ordered by rejection-rate priors):
+  if (!validateLeadInType(p, level)) return null;
+  if (!validateNegativeForm(p)) return null;
+  if (!validateAssociatedWith(p)) return null;
+  if (!validateVagueQualifiers(p)) return null;
+  if (!validateSubjectiveAdjectives(p)) return null;
+  if (!validatePejorativeLanguage(p)) return null;
+  if (!validateNoAllOrNoneOfTheAbove(p)) return null;
+  if (!validateSiteOfCare(p)) return null;
   if (detectAntiCueingViolation(p)) return null;
 
   const letters      = ["A","B","C","D","E"];
