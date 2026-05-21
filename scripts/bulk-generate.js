@@ -1548,7 +1548,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 // ─── MCQ TOOL SCHEMA ──────────────────────────────────────────────────────────
 const MCQ_TOOL = {
   name: "emit_mcq",
-  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation. Conforms to ABIM Question Writing Guidelines and USMLE/NBME Item-Writing Guide canon.",
   input_schema: {
     type: "object",
     properties: {
@@ -1560,9 +1560,32 @@ const MCQ_TOOL = {
         required: ["A", "B", "C", "D", "E"]
       },
       correct:      { type: "string", enum: ["A","B","C","D","E"] },
-      explanation:  { type: "string" }
+      explanation:  { type: "string" },
+      lead_in_type: {
+        type: "string",
+        enum: [
+          "most_likely_diagnosis",
+          "diagnostic_inference_atypical_presentation",
+          "clinical_features_of_named_disease",
+          "next_step_in_diagnostic_workup",
+          "most_accurate_diagnostic_test",
+          "underlying_mechanism_or_pathophysiology",
+          "mechanism_of_action_or_toxicity",
+          "most_appropriate_pharmacotherapy",
+          "most_appropriate_clinical_intervention",
+          "next_step_in_management",
+          "mixed_management_with_comorbidity",
+          "disposition_or_transition_of_care",
+          "risk_of_future_adverse_event_or_complication",
+          "strongest_risk_factor",
+          "preventive_recommendation",
+          "informed_consent_or_ethical_decision",
+          "interpretation_of_data_or_literature"
+        ],
+        description: "REQUIRED. Identifies the lead-in task type per ABIM Question Writing Guidelines Section C.1. Per-level allow-lists enforced post-emit; selecting a type outside the level's allowed set will cause rejection."
+      }
     },
-    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
+    required: ["demographic_check", "stem", "choices", "correct", "explanation", "lead_in_type"]
   }
 };
 
