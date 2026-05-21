@@ -1334,6 +1334,198 @@ function validateConsistency(p) {
   return true;
 }
 
+// ─── CANON-ALIGNED VALIDATORS (v7.5.6) ───────────────────────────────────────
+// All rules sourced from ABIM Question Writing Guidelines and NBME Item-Writing
+// Guide (6th ed). Section references in comments throughout.
+
+// ABIM C.1 — Per-level lead-in allow-list. Diagnosis-tier lead-ins permitted at
+// all levels per ABIM canon, but weighted/scoped via qTypePool and tier prompts.
+const ALLOWED_LEAD_INS_BY_LEVEL = {
+  "USMLE Step 1": new Set([
+    "underlying_mechanism_or_pathophysiology",
+    "mechanism_of_action_or_toxicity",
+    "most_likely_diagnosis",
+    "clinical_features_of_named_disease",
+    "strongest_risk_factor",
+    "interpretation_of_data_or_literature"
+  ]),
+  "USMLE Step 2 CK": new Set([
+    "most_likely_diagnosis",
+    "diagnostic_inference_atypical_presentation",
+    "next_step_in_diagnostic_workup",
+    "most_accurate_diagnostic_test",
+    "most_appropriate_pharmacotherapy",
+    "most_appropriate_clinical_intervention",
+    "next_step_in_management",
+    "risk_of_future_adverse_event_or_complication",
+    "preventive_recommendation",
+    "informed_consent_or_ethical_decision",
+    "interpretation_of_data_or_literature"
+  ]),
+  "USMLE Step 3": new Set([
+    "next_step_in_management",
+    "mixed_management_with_comorbidity",
+    "disposition_or_transition_of_care",
+    "most_appropriate_pharmacotherapy",
+    "most_appropriate_clinical_intervention",
+    "most_accurate_diagnostic_test",
+    "next_step_in_diagnostic_workup",
+    "risk_of_future_adverse_event_or_complication",
+    "informed_consent_or_ethical_decision",
+    "diagnostic_inference_atypical_presentation"
+  ]),
+  "ABIM Internal Medicine": new Set([
+    "next_step_in_management",
+    "mixed_management_with_comorbidity",
+    "most_appropriate_pharmacotherapy",
+    "most_accurate_diagnostic_test",
+    "next_step_in_diagnostic_workup",
+    "risk_of_future_adverse_event_or_complication",
+    "preventive_recommendation",
+    "diagnostic_inference_atypical_presentation",
+    "interpretation_of_data_or_literature"
+  ]),
+  "ABIM Endocrinology": new Set([
+    "next_step_in_management",
+    "mixed_management_with_comorbidity",
+    "most_appropriate_pharmacotherapy",
+    "next_step_in_diagnostic_workup",
+    "most_accurate_diagnostic_test",
+    "risk_of_future_adverse_event_or_complication",
+    "diagnostic_inference_atypical_presentation",
+    "interpretation_of_data_or_literature"
+  ])
+};
+
+function validateLeadInType(p, level) {
+  if (!p.lead_in_type) {
+    console.warn("[validateLeadInType] Missing lead_in_type field.");
+    return false;
+  }
+  const allowed = ALLOWED_LEAD_INS_BY_LEVEL[level];
+  if (!allowed) {
+    console.warn(`[validateLeadInType] Unknown level: ${level}`);
+    return false;
+  }
+  if (!allowed.has(p.lead_in_type)) {
+    console.warn(`[validateLeadInType] Lead-in type "${p.lead_in_type}" not permitted at level "${level}".`);
+    return false;
+  }
+  return true;
+}
+
+// Extract the lead-in (last sentence of stem). Defensive: returns full stem if no
+// terminal sentence boundary is found.
+function extractLeadIn(stem) {
+  if (!stem || typeof stem !== "string") return "";
+  const sentences = stem.match(/[^.!?]+[.!?]+/g);
+  if (!sentences || sentences.length === 0) return stem.trim();
+  return sentences[sentences.length - 1].trim();
+}
+
+// ABIM C.2.b — Negative-form lead-ins forbidden ("Which of the following is NOT
+// true", "LEAST likely", "all of the following EXCEPT").
+function validateNegativeForm(p) {
+  if (!p || !p.stem) return false;
+  const leadIn = extractLeadIn(p.stem);
+  if (/\b(EXCEPT|NOT|LEAST\s+likely|all\s+of\s+the\s+following\s+except)\b/i.test(leadIn)) {
+    console.warn(`[validateNegativeForm] Negative-form lead-in detected: "${leadIn.slice(0, 80)}..."`);
+    return false;
+  }
+  return true;
+}
+
+// ABIM C.2.a — "Associated with" is forbidden in lead-ins.
+function validateAssociatedWith(p) {
+  if (!p || !p.stem) return false;
+  const leadIn = extractLeadIn(p.stem);
+  if (/\bassociated\s+with\b/i.test(leadIn)) {
+    console.warn(`[validateAssociatedWith] "Associated with" detected in lead-in: "${leadIn.slice(0, 80)}..."`);
+    return false;
+  }
+  return true;
+}
+
+// ABIM B.3 — Vague qualifiers and absolutes forbidden in choices.
+const VAGUE_QUALIFIER_PATTERN = /\b(often|usually|sometimes|rarely|commonly|frequently|generally|always|never)\b/i;
+function validateVagueQualifiers(p) {
+  if (!p || !p.choices) return false;
+  for (const letter of ["A", "B", "C", "D", "E"]) {
+    const text = p.choices[letter];
+    if (text && VAGUE_QUALIFIER_PATTERN.test(text)) {
+      console.warn(`[validateVagueQualifiers] Vague qualifier in choice ${letter}: "${text.slice(0, 80)}..."`);
+      return false;
+    }
+  }
+  return true;
+}
+
+// ABIM B.3 — Subjective adjectives forbidden as patient descriptors. Scoped to
+// the first sentence of the stem to avoid false positives when these terms
+// appear in lab/history context (e.g., "older adults are at increased risk" in
+// the explanation is fine; "an older patient presents to clinic" is not).
+function validateSubjectiveAdjectives(p) {
+  if (!p || !p.stem) return false;
+  const firstSentence = p.stem.split(/[.!?]/)[0] || "";
+  const SUBJECTIVE_PATTERN = /\b(young|middle-aged|older|elderly|obese)\s+(man|woman|patient|male|female|adult)\b/i;
+  if (SUBJECTIVE_PATTERN.test(firstSentence)) {
+    console.warn(`[validateSubjectiveAdjectives] Subjective adjective as patient descriptor: "${firstSentence.slice(0, 80)}..."`);
+    return false;
+  }
+  return true;
+}
+
+// ABIM B.3 — Pejorative phrasings forbidden in patient history. "Complains of"
+// and "denies" carry judgment connotations per ABIM canon.
+function validatePejorativeLanguage(p) {
+  if (!p || !p.stem) return false;
+  if (/\b(complains\s+of|denies)\b/i.test(p.stem)) {
+    console.warn(`[validatePejorativeLanguage] Pejorative phrasing detected in stem ("complains of" / "denies").`);
+    return false;
+  }
+  return true;
+}
+
+// ABIM D.6, D.7 — "All of the above" / "None of the above" forbidden as choices.
+function validateNoAllOrNoneOfTheAbove(p) {
+  if (!p || !p.choices) return false;
+  const PATTERN = /^\s*(all|none)\s+of\s+the\s+above\s*\.?\s*$/i;
+  for (const letter of ["A", "B", "C", "D", "E"]) {
+    if (PATTERN.test(p.choices[letter] || "")) {
+      console.warn(`[validateNoAllOrNoneOfTheAbove] Forbidden meta-choice in ${letter}: "${p.choices[letter]}"`);
+      return false;
+    }
+  }
+  return true;
+}
+
+// ABIM B.1.c — Site of care required in patient-based questions. Scoped to the
+// first 2 sentences of the stem (liberal whitelist, opening-orientation rule).
+const SITE_OF_CARE_PATTERNS = [
+  /\b(emergency\s+department|ED|emergency\s+room|ER)\b/i,
+  /\b(clinic|outpatient|office|primary\s+care|endocrinology\s+clinic|cardiology\s+clinic|fellowship\s+clinic)\b/i,
+  /\b(hospital|inpatient|admitted|hospitalized|admission)\b/i,
+  /\b(ICU|intensive\s+care|MICU|SICU|CCU|NICU)\b/i,
+  /\b(nursing\s+home|long-term\s+care|skilled\s+nursing|SNF|rehabilitation)\b/i,
+  /\b(urgent\s+care|walk-in)\b/i,
+  /\b(your\s+office|your\s+clinic|the\s+practice)\b/i,
+  /\b(follow[-\s]?up\s+visit|routine\s+visit|annual\s+(visit|physical|exam))\b/i,
+  /\b(presents\s+to|was\s+admitted\s+to|is\s+hospitalized|was\s+seen\s+in|was\s+referred\s+to)\b/i,
+  /\b(consultation|consult\s+is\s+requested|asked\s+to\s+see)\b/i,
+  /\b(postpartum|postoperative|peri[-\s]?operative)\s+(unit|day|setting)\b/i,
+  /\b(operating\s+room|OR|recovery\s+room|PACU)\b/i
+];
+function validateSiteOfCare(p) {
+  if (!p || !p.stem) return false;
+  const sentences = p.stem.match(/[^.!?]+[.!?]+/g) || [p.stem];
+  const opening = sentences.slice(0, 2).join(" ");
+  for (const pat of SITE_OF_CARE_PATTERNS) {
+    if (pat.test(opening)) return true;
+  }
+  console.warn(`[validateSiteOfCare] No site of care detected in first 2 sentences: "${opening.slice(0, 120)}..."`);
+  return false;
+}
+
 function validateChoiceCompleteness(p) {
   if (!p || !p.choices || !p.stem || !p.explanation) return false;
   
