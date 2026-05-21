@@ -1932,20 +1932,22 @@ RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
 
   const step3TierPrompt = isStep3 ? `
 USMLE STEP 3 TIER 3-5 REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Must present management decision, disposition, or intervention.
+- Diagnosis-tier lead-ins ("Which of the following is the most likely diagnosis?") are permitted per ABIM/NBME canon ONLY if the case requires synthesis (atypical presentation, conflicting data, multi-system reasoning). They must be a small minority of items at this level.
+- Default to management-tier lead-ins: next step in management, disposition, pharmacotherapy, intervention.
 - Build in realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
-- Distractors must include the Tier 1/2 answer (what a MS3 would choose).` : "";
+- Distractors must include the Tier 1/2 answer (what an MS3 would choose).` : "";
 
   const abimIMTierPrompt = isABIM_IM ? `
 ABIM INTERNAL MEDICINE TIER 3-4 REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
+- Diagnosis-tier lead-ins permitted per ABIM Question Writing Guidelines C.1(a) ONLY when the case requires synthesis (borderline data, atypical presentation, multi-comorbidity reasoning). Cap diagnosis-tier items at ≤15% of pool.
+- Default to management-tier lead-ins: next step in management, pharmacotherapy choice given comorbidities, diagnostic test selection.
 - Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.
-- Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
+- Distractors must include the Tier 1 answer (what an MS4 would choose).` : "";
 
   const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Question must test subspecialty management, complex diagnostic workup, or therapy modification.
+- Diagnosis-tier lead-ins permitted per ABIM Question Writing Guidelines C.1(a) ONLY when the case is atypical, complex, or guideline-edge (e.g., distinguishing factitious from endogenous hyperinsulinism). Cap diagnosis-tier items at ≤10% of pool.
+- Default to subspecialty-tier lead-ins: next step in management, pharmacologic choice with cardiorenal profile, next step in diagnostic workup, therapy modification.
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
 - Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
