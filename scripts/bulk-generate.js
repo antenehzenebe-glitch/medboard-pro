@@ -1799,14 +1799,31 @@ function buildPrompt(level, topic) {
   const isStep3     = level === "USMLE Step 3";
   const isABIM_IM   = level === "ABIM Internal Medicine";
   const isStep1     = level === "USMLE Step 1";
+  const isStep2CK   = level === "USMLE Step 2 CK";  // v7.5.6
 
-  const maxTokens   = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
-
+  const maxTokens   = isABIM_Endo ? 3200
+                    : (isABIM_IM || isStep3) ? 2800
+                    : isStep2CK ? 2600
+                    : 2200;
   let qTypePool = [];
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
   } else if (isStep1) {
     qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
+    } else if (isStep2CK) {
+    // v7.5.6 — Weights derived from USMLE Step 2 CK Physician Tasks/Competencies blueprint.
+    qTypePool = [
+      {s:"MOST LIKELY DIAGNOSIS (Patient Care: Diagnosis — 16-20% of CK)", w:18},
+      {s:"MOST ACCURATE DIAGNOSTIC TEST or laboratory study with highest sensitivity/specificity (Patient Care: Lab/Diagnostic Studies — 13-17%)", w:15},
+      {s:"NEXT STEP IN MANAGEMENT after initial workup (Patient Care: Mixed Management — 12-16%)", w:14},
+      {s:"MOST APPROPRIATE PHARMACOTHERAPY given patient factors (Patient Care: Pharmacotherapy — 8-12%)", w:12},
+      {s:"MOST APPROPRIATE PREVENTIVE RECOMMENDATION or screening (Patient Care: Health Maintenance — 5-10%)", w:8},
+      {s:"RISK OF DEVELOPING WHICH ADVERSE EFFECT or future complication (Patient Care: Prognosis/Outcome — 5-9%)", w:8},
+      {s:"MOST APPROPRIATE CLINICAL INTERVENTION or procedure (Patient Care: Clinical Interventions — 6-10%)", w:7},
+      {s:"INFORMED CONSENT or ethical decision (Professionalism — 5-7%)", w:6},
+      {s:"INTERPRETATION OF DATA from a study or graph (Practice-based Learning — 3-5%)", w:4},
+      {s:"NEXT STEP IN DIAGNOSTIC WORKUP given an incomplete picture", w:8}
+    ];
   } else if (isStep3) {
     qTypePool = [
       {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
