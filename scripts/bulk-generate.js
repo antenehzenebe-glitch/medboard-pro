@@ -1,6 +1,33 @@
-// bulk-// bulk-generate.js — MedBoard Pro
-// v7.5.5 — Parity with generate-mcq.js v7.5.4
+// bulk-generate.js — MedBoard Pro
+// v7.5.6 — ABIM/NBME Canon Alignment (2026-05-21)
 // ---------------------------------------------------------------
+// CHANGELOG (v7.5.6):
+// - ADDED: 8 canon-aligned validators sourced from ABIM Question Writing
+//   Guidelines (Sections B.1, B.3, C.1, C.2.a, C.2.b, D.4-D.7) and
+//   USMLE/NBME Item-Writing Guide (6th ed):
+//     validateLeadInType            — per-level enum allow-list (ABIM C.1)
+//     validateNegativeForm          — bans EXCEPT / NOT / LEAST (ABIM C.2.b)
+//     validateAssociatedWith        — bans "associated with" (ABIM C.2.a)
+//     validateVagueQualifiers       — bans often/usually/etc in choices (ABIM B.3)
+//     validateSubjectiveAdjectives  — bans young/elderly/obese as descriptors (ABIM B.3)
+//     validatePejorativeLanguage    — bans "complains of" / "denies" (ABIM B.3)
+//     validateNoAllOrNoneOfTheAbove — bans these as choices (ABIM D.6/D.7)
+//     validateSiteOfCare            — requires site in first 2 stem sentences (ABIM B.1.c)
+// - ADDED: lead_in_type field in MCQ_TOOL.input_schema (17-value universal enum).
+// - ADDED: isStep2CK branch in buildPrompt() with dedicated qTypePool grounded
+//   in USMLE Step 2 CK Physician Tasks/Competencies blueprint weights.
+// - CORRECTED: Tier prompts no longer say "FORBIDDEN: most likely diagnosis"
+//   at Step 3 / ABIM IM / ABIM Endo. ABIM canon lists diagnosis-tier
+//   lead-ins under Question Task (a). Replaced with: "permitted only with
+//   synthesis-tier atypical or guideline-edge stems" (matches ABIM's own
+//   classification of diagnosis questions as synthesis-tier).
+// - ADDED: ABIM race/ethnicity rule to L1 guardrails (B.1, second paragraph):
+//   "Race or ethnic origin must not be mentioned in the stem unless the
+//   testing point requires it and cannot be answered correctly without it."
+// - FORWARD-ONLY: existing rows not retroactively re-validated. Validators
+//   gate generation, not the existing bank.
+// ---------------------------------------------------------------
+// v7.5.5 — Parity with generate-mcq.js v7.5.4
 // CHANGELOG (v7.5.5 — 2026-05-20):
 // - FIXED (P0): processRawMcq now calls validateChoiceCompleteness.
 //   Closes the root-cause bug that admitted 34 rows with empty {} choices.
