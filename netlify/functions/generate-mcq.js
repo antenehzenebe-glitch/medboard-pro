@@ -2132,13 +2132,35 @@ exports.handler = async function (event) {
       const consistencyOk = validateConsistency(p);
       const choicesOk     = validateChoiceCompleteness(p);
       const cueingFree    = !detectAntiCueingViolation(p);
-      isValid = demoOk && consistencyOk && choicesOk && cueingFree;
+      // v7.5.7 — canon-aligned validators (ABIM B.1/B.3/C.1/C.2/D.6/D.7)
+      const leadInOk      = validateLeadInType(p, b.level);
+      const negFormOk     = validateNegativeForm(p);
+      const assocOk       = validateAssociatedWith(p);
+      const vagueOk       = validateVagueQualifiers(p);
+      const adjectivesOk  = validateSubjectiveAdjectives(p);
+      const pejorativeOk  = validatePejorativeLanguage(p);
+      const aotaOk        = validateNoAllOrNoneOfTheAbove(p);
+      const siteOfCareOk  = validateSiteOfCare(p);
+      isValid = demoOk && consistencyOk && choicesOk && cueingFree
+             && leadInOk && negFormOk && assocOk && vagueOk
+             && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk;
 
       if (!isValid && attempts === 3) {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
         p               = fbResult.parsed;
         generationModel = fbResult.model;
-        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic) && validateConsistency(p) && validateChoiceCompleteness(p) && !detectAntiCueingViolation(p);
+        isValid = validateDemographics(p.stem, pd.randomSex, pd.resolvedTopic)
+               && validateConsistency(p)
+               && validateChoiceCompleteness(p)
+               && !detectAntiCueingViolation(p)
+               && validateLeadInType(p, b.level)
+               && validateNegativeForm(p)
+               && validateAssociatedWith(p)
+               && validateVagueQualifiers(p)
+               && validateSubjectiveAdjectives(p)
+               && validatePejorativeLanguage(p)
+               && validateNoAllOrNoneOfTheAbove(p)
+               && validateSiteOfCare(p);
       }
     }
 
