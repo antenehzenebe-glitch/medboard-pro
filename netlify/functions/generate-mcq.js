@@ -1,7 +1,49 @@
 // generate-mcq.js — MedBoard Pro
-// v7.5.4 — Randomization Fix & Serverless Optimization
+// v7.5.7 — Parity with bulk-generate.js v7.5.6 + DI L2 anchor
 // ---------------------------------------------------------------
-// CHANGELOG:
+// CHANGELOG (v7.5.7 — 2026-05-24):
+// - ADDED (Patch 2): lead_in_type enum (17 values) added to MCQ_TOOL.input_schema
+//   and marked required. Mirrors bulk-generate.js commit c0b4abf. Forces the
+//   model to declare its lead-in category — enables validateLeadInType to enforce
+//   ABIM C.1 per-level allow-lists.
+// - ADDED (Patch 3): 8 canon-aligned validator functions inserted above
+//   validateChoiceCompleteness. Sources: ABIM Question Writing Guidelines
+//   (B.1, B.3, C.1, C.2, D.6, D.7) and NBME Item-Writing Guide 6th ed.
+//   Validators added: validateLeadInType, validatePejorativeLanguage,
+//   validateSubjectiveAdjectives, validateSiteOfCare, validateAllOfTheAbove,
+//   validateAssociatedWith, validateExceptNotLeast, validateVagueQualifiers.
+//   Mirrors bulk-generate.js commit 3e01ca3.
+// - ADDED (Patch 4): 8 new validators wired into the handler's isValid AND
+//   chain (inline-AND approach — generate-mcq.js has no processRawMcq function).
+//   Validators run after the existing 4 (demographics, consistency, choice
+//   completeness, anti-cueing); first failure short-circuits via the AND chain.
+// - ADDED (Patch 5): isStep2CK flag in buildPrompt with dedicated qTypePool
+//   carrying USMLE Step 2 CK official blueprint weights (Diagnosis 16-20%,
+//   Lab/Diagnostic 13-17%, Mixed Mgmt 12-16%, Pharmacotherapy 8-12%, etc.).
+//   maxTokens bumped to 2800 for Step 2 CK. Mirrors bulk-generate.js commit
+//   55238d0. Closes the gap where Step 2 CK was falling through to the generic
+//   else-branch qTypePool.
+// - FIXED (Patch 6): Tier prompts (step3TierPrompt, abimIMTierPrompt,
+//   endoTier3Prompt) corrected — replaced "FORBIDDEN: most likely diagnosis?"
+//   with "PERMITTED at synthesis tier only, cap at <=10-15% of pool".
+//   Source: ABIM Question Writing Guidelines list "most likely diagnosis?"
+//   as Question Task category (a), permitted at all levels. Mirrors
+//   bulk-generate.js commit 533adfb.
+// - ADDED (Patch 7): Rules I/J/K appended to integrityRules. Rule H
+//   (Anti-Cueing) preserved. I = ABIM B.1.c site of care requirement;
+//   J = ABIM B.3 pejorative language / subjective adjectives; K = ABIM
+//   C.1+C.2 lead-in canon + "associated with" / EXCEPT-NOT-LEAST bans +
+//   D.6/D.7 "all/none of the above" bans. Mirrors bulk-generate.js commit
+//   988ae03.
+// - ADDED (Patch 8): DIABETES INSIPIDUS L2 anchor — water deprivation is
+//   contraindicated when baseline Na > 145 mEq/L or serum osmolality > 295-300
+//   mOsm/kg; next step in that case is direct DDAVP challenge. Identified
+//   2026-05-21 PM vetting when a generated DI stem ran the water deprivation
+//   test on a patient with Na 147. Source: Endocrine Society / ESE 2018
+//   consensus, Christ-Crain et al. Also applied as v7.5.7 hotfix to
+//   bulk-generate.js TOPIC_GUARDRAILS in this same session.
+// ---------------------------------------------------------------
+// CHANGELOG (v7.5.4):
 // - FIXED (v7.5.4): Restored missing NUTRITION_INJECTION_RATE variable to prevent ReferenceError.
 // - FIXED: Dynamic routing ensures no hallucination/repetition on "Random" topics.
 // - OPTIMIZED: Maintained "fire-and-forget" DB save to prevent Netlify 504 Timeouts.
@@ -1255,21 +1297,44 @@ function deriveSpecialtyGroup(level, resolvedTopic) {
 // ============================================================
 const MCQ_TOOL = {
   name: "emit_mcq",
-  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation.",
+  description: "Emit a single board-style multiple-choice question with exactly 5 answer choices (A-E), one correct answer, and an explanation. Conforms to ABIM Question Writing Guidelines and USMLE/NBME Item-Writing Guide canon.",
   input_schema: {
     type: "object",
     properties: {
       demographic_check: { type: "string" },
-      stem: { type: "string", description: "The clinical vignette. Must end with the interrogative sentence." },
+      stem:              { type: "string" },
       choices: {
         type: "object",
         properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
         required: ["A", "B", "C", "D", "E"]
       },
-      correct: { type: "string", enum: ["A", "B", "C", "D", "E"] },
-      explanation: { type: "string", description: "Use provided formatting rules for the explanation." }
+      correct:      { type: "string", enum: ["A","B","C","D","E"] },
+      explanation:  { type: "string" },
+      lead_in_type: {
+        type: "string",
+        enum: [
+          "most_likely_diagnosis",
+          "diagnostic_inference_atypical_presentation",
+          "clinical_features_of_named_disease",
+          "next_step_in_diagnostic_workup",
+          "most_accurate_diagnostic_test",
+          "underlying_mechanism_or_pathophysiology",
+          "mechanism_of_action_or_toxicity",
+          "most_appropriate_pharmacotherapy",
+          "most_appropriate_clinical_intervention",
+          "next_step_in_management",
+          "mixed_management_with_comorbidity",
+          "disposition_or_transition_of_care",
+          "risk_of_future_adverse_event_or_complication",
+          "strongest_risk_factor",
+          "preventive_recommendation",
+          "informed_consent_or_ethical_decision",
+          "interpretation_of_data_or_literature"
+        ],
+        description: "REQUIRED. Identifies the lead-in task type per ABIM Question Writing Guidelines Section C.1. Per-level allow-lists enforced post-emit; selecting a type outside the level's allowed set will cause rejection."
+      }
     },
-    required: ["demographic_check", "stem", "choices", "correct", "explanation"]
+    required: ["demographic_check", "stem", "choices", "correct", "explanation", "lead_in_type"]
   }
 };
 
