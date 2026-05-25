@@ -1909,12 +1909,26 @@ function buildPrompt(level, topic, isNutrition) {
   const isStep3     = level === "USMLE Step 3";
   const isABIM_IM   = level === "ABIM Internal Medicine";
   const isStep1     = level === "USMLE Step 1";
+  const isStep2CK   = level === "USMLE Step 2 CK";
 
   let qTypePool = [];
   if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
   } else if (isStep1) {
     qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
+  } else if (isStep2CK) {
+    // USMLE Step 2 CK Physician Tasks/Competencies — official current weighting (usmle.org)
+    qTypePool = [
+      {s:"MOST LIKELY DIAGNOSIS based on clinical presentation and findings",w:18},
+      {s:"MOST APPROPRIATE LAB OR DIAGNOSTIC STUDY to confirm or refine the working diagnosis",w:15},
+      {s:"MOST APPROPRIATE MANAGEMENT integrating diagnosis, treatment, and follow-up",w:14},
+      {s:"MOST APPROPRIATE PHARMACOTHERAPY for the patient's specific presentation",w:10},
+      {s:"MOST LIKELY PROGNOSIS or NATURAL HISTORY given the current scenario",w:7},
+      {s:"MOST APPROPRIATE PREVENTIVE INTERVENTION for the patient at this visit",w:8},
+      {s:"MOST APPROPRIATE NON-PHARMACOLOGIC INTERVENTION (procedure, counseling, monitoring)",w:8},
+      {s:"MOST APPROPRIATE PROFESSIONALISM, COMMUNICATION, OR ETHICS response",w:6},
+      {s:"MOST APPROPRIATE PRACTICE-BASED LEARNING or quality-improvement response",w:4}
+    ];
   } else if (isStep3) {
     qTypePool = [
       {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
@@ -1944,7 +1958,9 @@ function buildPrompt(level, topic, isNutrition) {
   const randomSex   = pickSexForTopic(promptTopic);
 
   const isUSMLE   = level.includes("USMLE");
-  const maxTokens = isABIM_Endo ? 3200 : (isABIM_IM || isStep3) ? 2800 : 2200;
+  const maxTokens = isABIM_Endo ? 3200
+                  : (isABIM_IM || isStep3 || isStep2CK) ? 2800
+                  : 2200;
 
   const systemRole = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
 
