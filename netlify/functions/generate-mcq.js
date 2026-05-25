@@ -756,9 +756,9 @@ const GENERIC_GUARDRAILS = {
 - Cite only data explicitly present in the stem.
 - Use current officially published society guidelines, not legacy criteria. Do not invent recent dates for older guidelines.
 - Numeric values in explanation must match stem exactly (Integrity Rule G).`,
-  l2: `COGNITIVE COMPLEXITY EXPECTATION:
-FORBIDDEN: "What is the most likely diagnosis?" as the question type for ABIM-level questions.
-REQUIRED: Question must test management decision, drug selection, or workup escalation — not basic recognition.`
+l2: `COGNITIVE COMPLEXITY EXPECTATION:
+"What is the most likely diagnosis?" is PERMITTED at ABIM-level only as a synthesis-tier item (~10-15% of pool) — not as a default lead-in.
+REQUIRED: The majority of items must test management decision, drug selection, or workup escalation — not basic recognition.`
 };
 
 function getTopicGuardrails(level, topic) {
@@ -1992,20 +1992,20 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
   } else if (isStep3) {
     levelRules = `USMLE STEP 3 RULES (PGY-1 LEVEL — PRACTICE-READY PHYSICIAN):
 - Question type focus: management decisions, disposition (admit vs discharge, ICU vs floor), threshold decisions (treat vs observe), follow-up planning.
-- FORBIDDEN: "What is the most likely diagnosis?" — diagnosis must be implied or stated in the stem.
+- "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items must center on management decisions, disposition, or threshold judgments.
 - Distractors should reflect real management forks where a PGY-1 might choose wrong (premature discharge, unnecessary admission, wrong tier of antibiotic, wrong agent in a stepped protocol).
 - Multi-system, complex patients are expected; address polypharmacy, comorbidity interactions, code status, goals of care where appropriate.
 - Public-health, ethics, and biostatistics integration acceptable when clinically relevant.`;
   } else if (isABIM_IM) {
     levelRules = `ABIM INTERNAL MEDICINE RULES (BOARD-CERTIFYING INTERNIST LEVEL):
 - Question type focus: multi-system synthesis, complex comorbidities, drug-drug interactions, treatment failure or intolerance, borderline risk scores requiring judgment.
-- FORBIDDEN: "What is the most likely diagnosis?" — synthesis questions require management-level lead-ins.
+- "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items require management-level lead-ins.
 - Distractors must be options a guideline-aware internist might actually choose; "obviously wrong" distractors are unacceptable at this level.
 - Address: when to refer to subspecialty, when to initiate vs withhold treatment, how to adjust for comorbidities (CKD, HF, cirrhosis, frailty).`;
   } else if (isABIM_Endo) {
     levelRules = `ABIM ENDOCRINOLOGY RULES (SUBSPECIALIST LEVEL):
 - Question type focus: atypical presentations, guideline-edge cases, complex diagnostic workups (CRH stimulation, IPSS, octreotide/68Ga-DOTATATE scan, genetic panels), therapy modification.
-- FORBIDDEN: "What is the most likely diagnosis?" — the stem must test subspecialty management, complex diagnostic workup, or therapy modification.
+- "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items must test subspecialty management, complex diagnostic workup, or therapy modification.
 - Distractors must be options a subspecialty colleague might reasonably propose; items must discriminate between fellow-level and attending-level reasoning.
 - Address: dynamic testing protocols, surgical vs medical management, peri-procedural management (adrenalectomy, thyroidectomy), pregnancy considerations for endocrine disease.`;
   } else {
@@ -2065,20 +2065,20 @@ RESPONSE FORMAT: You MUST respond by calling the emit_mcq tool exactly once.`;
 
   const step3TierPrompt = isStep3 ? `
 USMLE STEP 3 TIER 3-5 REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
-- Must present management decision, disposition, or intervention.
+- "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); default is management/disposition/intervention.
+- Must present management decision, disposition, or intervention in the majority of items.
 - Build in realistic constraint: facility without cath lab, transfer time >120 min, or failed first-line therapy.
 - Distractors must include the Tier 1/2 answer (what a MS3 would choose).` : "";
 
   const abimIMTierPrompt = isABIM_IM ? `
 ABIM INTERNAL MEDICINE TIER 3-4 REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Diagnosis MUST be implied or stated.
+- "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); default is management-level lead-ins.
 - Present synthesis scenario: borderline risk scores, treatment failure, intolerance, multi-comorbidity drug selection.
 - Distractors must include the Tier 1 answer (what a MS4 would choose).` : "";
 
   const endoTier3Prompt = isABIM_Endo ? `
 ABIM ENDOCRINOLOGY TIER 3+ REQUIREMENTS:
-- FORBIDDEN: "What is the most likely diagnosis?". Question must test subspecialty management, complex diagnostic workup, or therapy modification.
+- "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the question must test subspecialty management, complex diagnostic workup, or therapy modification in the majority of items.
 - Present an ATYPICAL, COMPLEX, or GUIDELINE-EDGE scenario.
 - Distractors must include the "classic teaching" answer that a non-subspecialist would choose.` : "";
 
