@@ -485,9 +485,11 @@ REQUIRED Tier 3+ angles:
 - Hypertonic saline-stimulated copeptin <4.9 pmol/L confirms AVP-D (central DI).
 - Desmopressin response distinguishes central (responds) from nephrogenic (does not).
 - Hypertonic saline-stimulated copeptin has largely replaced classic water deprivation test in many centers.
-- Lithium causes nephrogenic DI; gestational DI from placental vasopressinase.`,
+- Lithium causes nephrogenic DI; gestational DI from placental vasopressinase.
+- WATER DEPRIVATION CONTRAINDICATED if baseline serum Na > 145 mEq/L OR serum osmolality > 295-300 mOsm/kg — patient is already maximally stimulated; deprivation risks dangerous hypernatremia without diagnostic yield. Proceed directly to DDAVP challenge (or hypertonic saline copeptin testing where available). Source: Endocrine Society / ESE 2018 consensus, Christ-Crain et al.`,
     l2: `DIABETES INSIPIDUS COGNITIVE COMPLEXITY:
 FORBIDDEN basic stems: "Diagnosis of DI?", "Treatment of central DI?"
+FORBIDDEN: ordering water deprivation test as the correct answer when stem labs indicate Na > 145 or serum osmolality > 295-300 — this is a contraindication failure mode (board examiners will mark direct DDAVP challenge as the correct answer instead).
 REQUIRED Tier 3+ angles:
 - Primary polydipsia vs partial central DI differentiation
 - Post-pituitary-surgery triphasic response recognition (DI → SIADH → permanent DI)
