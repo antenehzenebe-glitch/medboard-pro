@@ -2039,7 +2039,20 @@ H. ANTI-CUEING (CRITICAL — VIOLATIONS DISQUALIFY THE ITEM):
    - If removing makes a DISTRACTOR more attractive (rules out competing differential) → KEEP.
    - If removing makes only the CORRECT answer less attractive (clears its contraindication) → DELETE.
 
-   Pertinent negatives exist to differentiate among DIAGNOSES on the differential, NOT to clear the path to the THERAPEUTIC answer.`;
+   Pertinent negatives exist to differentiate among DIAGNOSES on the differential, NOT to clear the path to the THERAPEUTIC answer.
+I. ABIM CANON — DEMOGRAPHICS (Section B.1):
+   - Stem MUST include gender, age, and site of care (clinic, ED, hospital, ICU, etc.) within the first 2 sentences.
+   - Race, ethnicity, and occupation MUST NOT be mentioned unless the testing point cannot be answered correctly without that information. Default: omit.
+   - Use quantitative descriptors (e.g., "55-year-old", "BMI 31"). FORBIDDEN: subjective adjectives "young", "middle-aged", "older", "elderly", "obese" as patient descriptors.
+J. ABIM CANON — STEM PHRASING (Section B.3):
+   - FORBIDDEN phrasing: "complains of" → use "reports" or "has". "denies" → use "has no" or "no history of".
+   - FORBIDDEN in choices: vague qualifiers (often, usually, sometimes, rarely, commonly, frequently, generally) and absolutes (always, never).
+K. ABIM CANON — LEAD-IN (Sections C.1, C.2):
+   - Lead-in MUST be a single closed question ending in "?".
+   - FORBIDDEN phrasings: "associated with", "NOT", "EXCEPT", "LEAST likely".
+   - FORBIDDEN choices: "All of the above", "None of the above".
+   - Set lead_in_type to the appropriate enum value matching the cognitive task.
+`;
 
   const guardrails = getTopicGuardrails(level, promptTopic);
 
