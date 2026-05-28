@@ -315,6 +315,51 @@ function LegalModal({type, onClose}) {
 function LandingPage(props) {
   var {showAuth, setShowAuth, authMode, setAuthMode, email, setEmail, pw, setPw, nm, setNm, authErr, handleAuth, googleLogin, setLegalModal} = props;
 
+  const [demoState, setDemoState] = React.useState("idle"); // idle|loading|active|answered
+  const [demoQ, setDemoQ] = React.useState(null);
+  const [demoSel, setDemoSel] = React.useState("");
+  const [demoLvl, setDemoLvl] = React.useState("ABIM Internal Medicine");
+  const [demoErr, setDemoErr] = React.useState("");
+
+  async function loadDemo() {
+    setDemoState("loading");
+    setDemoErr("");
+    try {
+      var { data, error } = await sb.rpc('serve_next_mcq', {
+        p_exam_level: demoLvl, p_topic: null, p_user_id: null
+      });
+      if (!error && data && data.length > 0) {
+        setDemoQ(data[0]);
+        setDemoState("active");
+        return;
+      }
+    } catch(e) {}
+    try {
+      var res = await fetch("/.netlify/functions/generate-mcq", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({topic:"Random -- All Specialties", level: demoLvl})
+      });
+      if (res.ok) {
+        var items = await res.json();
+        var q = items[0];
+        if (q.correct && !q.correct_answer) q.correct_answer = q.correct;
+        if (q.topic && !q.blueprint_tag) q.blueprint_tag = q.topic;
+        setDemoQ(q);
+        setDemoState("active");
+        return;
+      }
+    } catch(e2) {}
+    setDemoState("idle");
+    setDemoErr("Unable to load question. Please try again.");
+  }
+
+  function demoChoiceColor(letter) {
+    if (!demoQ || demoState !== "answered") return demoSel === letter ? GOLD : BDR;
+    if (letter === demoQ.correct_answer) return "#10b981";
+    if (letter === demoSel && letter !== demoQ.correct_answer) return "#ef4444";
+    return BDR;
+  }
+
   return (
     <div style={{minHeight:"100vh",background:BG, display:"flex", flexDirection:"column"}}>
       <nav style={{padding:"0 5%",height:72,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+BDR,position:"sticky",top:0,background:"rgba(10,10,15,0.97)",backdropFilter:"blur(12px)",zIndex:100}}>
@@ -325,6 +370,7 @@ function LandingPage(props) {
         <div style={{display:"flex",gap:24,color:"#94a3b8",fontSize:14,fontWeight:600,display:window.innerWidth>768?"flex":"none"}}>
           <a href="#how" style={{color:"inherit",textDecoration:"none"}}>Features</a>
           <a href="#about" style={{color:"inherit",textDecoration:"none"}}>About</a>
+          <a href="#demo" style={{color:GOLD,fontWeight:700,textDecoration:"none"}}>Try Free</a>
           <a href="#pricing" style={{color:"inherit",textDecoration:"none"}}>Pricing</a>
         </div>
         <button onClick={()=>{setAuthMode('signup'); setShowAuth(true);}} style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"1px solid #3b82f6",color:"#fff",padding:"10px 24px",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14,boxShadow:"0 4px 14px rgba(0,40,104,0.4)"}}>
@@ -354,6 +400,125 @@ function LandingPage(props) {
             <div className="exam-pill"><span style={{color:"#6366f1",fontWeight:800,fontSize:14,marginBottom:4}}>USMLE Step 3</span><span style={{color:"#64748b",fontSize:11}}>PGY-1/2</span></div>
             <div className="exam-pill"><span style={{color:"#10b981",fontWeight:800,fontSize:14,marginBottom:4}}>ABIM IM</span><span style={{color:"#64748b",fontSize:11}}>Residents</span></div>
             <div className="exam-pill"><span style={{color:GOLD,fontWeight:800,fontSize:14,marginBottom:4}}>ABIM Endo</span><span style={{color:"#64748b",fontSize:11}}>Fellows</span></div>
+          </div>
+        </section>
+
+        <section id="demo" style={{padding:"80px 5%",background:"linear-gradient(180deg,rgba(0,40,104,0.06) 0%,rgba(0,0,0,0) 100%)"}}>
+          <div style={{maxWidth:800,margin:"0 auto"}}>
+            <div style={{textAlign:"center",marginBottom:40}}>
+              <div className="hero-tag">⚡ No account required</div>
+              <h2 style={{fontSize:32,fontWeight:800,color:"#f1f5f9",marginBottom:12}}>Try a Sample Question</h2>
+              <p style={{color:"#64748b",fontSize:16}}>Experience board-level clinical rigor — free, right now.</p>
+            </div>
+
+            {demoState === "idle" && (
+              <div className="fade" style={{textAlign:"center"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,flexWrap:"wrap",marginBottom:24}}>
+                  <span style={{color:"#94a3b8",fontWeight:700,fontSize:13}}>Exam Level:</span>
+                  {LEVELS.map(l => (
+                    <button key={l.v} onClick={()=>setDemoLvl(l.v)}
+                      style={{padding:"7px 14px",borderRadius:8,border:"1px solid "+(demoLvl===l.v?GOLD:BDR),
+                        background:demoLvl===l.v?"rgba(201,168,76,0.1)":"transparent",
+                        color:demoLvl===l.v?GOLD:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:12}}>
+                      {l.l}
+                    </button>
+                  ))}
+                </div>
+                {demoErr && <p style={{color:"#ef4444",fontSize:13,marginBottom:16}}>{demoErr}</p>}
+                <button onClick={loadDemo}
+                  style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid #3b82f6",
+                    color:"#fff",padding:"16px 48px",borderRadius:12,fontWeight:800,fontSize:16,cursor:"pointer",
+                    boxShadow:"0 8px 24px rgba(0,40,104,0.5)"}}>
+                  Try a Question ▶
+                </button>
+                <p style={{marginTop:12,fontSize:12,color:"#475569"}}>Free · No signup · Full explanation included</p>
+              </div>
+            )}
+
+            {demoState === "loading" && (
+              <div style={{textAlign:"center",padding:40}}>
+                <div style={{width:40,height:40,border:"4px solid "+GOLD,borderTopColor:"transparent",
+                  borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 16px"}}></div>
+                <p style={{color:"#94a3b8",fontWeight:600}}>Loading QBank Item...</p>
+              </div>
+            )}
+
+            {(demoState === "active" || demoState === "answered") && demoQ && (
+              <div className="fade" style={{background:CARD,border:"1px solid "+(demoState==="answered"?GOLD:BDR),borderRadius:16,padding:32}}>
+                <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20}}>
+                  <span style={{background:"transparent",border:"1px solid "+GOLD,color:GOLD,borderRadius:6,
+                    padding:"4px 12px",fontSize:12,fontWeight:800}}>Sample Question</span>
+                  <span style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",
+                    color:"#818cf8",borderRadius:6,padding:"4px 12px",fontSize:12,fontWeight:700}}>
+                    {demoQ.blueprint_tag || demoQ.exam_level}
+                  </span>
+                </div>
+                <p style={{fontSize:16,lineHeight:1.8,marginBottom:24,color:"#f1f5f9"}}>{demoQ.stem}</p>
+                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
+                  {Object.entries(demoQ.choices).map(([letter, text]) => (
+                    <button key={letter} disabled={demoState==="answered"}
+                      onClick={()=>{setDemoSel(letter); setDemoState("answered");}}
+                      style={{display:"flex",alignItems:"flex-start",gap:14,padding:"14px 18px",
+                        borderRadius:10,border:"2px solid "+demoChoiceColor(letter),
+                        background:"rgba(255,255,255,0.02)",cursor:demoState==="answered"?"default":"pointer",
+                        textAlign:"left",width:"100%",transition:"border-color 0.2s"}}>
+                      <span style={{minWidth:28,height:28,borderRadius:6,
+                        border:"1px solid "+demoChoiceColor(letter),
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontWeight:800,fontSize:13,flexShrink:0,
+                        color:demoState==="answered"&&letter===demoQ.correct_answer?"#10b981":
+                              demoState==="answered"&&letter===demoSel&&letter!==demoQ.correct_answer?"#ef4444":"#94a3b8"}}>
+                        {letter}
+                      </span>
+                      <span style={{fontSize:14,lineHeight:1.6,
+                        color:demoState==="answered"&&letter===demoQ.correct_answer?"#10b981":
+                              demoState==="answered"&&letter===demoSel&&letter!==demoQ.correct_answer?"#ef4444":"#cbd5e1"}}>
+                        {text}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {demoState === "answered" && (
+                  <div className="fade">
+                    <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.25)",
+                      borderRadius:10,padding:"18px 22px",marginBottom:20}}>
+                      <p style={{color:demoSel===demoQ.correct_answer?"#10b981":"#f59e0b",
+                        fontWeight:800,fontSize:15,marginBottom:8}}>
+                        {demoSel===demoQ.correct_answer?"Correct!":"Incorrect — Correct answer: "+demoQ.correct_answer}
+                      </p>
+                      <p style={{color:"#94a3b8",fontSize:14,lineHeight:1.7}}>{demoQ.explanation}</p>
+                    </div>
+                    <div style={{background:"linear-gradient(135deg,rgba(0,40,104,0.3),rgba(26,74,154,0.2))",
+                      border:"1px solid "+GOLD,borderRadius:12,padding:"24px 28px",textAlign:"center"}}>
+                      <p style={{color:"#f1f5f9",fontWeight:800,fontSize:18,marginBottom:8}}>
+                        Ready for the full QBank?
+                      </p>
+                      <p style={{color:"#64748b",fontSize:14,marginBottom:20}}>
+                        150+ approved board questions. 14-day free trial · Cancel anytime.
+                      </p>
+                      <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+                        <button onClick={()=>{setAuthMode('signup');setShowAuth(true);}}
+                          style={{background:"linear-gradient(135deg,"+NAVY+",#1a4a9a)",border:"2px solid #3b82f6",
+                            color:"#fff",padding:"12px 32px",borderRadius:10,fontWeight:800,fontSize:15,cursor:"pointer",
+                            boxShadow:"0 6px 20px rgba(0,40,104,0.4)"}}>
+                          Start Free Trial →
+                        </button>
+                        <button onClick={()=>{setDemoState("idle");setDemoQ(null);setDemoSel("");}}
+                          style={{background:"transparent",border:"1px solid "+BDR,color:"#94a3b8",
+                            padding:"12px 24px",borderRadius:10,fontWeight:700,fontSize:14,cursor:"pointer"}}>
+                          Try Another Question
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {demoState === "active" && (
+                  <p style={{fontSize:12,color:"#475569",textAlign:"center"}}>Select your answer above to reveal the explanation</p>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
