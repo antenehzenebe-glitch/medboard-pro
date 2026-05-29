@@ -1616,6 +1616,9 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
+const dropTally = { _genFailed: 0, _warnUnseeded: 0 };
+function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
+
 function checkUnseededCitations(p) {
   if (!p || !p.explanation) return [];
   const text = String(p.explanation);
@@ -1633,6 +1636,7 @@ function checkUnseededCitations(p) {
         const msg = `[citation-warn] Unseeded body "${token} ${yearMatch[0]}" \u2014 verify edition during vetting.`;
         console.warn(msg);
         notices.push(msg);
+        dropTally._warnUnseeded++;
       }
     }
   }
@@ -2132,21 +2136,21 @@ Execute the generation using the emit_mcq tool. Set demographic_check to "confir
 
 // ─── PROCESS RAW MCQ ─────────────────────────────────────────────────────────
 function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknown") {
-  if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return null;
-  if (!validateDemographics(p.stem, p._sex || "man", resolvedTopic)) return null;
-  if (!validateConsistency(p)) return null;
-  if (!validateChoiceCompleteness(p)) return null;  // v7.5.5 P0: closes empty-{} bug
+  if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return recordDrop("malformed");
+  if (!validateDemographics(p.stem, p._sex || "man", resolvedTopic)) return recordDrop("demographics");
+  if (!validateConsistency(p)) return recordDrop("consistency");
+  if (!validateChoiceCompleteness(p)) return recordDrop("choiceCompleteness");
   // v7.5.6 — ABIM/NBME canon enforcement (ordered by rejection-rate priors):
-  if (!validateLeadInType(p, level)) return null;
-  if (!validateNegativeForm(p)) return null;
-  if (!validateAssociatedWith(p)) return null;
-  if (!validateVagueQualifiers(p)) return null;
-  if (!validateSubjectiveAdjectives(p)) return null;
-  if (!validatePejorativeLanguage(p)) return null;
-  if (!validateNoAllOrNoneOfTheAbove(p)) return null;
-  if (!validateSiteOfCare(p)) return null;
-  if (!validateCitationYears(p)) return null;
-  if (detectAntiCueingViolation(p)) return null;
+  if (!validateLeadInType(p, level)) return recordDrop("leadInType");
+  if (!validateNegativeForm(p)) return recordDrop("negativeForm");
+  if (!validateAssociatedWith(p)) return recordDrop("associatedWith");
+  if (!validateVagueQualifiers(p)) return recordDrop("vagueQualifiers");
+  if (!validateSubjectiveAdjectives(p)) return recordDrop("subjectiveAdjectives");
+  if (!validatePejorativeLanguage(p)) return recordDrop("pejorativeLanguage");
+  if (!validateNoAllOrNoneOfTheAbove(p)) return recordDrop("allOrNoneOfAbove");
+  if (!validateSiteOfCare(p)) return recordDrop("siteOfCare");
+  if (!validateCitationYears(p)) return recordDrop("citationYears");
+  if (detectAntiCueingViolation(p)) return recordDrop("antiCueing");
   checkUnseededCitations(p); // PART 2: non-blocking warn on the accepted item, past all reject gates
 
   const letters      = ["A","B","C","D","E"];
@@ -2459,6 +2463,7 @@ async function runStandardMode(queue, silent = false) {
     }
 
     done++;
+    dropTally._genFailed++;
     return null;
   }
   
@@ -2505,6 +2510,13 @@ async function main() {
   console.log(`║  Generated:   ${String(validRecords.length).padEnd(33)}║`);
   console.log(`║  Saved to DB: ${String(saved).padEnd(33)}║`);
   console.log(`║  DB errors:   ${String(errors).padEnd(33)}║`);
+  const validatorDrops = Object.entries(dropTally).filter(([k]) => !k.startsWith("_")).sort((a,b) => b[1]-a[1]);
+  const totalDropped = validatorDrops.reduce((s,[,n]) => s+n, 0);
+  console.log("╠══════════════════════════════════════════════════╣");
+  console.log(`║  Validator drops: ${String(totalDropped).padEnd(29)}║`);
+  for (const [reason, n] of validatorDrops) console.log(`║    • ${reason}: ${n}`);
+  console.log(`║  Gen failures (both engines): ${String(dropTally._genFailed).padEnd(17)}║`);
+  console.log(`║  Unseeded-citation warns: ${String(dropTally._warnUnseeded).padEnd(21)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
 }
