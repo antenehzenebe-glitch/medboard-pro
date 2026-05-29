@@ -1635,11 +1635,11 @@ function validateSiteOfCare(p) {
 // "ATA 2024". Seed = CLAUDE.md s6 canon + DI (ESE 2018) + A1/A2 anchors.
 // Runs at GENERATION time only; stored rows are untouched.
 const ALLOWED_GUIDELINE_CITATIONS = {
-  "Endocrine Society": new Set(["2009", "2016", "2018"]),
-  "ATA":   new Set(["2015", "2016"]),
-  "AACE":  new Set(["2022", "2023"]),
-  "ESE":   new Set(["2018", "2023"]),
-  "ADA":   new Set(["2026"]),
+  "Endocrine Society": new Set(["2008", "2009", "2014", "2016", "2018", "2022", "2024", "2025"]),
+  "ATA":   new Set(["2014", "2015", "2016", "2017", "2025"]),
+  "AACE":  new Set(["2020", "2022", "2023", "2025", "2026"]),
+  "ESE":   new Set(["2018", "2023", "2024"]),
+  "ADA":   new Set(["2024", "2025", "2026"]),
   "ACR":   new Set(["2017", "2023"]),
   "EULAR": new Set(["2023"]),
   "AHA":   new Set(["2024"]),
@@ -1658,7 +1658,7 @@ function validateCitationYears(p) {
   const text = String(p.explanation);
   for (const token of GUIDELINE_TOKENS) {
     const esc = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const tokenRe = new RegExp(esc, "gi");
+    const tokenRe = new RegExp("\\b" + esc + "\\b", "gi");
     let m;
     while ((m = tokenRe.exec(text)) !== null) {
       const start = Math.max(0, m.index - 25);
