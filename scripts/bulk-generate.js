@@ -1,5 +1,5 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.6 — ABIM/NBME Canon Alignment (2026-05-21)
+// v7.5.8 — citation-year lock + lab-value lock + single-best guard + AI/AC monitoring + post-stroke AC anchors
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.6):
 // - ADDED: 8 canon-aligned validators sourced from ABIM Question Writing
@@ -2341,7 +2341,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.7)    ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.8)    ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
