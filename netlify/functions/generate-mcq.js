@@ -67,6 +67,20 @@ const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 
 // ============================================================
 const TOPIC_GUARDRAILS = [
   {
+    keywords: ["atrial fibrillation stroke", "post-stroke anticoagulation", "cardioembolic stroke", "anticoagulation timing after stroke", "ELAN", "1-3-6-12", "DOAC after stroke", "secondary stroke prevention", "hemorrhagic transformation", "AF-related ischemic stroke"],
+    l1: `POST-STROKE ANTICOAGULATION TIMING (AF-RELATED ISCHEMIC STROKE) FOUNDATIONAL ANCHORS:
+- TWO frameworks coexist and are BOTH defensible: (1) the traditional EHRA "1-3-6-12 day" rule keyed to infarct severity (TIA ~day 1; small/mild ~day 3; moderate ~day 6; large/severe ~day 12); (2) the ELAN trial (2023) and 2024 AHA/ASA guidance supporting EARLIER initiation (early DOAC by ~day 3-4 in minor-to-moderate stroke; ~day 6-7 in large stroke) without increased symptomatic intracranial hemorrhage.
+- For non-valvular AF, a DOAC is PREFERRED over warfarin for secondary prevention.
+- WARFARIN (not a DOAC) is required when AF coexists with a MECHANICAL heart valve OR moderate-to-severe (rheumatic) MITRAL STENOSIS.
+- NO heparin "bridging" for AF-associated ischemic stroke - therapeutic UFH/LMWH bridging increases hemorrhagic transformation without reducing recurrence.
+- Exclude HEMORRHAGIC TRANSFORMATION on repeat imaging before initiating; defer (commonly up to ~4 weeks) for large infarcts or established hemorrhagic transformation.
+- Source: ELAN trial 2023 (NEJM); 2024 AHA/ASA secondary stroke-prevention guidance; EHRA practical guide.`,
+    l2: `POST-STROKE ANTICOAGULATION TIMING COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "When do you start anticoagulation after stroke?" with a single numeric key.
+FORBIDDEN keys: keying a specific day that only ONE of the two frameworks supports (1-3-6-12 vs ELAN) - this is double-defensible and must not be the discriminator; keying transesophageal echocardiography BEFORE anticoagulation when AF is already the established embolic source; keying therapeutic UFH/LMWH BRIDGING for AF-associated stroke.
+REQUIRED Tier-3 angles: identify WHEN a ~4-week deferral applies (large infarct / hemorrhagic transformation); distinguish CARDIOEMBOLIC (anticoagulate) from non-cardioembolic (antiplatelet) secondary prevention; reason about hemorrhagic-transformation imaging timing before initiation; select warfarin over a DOAC for mechanical valve or moderate-to-severe mitral stenosis.`,
+  },
+  {
     keywords: ["adrenal insufficiency", "addison", "addison's disease", "primary adrenal insufficiency", "secondary adrenal insufficiency", "hydrocortisone replacement", "fludrocortisone", "glucocorticoid replacement", "mineralocorticoid replacement", "plasma renin activity", "steroid replacement monitoring"],
     l1: `ADRENAL INSUFFICIENCY - REPLACEMENT MONITORING FOUNDATIONAL ANCHORS:
 - GLUCOCORTICOID adequacy has NO reliable biochemical marker. Titrate hydrocortisone CLINICALLY: resolution of fatigue/anorexia/weight loss, and absence of over-replacement signs (weight gain, central adiposity, glucose intolerance, insomnia, hypertension). Do NOT titrate hydrocortisone to random serum cortisol, ACTH, or 24-hour urinary free cortisol.
@@ -1609,6 +1623,54 @@ function validateSiteOfCare(p) {
   }
   console.warn(`[validateSiteOfCare] No site of care detected in first 2 sentences: "${opening.slice(0, 120)}..."`);
   return false;
+}
+
+// ============================================================
+// CITATION-YEAR LOCK (v7.5.8) - forbids fabricated guideline years
+// ============================================================
+// Targets explanations that attach an invented year to a society/guideline name
+// ("ATA 2024", "ATA 2025", "AACE 2025", "2023 ATA/ACR"). Only years adjacent to a
+// recognized issuing body are checked; bare numbers (ages, labs) are ignored.
+// Per-society allow-list lets us permit "AHA/ASA 2024" while still rejecting
+// "ATA 2024". Seed = CLAUDE.md s6 canon + DI (ESE 2018) + A1/A2 anchors.
+// Runs at GENERATION time only; stored rows are untouched.
+const ALLOWED_GUIDELINE_CITATIONS = {
+  "Endocrine Society": new Set(["2009", "2016", "2018"]),
+  "ATA":   new Set(["2015", "2016"]),
+  "AACE":  new Set(["2022", "2023"]),
+  "ESE":   new Set(["2018", "2023"]),
+  "ADA":   new Set(["2026"]),
+  "ACR":   new Set(["2017", "2023"]),
+  "EULAR": new Set(["2023"]),
+  "AHA":   new Set(["2024"]),
+  "ASA":   new Set(["2024"]),
+  "EHRA":  new Set(["2021"]),
+  "KDIGO": new Set(["2022", "2024"]),
+  "Jonklaas": new Set(["2014"])
+};
+// Match longest society names first so "Endocrine Society" wins over substrings.
+const GUIDELINE_TOKENS = Object.keys(ALLOWED_GUIDELINE_CITATIONS)
+  .sort((a, b) => b.length - a.length);
+const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial rollout
+
+function validateCitationYears(p) {
+  if (!p || !p.explanation) return true;
+  const text = String(p.explanation);
+  for (const token of GUIDELINE_TOKENS) {
+    const esc = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tokenRe = new RegExp(esc, "gi");
+    let m;
+    while ((m = tokenRe.exec(text)) !== null) {
+      const start = Math.max(0, m.index - 25);
+      const window = text.slice(start, m.index + token.length + 25);
+      const yearMatch = window.match(/\b(19|20)\d{2}\b/);
+      if (yearMatch && !ALLOWED_GUIDELINE_CITATIONS[token].has(yearMatch[0])) {
+        console.warn(`[validateCitationYears] Disallowed citation "${token} ${yearMatch[0]}" (allowed: ${[...ALLOWED_GUIDELINE_CITATIONS[token]].join(", ")}).`);
+        if (CITATION_LOCK_ENFORCE) return false;
+      }
+    }
+  }
+  return true;
 }
 
 function validateChoiceCompleteness(p) {
