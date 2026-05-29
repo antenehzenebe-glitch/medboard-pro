@@ -2129,6 +2129,9 @@ K. ABIM CANON — LEAD-IN (Sections C.1, C.2):
    - FORBIDDEN phrasings: "associated with", "NOT", "EXCEPT", "LEAST likely".
    - FORBIDDEN choices: "All of the above", "None of the above".
    - Set lead_in_type to the appropriate enum value matching the cognitive task.
+
+L. STEM-EXPLANATION LAB-VALUE REPRODUCTION LOCK (v7.5.8): When the explanation restates any analyte, vital sign, or numeric result already given in the stem, reproduce the EXACT value and units from the stem verbatim. NEVER introduce a second, different number for the same analyte (e.g., a stem calcium of 10.1 mg/dL must not appear as 14.5 mg/dL in the explanation). If a genuinely new follow-up or derived value is needed, label it explicitly as a separate measurement; do not silently overwrite the stem value.
+M. SINGLE-BEST-ANSWER DISCRIMINATOR (v7.5.8): Do NOT key an answer when another option is equally defensible under current guidelines (e.g., levothyroxine start-low-go-slow vs full-replacement dose in a healthy young adult; preeclampsia delivery timing within an acceptable window; coexisting post-stroke anticoagulation-timing frameworks). The stem MUST contain an explicit discriminator - a comorbidity, age or physiologic extreme, contraindication, or guideline-defined threshold - that makes exactly ONE option best, and the explanation must name that discriminator as the reason the runner-up is inferior. If no single best answer can be justified, fix the STEM (add the discriminator), not the key.
 `;
 
   const guardrails = getTopicGuardrails(level, promptTopic);
