@@ -66,6 +66,19 @@ const VALID_LEVELS = ["ABIM Internal Medicine","ABIM Endocrinology","USMLE Step 
 // TOPIC GUARDRAIL MAP (Layer 1 + Layer 2 per topic)
 // ============================================================
 const TOPIC_GUARDRAILS = [
+  {
+    keywords: ["adrenal insufficiency", "addison", "addison's disease", "primary adrenal insufficiency", "secondary adrenal insufficiency", "hydrocortisone replacement", "fludrocortisone", "glucocorticoid replacement", "mineralocorticoid replacement", "plasma renin activity", "steroid replacement monitoring"],
+    l1: `ADRENAL INSUFFICIENCY - REPLACEMENT MONITORING FOUNDATIONAL ANCHORS:
+- GLUCOCORTICOID adequacy has NO reliable biochemical marker. Titrate hydrocortisone CLINICALLY: resolution of fatigue/anorexia/weight loss, and absence of over-replacement signs (weight gain, central adiposity, glucose intolerance, insomnia, hypertension). Do NOT titrate hydrocortisone to random serum cortisol, ACTH, or 24-hour urinary free cortisol.
+- MINERALOCORTICOID adequacy (fludrocortisone; primary AI only) is assessed PRIMARILY CLINICALLY: supine and standing BP, orthostatic symptoms, salt craving, peripheral edema, plus serum Na and K. PLASMA RENIN ACTIVITY is ADJUNCTIVE - target the upper half of the reference range. Suppressed PRA with edema/hypertension/hypokalemia indicates OVER-replacement; elevated PRA with orthostasis/salt-craving/hyperkalemia indicates UNDER-replacement.
+- SECONDARY (and tertiary) adrenal insufficiency does NOT require mineralocorticoid replacement - the renin-angiotensin-aldosterone axis is intact. Fludrocortisone and PRA monitoring apply to PRIMARY AI (Addison) only.
+- Sick-day / stress-dose rules and a parenteral hydrocortisone emergency kit are mandatory components of management and patient education.
+- Source: Endocrine Society 2016 (Bornstein et al.), Primary Adrenal Insufficiency clinical practice guideline.`,
+    l2: `ADRENAL INSUFFICIENCY - REPLACEMENT MONITORING COGNITIVE COMPLEXITY:
+FORBIDDEN basic stems: "How do you monitor glucocorticoid replacement?", "What is the treatment of Addison's disease?"
+FORBIDDEN keys: framing plasma renin activity as the "gold standard" for monitoring replacement; keying "best test to monitor glucocorticoid replacement" to ANY biochemical test (there is none - it is clinical); keying random/serum cortisol or ACTH to titrate the hydrocortisone dose; keying fludrocortisone or PRA monitoring in a patient with SECONDARY AI.
+REQUIRED Tier-3 angles: discriminate OVER- vs UNDER-replacement from a constellation (BP, orthostasis, Na/K, PRA, edema, weight); recognize that secondary AI needs glucocorticoid only; adjust stress dosing for intercurrent illness or surgery.`,
+  },
   // ─── ENDOCRINOLOGY: DIABETES CLUSTER ──────────────────────────────────────
   {
     keywords: ["dka", "hhs", "diabetic ketoacidosis", "hyperglycemic hyperosmolar"],
