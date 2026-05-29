@@ -1589,23 +1589,55 @@ function validateSiteOfCare(p) {
 // "ATA 2024". Seed = CLAUDE.md s6 canon + DI (ESE 2018) + A1/A2 anchors.
 // Runs at GENERATION time only; stored rows are untouched.
 const ALLOWED_GUIDELINE_CITATIONS = {
+  // Endocrine core — verified to publication year (AM pass; SESSION_LOG_2026_05_29_AM)
   "Endocrine Society": new Set(["2008", "2009", "2014", "2016", "2018", "2022", "2024", "2025"]),
   "ATA":   new Set(["2014", "2015", "2016", "2017", "2025"]),
   "AACE":  new Set(["2020", "2022", "2023", "2025", "2026"]),
   "ESE":   new Set(["2018", "2023", "2024"]),
   "ADA":   new Set(["2024", "2025", "2026"]),
+  // Non-endo — verified to publication year (PM pass, 2026-05-29)
+  "AHA":   new Set(["2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]),
+  "ASA":   new Set(["2018", "2019", "2021", "2022", "2026"]),
+  "KDIGO": new Set(["2021", "2022", "2024", "2025"]),
+  "GOLD":  new Set(["2024", "2025", "2026"]),
+  "GINA":  new Set(["2024", "2025", "2026"]),
+  "EULAR": new Set(["2022", "2023"]),
   "ACR":   new Set(["2017", "2023"]),
-  "EULAR": new Set(["2023"]),
-  "AHA":   new Set(["2024"]),
-  "ASA":   new Set(["2024"]),
   "EHRA":  new Set(["2021"]),
-  "KDIGO": new Set(["2022", "2024"]),
   "Jonklaas": new Set(["2014"])
 };
 // Match longest society names first so "Endocrine Society" wins over substrings.
 const GUIDELINE_TOKENS = Object.keys(ALLOWED_GUIDELINE_CITATIONS)
   .sort((a, b) => b.length - a.length);
 const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial rollout
+
+// Unseeded bodies (no canonical single "correct year"): flag for vetting, never reject.
+// Promote any of these into ALLOWED_GUIDELINE_CITATIONS to switch it to hard enforcement.
+const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
+  .sort((a, b) => b.length - a.length);
+
+function checkUnseededCitations(p) {
+  if (!p || !p.explanation) return [];
+  const text = String(p.explanation);
+  const notices = [];
+  for (const token of WARN_GUIDELINE_TOKENS) {
+    if (ALLOWED_GUIDELINE_CITATIONS[token]) continue; // promoted -> hard path owns it
+    const esc = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tokenRe = new RegExp("\\b" + esc + "\\b", "gi");
+    let m;
+    while ((m = tokenRe.exec(text)) !== null) {
+      const start = Math.max(0, m.index - 25);
+      const window = text.slice(start, m.index + token.length + 25);
+      const yearMatch = window.match(/\b(19|20)\d{2}\b/);
+      if (yearMatch) {
+        const msg = `[citation-warn] Unseeded body "${token} ${yearMatch[0]}" \u2014 verify edition during vetting.`;
+        console.warn(msg);
+        notices.push(msg);
+      }
+    }
+  }
+  return notices;
+}
 
 function validateCitationYears(p) {
   if (!p || !p.explanation) return true;
