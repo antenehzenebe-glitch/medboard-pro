@@ -2147,6 +2147,7 @@ function processRawMcq(p, level, topic, resolvedTopic) {
   if (!validateSiteOfCare(p)) return null;
   if (!validateCitationYears(p)) return null;
   if (detectAntiCueingViolation(p)) return null;
+  checkUnseededCitations(p); // PART 2: non-blocking warn on the accepted item, past all reject gates
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
