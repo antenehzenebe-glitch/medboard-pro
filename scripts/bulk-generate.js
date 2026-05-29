@@ -2131,7 +2131,7 @@ Execute the generation using the emit_mcq tool. Set demographic_check to "confir
 }
 
 // ─── PROCESS RAW MCQ ─────────────────────────────────────────────────────────
-function processRawMcq(p, level, topic, resolvedTopic) {
+function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknown") {
   if (!p || !p.stem || !p.choices || !p.correct || !p.explanation) return null;
   if (!validateDemographics(p.stem, p._sex || "man", resolvedTopic)) return null;
   if (!validateConsistency(p)) return null;
@@ -2180,6 +2180,7 @@ function processRawMcq(p, level, topic, resolvedTopic) {
     exam_level:      level,
     specialty_group: deriveSpecialtyGroup(level, resolvedTopic),
     blueprint_tag:   resolvedTopic,
+    generation_model: generationModel,
   };
 }
 
@@ -2335,7 +2336,7 @@ async function runBatchMode(queue) {
         const toolBlock = result.result.message?.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
         if (!toolBlock?.input) continue;
         const raw = { ...toolBlock.input, _sex: meta.sex };
-        const processed = processRawMcq(raw, meta.level, meta.topic, meta.resolvedTopic);
+        const processed = processRawMcq(raw, meta.level, meta.topic, meta.resolvedTopic, BULK_CLAUDE_MODEL);
         if (processed) allRecords.push(processed);
       } catch (e) {}
     }
@@ -2427,7 +2428,7 @@ async function runStandardMode(queue, silent = false) {
         const toolBlock = data.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
         if (!toolBlock?.input) throw new Error("No tool_use block");
         const raw       = { ...toolBlock.input, _sex: pd.randomSex };
-        const processed = processRawMcq(raw, item.level, item.topic, pd.resolvedTopic);
+        const processed = processRawMcq(raw, item.level, item.topic, pd.resolvedTopic, BULK_CLAUDE_MODEL);
         if (processed) {
           done++;
           if (!silent) process.stdout.write(`\r  ✅  ${done}/${queue.length} complete   `);
@@ -2446,7 +2447,7 @@ async function runStandardMode(queue, silent = false) {
       try {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
         const raw       = { ...fbResult.parsed, _sex: pd.randomSex };
-        const processed = processRawMcq(raw, item.level, item.topic, pd.resolvedTopic);
+        const processed = processRawMcq(raw, item.level, item.topic, pd.resolvedTopic, fbResult.model);
         if (processed) {
           done++;
           if (!silent) process.stdout.write(`\r  🔁  ${done}/${queue.length} complete (gemini)   `);
