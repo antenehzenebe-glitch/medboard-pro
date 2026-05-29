@@ -2086,6 +2086,7 @@ function processRawMcq(p, level, topic, resolvedTopic) {
   if (!validatePejorativeLanguage(p)) return null;
   if (!validateNoAllOrNoneOfTheAbove(p)) return null;
   if (!validateSiteOfCare(p)) return null;
+  if (!validateCitationYears(p)) return null;
   if (detectAntiCueingViolation(p)) return null;
 
   const letters      = ["A","B","C","D","E"];

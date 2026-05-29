@@ -2247,9 +2247,11 @@ exports.handler = async function (event) {
       const pejorativeOk  = validatePejorativeLanguage(p);
       const aotaOk        = validateNoAllOrNoneOfTheAbove(p);
       const siteOfCareOk  = validateSiteOfCare(p);
+      const citationOk    = validateCitationYears(p);
       isValid = demoOk && consistencyOk && choicesOk && cueingFree
              && leadInOk && negFormOk && assocOk && vagueOk
-             && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk;
+             && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk
+             && citationOk;
 
       if (!isValid && attempts === 3) {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
@@ -2266,7 +2268,8 @@ exports.handler = async function (event) {
                && validateSubjectiveAdjectives(p)
                && validatePejorativeLanguage(p)
                && validateNoAllOrNoneOfTheAbove(p)
-               && validateSiteOfCare(p);
+               && validateSiteOfCare(p)
+               && validateCitationYears(p);
       }
     }
 
