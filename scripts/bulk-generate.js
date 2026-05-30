@@ -65,6 +65,7 @@
 const crypto = require("crypto");
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const BULK_CLAUDE_MODEL = "claude-sonnet-4-6";
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 const SUPABASE_URL      = process.env.SUPABASE_URL;
    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
