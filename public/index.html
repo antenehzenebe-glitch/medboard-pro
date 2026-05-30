@@ -310,7 +310,26 @@ function LegalModal({type, onClose}) {
     </div>
   );
 }
-
+// ─── DAILY QUESTION WIDGET ────────────────────────────────────────────────────
+function DailyQuestionWidget() {
+  React.useEffect(function () {
+    if (document.getElementById("mbp-widget-script")) return;
+    var s = document.createElement("script");
+    s.id = "mbp-widget-script";
+    s.src = "/medboard-widget.js";
+    s.setAttribute("data-checkout", "https://medboardpro.org/");
+    s.setAttribute("data-endpoint", "");
+    s.setAttribute("data-placement", "landing-hero");
+    s.setAttribute("data-theme", "dark");
+    document.body.appendChild(s);
+  }, []);
+  return (
+    <div style={{padding:"10px 5% 50px", maxWidth:620, margin:"0 auto", width:"100%"}}>
+      <p style={{textAlign:"center", color:GOLD, fontSize:13, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:16}}>Try a free board question</p>
+      <div id="medboard-widget"></div>
+    </div>
+  );
+}
 // ─── LANDING PAGE ─────────────────────────────────────────────────────────────
 function LandingPage(props) {
   var {showAuth, setShowAuth, authMode, setAuthMode, email, setEmail, pw, setPw, nm, setNm, authErr, handleAuth, googleLogin, setLegalModal} = props;
@@ -356,7 +375,7 @@ function LandingPage(props) {
             <div className="exam-pill"><span style={{color:GOLD,fontWeight:800,fontSize:14,marginBottom:4}}>ABIM Endo</span><span style={{color:"#64748b",fontSize:11}}>Fellows</span></div>
           </div>
         </section>
-
+       <DailyQuestionWidget />
         <section id="how" style={{padding:"100px 5%",background:"linear-gradient(180deg, #0a0a0f 0%, #111827 100%)"}}>
           <div style={{maxWidth:1200,margin:"0 auto"}}>
             <div style={{textAlign:"center",marginBottom:64}}>
@@ -967,6 +986,5 @@ function App() {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
 </script>
-<div id="medboard-widget"></div>
-<script src="/medboard-widget.js" data-checkout="https://medboardpro.org/" data-endpoint="" data-placement="home" data-theme="light" defer></script></body>
+</body>
 </html>
