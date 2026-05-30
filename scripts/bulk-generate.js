@@ -1,5 +1,5 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.8 — citation-year lock + lab-value lock + single-best guard + AI/AC monitoring + post-stroke AC anchors
+// v7.5.9 — citation-year lock + lab-value lock + single-best guard + AI/AC monitoring + post-stroke AC anchors
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.6):
 // - ADDED: 8 canon-aligned validators sourced from ABIM Question Writing
@@ -2229,23 +2229,33 @@ function buildWorkQueue(count) {
     const topics = TOPIC_DISTRIBUTION[level] || [];
     for (const t of topics) flat.push({ level, topic: t.topic, w: t.weight });
   }
-  const totalWeight = flat.reduce((s, f) => s + f.w, 0);
-
+  // v7.5.9 (B3) — draw WITHOUT replacement to kill intra-batch concept clustering.
+  // Shuffle the distinct {level, topic} concepts and emit them round-robin,
+  // reshuffling whenever the pool is exhausted. Each concept therefore appears at
+  // most ceil(count / flat.length) times, evenly spread. This replaces the old
+  // weighted-WITH-replacement sampler that let high-weight topics (e.g. T2DM)
+  // recur within a single batch — semantic clustering that content_hash dedup
+  // cannot catch (the confirmed root of the April SGLT2i/DI/SIADH duplication).
+  if (flat.length === 0) return queue;
+  function shuffleConcepts(arr) {
+    const a = arr.slice();
+    for (let k = a.length - 1; k > 0; k--) {
+      const j = Math.floor(Math.random() * (k + 1));
+      const tmp = a[k]; a[k] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+  let pool = [];
   for (let i = 0; i < count; i++) {
-    let rand = Math.random() * totalWeight;
-    for (const item of flat) {
-      rand -= item.w;
-      if (rand < 0) {
-        // v7.5.3 Logic Fix: Intercept and inject nutrition topics dynamically based on probability
-        const nTopics = NUTRITION_BY_LEVEL[item.level];
-        if (nTopics && Math.random() < NUTRITION_INJECTION_RATE) {
-          const randomNutrition = nTopics[Math.floor(Math.random() * nTopics.length)];
-          queue.push({ level: item.level, topic: randomNutrition });
-        } else {
-          queue.push({ level: item.level, topic: item.topic });
-        }
-        break;
-      }
+    if (pool.length === 0) pool = shuffleConcepts(flat);
+    const item = pool.shift();
+    // Preserve the nutrition-injection hook (unchanged semantics).
+    const nTopics = NUTRITION_BY_LEVEL[item.level];
+    if (nTopics && Math.random() < NUTRITION_INJECTION_RATE) {
+      const randomNutrition = nTopics[Math.floor(Math.random() * nTopics.length)];
+      queue.push({ level: item.level, topic: randomNutrition });
+    } else {
+      queue.push({ level: item.level, topic: item.topic });
     }
   }
   return queue;
@@ -2486,7 +2496,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.8)    ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.9)    ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
