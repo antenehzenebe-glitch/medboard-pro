@@ -1,7 +1,7 @@
 /* ============================================================================
-   MedBoard Pro — Daily Board Question Widget  (v1.0)
+   MedBoard Pro — Daily Board Question Widget  (v1.1)
    ----------------------------------------------------------------------------
-   Embeddable, dependency-free lead-capture widget.
+   Embeddable, dependency-free funnel widget.
 
    USAGE (paste anywhere on any site):
      <div id="medboard-widget"></div>
@@ -13,12 +13,12 @@
              data-theme="light"    (light | dark)
              defer></script>
 
-   Funnel:
+   Funnel (v1.1 — Option A, drive trials directly):
      1. Show a real board question (zero friction).
      2. User answers -> instant correct/incorrect + 1-line teaser.
-     3. Soft email gate to unlock the full explanation.
-     4. After email -> full explanation + strong trial CTA.
-     5. Returning users (email already given) skip the gate -> keep coming back.
+     3. Full explanation shown immediately (no email gate).
+     4. Strong trial CTA directly under the explanation.
+     (Email-capture path is parked below for a later optional, non-blocking ask.)
    ========================================================================== */
 (function () {
   "use strict";
@@ -305,12 +305,11 @@
       esc(current.teaser) +
       "</span></div>";
 
-    var body;
-    if (unlocked) {
-      body = explanationBlock() + ctaBlock();
-    } else {
-      body = gateBlock();
-    }
+    // Option A (v1.1) — drive trials directly: explanation + CTA show
+    // immediately on answer, no email gate. gateBlock()/bindGate()/captureLead()
+    // are retained below (parked) for a later non-blocking, post-explanation
+    // optional email ask. Do NOT delete them.
+    var body = explanationBlock() + ctaBlock();
 
     // insert after opts
     var anchor = qs(".opts");
@@ -318,8 +317,7 @@
     holder.innerHTML = verdict + body;
     anchor.parentNode.insertBefore(holder, anchor.nextSibling);
 
-    if (unlocked) bindCTA();
-    else bindGate();
+    bindCTA();
   }
 
   function gateBlock() {
