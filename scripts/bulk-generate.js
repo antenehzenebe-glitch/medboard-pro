@@ -2427,7 +2427,7 @@ async function runStandardMode(queue, silent = false) {
           })
         });
         if (res.status === 429) { await sleep(5000 * (attempt + 1)); continue; }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) { const eb = await res.text().catch(() => ""); throw new Error(`HTTP ${res.status} — ${eb.slice(0, 200)}`); }
         const data      = await res.json();
         const toolBlock = data.content?.find(b => b.type === "tool_use" && b.name === "emit_mcq");
         if (!toolBlock?.input) throw new Error("No tool_use block");
@@ -2441,6 +2441,7 @@ async function runStandardMode(queue, silent = false) {
         // Validator rejected — fall through to next attempt
         if (attempt < 2) await sleep(1500);
       } catch (e) {
+        if (!silent) console.warn(`  ⚠️  [${item.level}/${item.topic}] claude attempt ${attempt + 1}: ${e.message}`);
         // Network / schema / tool_use error — fall through to next attempt
         if (attempt < 2) await sleep(2000);
       }
@@ -2457,7 +2458,8 @@ async function runStandardMode(queue, silent = false) {
           if (!silent) process.stdout.write(`\r  🔁  ${done}/${queue.length} complete (gemini)   `);
           return processed;
         }
-      } catch (_) {
+      } catch (e2) {
+        if (!silent) console.warn(`  ⚠️  [${item.level}/${item.topic}] gemini fallback: ${e2.message}`);
         // Both providers exhausted; the queued item is lost. Continue the run.
       }
     }
