@@ -1,9 +1,10 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: May 16, 2026
+> Last updated: **May 30, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded.
+> Generators at **v7.5.9**, pushed (HEAD `abd3ccd`).
 
----
+-----
 
 ## 1. What this project is
 
@@ -19,282 +20,255 @@
 
 **Differentiator (do not lose sight of this):** built by a fellowship program director with endocrinology depth, including fellowship-level clinical algorithms, ACGME milestone alignment, and a culturally responsive case design philosophy. The platform does NOT compete with UWorld/Amboss on breadth — it competes on Endo depth, rigor, and price.
 
-**Subscription tiers:** Medical Student ($29/mo), Resident/Fellow ($59/mo), Institution ($499/mo). Stripe Payment Links + Customer Portal. 14-day free trial.
+**Subscription tiers:** Medical Student ($29/mo), Resident/Fellow ($59/mo), Institution ($499/mo or $2,999/yr). Stripe Payment Links + Customer Portal. 14-day free trial.
 
----
+-----
 
 ## 2. Tech stack
 
-| Layer | Stack |
-|---|---|
-| Frontend | React (single-file via Babel in `public/index.html`), inline CSS-in-JS, no build step |
-| Hosting | Netlify (auto-deploy from GitHub `main` branch) |
-| Serverless backend | Netlify Functions (Node.js 18+) |
-| Database | Supabase (Postgres) with Row Level Security |
-| Auth | Supabase Auth, opaque API keys (`sb_publishable_*` client-side, `sb_secret_*` server-only) |
-| AI generation | Anthropic Claude (primary), Google Gemini (fallback) |
-| Payments | Stripe Payment Links + Customer Portal (no custom checkout) |
-| Bulk operations | GitHub Actions workflows |
+|Layer             |Stack                                                                                       |
+|------------------|--------------------------------------------------------------------------------------------|
+|Frontend          |React (single-file via Babel in `public/index.html` / root `index.html`), inline CSS-in-JS, no build step |
+|Hosting           |Netlify (auto-deploy from GitHub `main` branch)                                             |
+|Serverless backend|Netlify Functions (Node.js 18+)                                                             |
+|Database          |Supabase (Postgres) with Row Level Security                                                 |
+|Serving           |Supabase RPC `serve_next_mcq` (DB-first, **live**); `generate-mcq.js` as fallback           |
+|Auth              |Supabase Auth, opaque API keys (`sb_publishable_*` client-side, `sb_secret_*` server-only)  |
+|AI generation     |Anthropic Claude (primary, Sonnet 4.6 = `claude-sonnet-4-6`), Google Gemini (fallback, gen-mcq only) |
+|Lead funnel       |Embeddable `medboard-widget.js` (Shadow DOM); `capture-lead.js` Netlify fn (parked)         |
+|Payments          |Stripe Payment Links + Customer Portal (no custom checkout)                                 |
+|Bulk operations   |GitHub Actions workflows                                                                    |
 
----
+-----
 
 ## 3. Repository layout
 
 ```
-medboard-pro/
-├── public/
-│   └── index.html              # Single-file React frontend; base64 headshot embedded on line ~388
+medboard-pro/                   # REPO ROOT (= /workspaces/medboard-pro in Codespaces)
+├── index.html                  # Landing + app (single-file React); embeds the daily-question widget
+├── medboard-widget.js          # Embeddable lead/funnel widget (served at root: /medboard-widget.js)
 ├── netlify/
 │   └── functions/
-│       ├── generate-mcq.js     # Main MCQ generation endpoint
-│       └── edge-functions/     # Edge function scaffolding (partially used)
+│       ├── generate-mcq.js     # Live single-question generator + DB-first fallback (v7.5.x)
+│       └── capture-lead.js     # Lead-capture fn (ready; wiring PARKED — see §8 funnel)
+├── public/
+│   └── index.html              # (single-file React frontend; base64 headshot ~line 388)
 ├── scripts/
-│   └── bulk-generate.js        # Batch MCQ generator run via GitHub Actions
+│   └── bulk-generate.js        # Batch MCQ generator run via GitHub Actions (v7.5.9)
 ├── .github/
 │   └── workflows/              # Bulk MCQ Generator workflow lives here
-├── supabase-migration.sql      # Pending schema migration (cueing_flag, cueing_notes, cueing_checked_at)
-├── revet.js                    # Re-vetting script (anti-cueing pass on existing rows)
+├── supabase-migration.sql      # cueing_* migration (historical)
+├── README.md
 └── CLAUDE.md                   # This file
 ```
 
-**Critical:** `public/index.html` is a single static file with Babel-in-the-browser JSX. There is **no build step**. Every change is the deployed change.
+**Critical:** the frontend is Babel-in-the-browser JSX with **no build step**. Every change is the deployed change.
 
----
+**Patch workflow:** generator edits use self-contained Python scripts that anchor on a unique byte-exact string, assert the occurrence count before editing (abort-before-write if the anchor is wrong), and are idempotent. Run from the **repo root** (`python3 patch.py`), `node --check` both files, `rm` the script, commit. Do NOT paste large heredocs into the Codespaces web terminal — they char-mangle; create the file (or use a quoted `<<'EOF'` heredoc) instead. Browser uploads of `.py` scripts sometimes land in `.github/workflows/` or get renamed `name (1).py` — `find` + `mv` to root before running.
+
+**Parity rule:** `generate-mcq.js` and `bulk-generate.js` must carry byte-identical `TOPIC_GUARDRAILS`, `integrityRules`, and `ALLOWED_GUIDELINE_CITATIONS`. These have silently drifted before (fixed in `ed36ef9`). Diff after any guardrail edit. Note B3 (the sampler) is **bulk-only** — the live single-question path doesn't batch-sample, so it is correctly NOT mirrored to gen-mcq.
+
+-----
 
 ## 4. Architecture
 
-### Current (AI-first)
+### Serving path (DB-first hybrid — LIVE)
 
 ```
 User clicks "Next Question"
-    ↓
-React frontend (public/index.html)
-    ↓ POST /.netlify/functions/generate-mcq
-Netlify Function (generate-mcq.js)
-    ↓
-Claude API (with topic-guardrailed prompt + 5-point self-verification)
-    ↓ on failure
-Gemini API (fallback)
-    ↓
-Supabase INSERT → mcqs (status: 'pending_review')
-    ↓
-Return question JSON to frontend
+    ↓ Supabase RPC: serve_next_mcq(level, topic, user_id)
+    ├── Match found → approved, unseen, cueing-clear row   (~0.05–0.3s)  ← ~95% of cases
+    └── No match    → POST /.netlify/functions/generate-mcq (19–25s)     ← fallback only
 ```
 
-**Observed latency:** 19–25 seconds per call. Netlify hard timeout is 26 seconds. The system operates within a 1–7 second margin of catastrophic failure on every request. Cold starts add 1–3 seconds and account for most "Unable to reach QBank" errors.
+Both serving functions gate on `status` only. `serve_next_mcq` additionally filters `cueing_flag IS NOT TRUE`; `fetch_unseen_mcqs` (SECURITY DEFINER) does not (audit before relying on cueing_flag as a hard gate through every path).
 
-### Target (DB-first hybrid — top architectural priority)
+**Servable-pool definition (authoritative):** `status = 'approved' AND cueing_flag IS NOT TRUE`.
 
-```
-User clicks "Next Question"
-    ↓
-Frontend calls Supabase RPC: serve_next_mcq(level, topic, user_id)
-    ↓
-    ├── Match found → Return approved unseen row    (~0.05–0.3s)  ← 95% of cases
-    └── No match    → POST /.netlify/functions/generate-mcq  (22–25s)  ← thin filters only
-```
+### Threshold to declare a level "live-first"
 
-**Threshold to flip DB-first per level:**
-
-| Level | Approved rows needed before flipping |
-|---|---|
-| ABIM Endocrinology | ~175 (25 per major topic × 7 topics) |
-| ABIM Internal Medicine | ~165 (15 per subspecialty × 11) |
-| USMLE Step 1 | ~150 (10 per organ system × 15) |
-| USMLE Step 2 CK | ~180 (15 per system × 12) |
-| USMLE Step 3 | ~150 (15 per system × 10) |
-
-A `level_is_live` config row in Supabase will gate the DB-first call per level so we can flip levels independently.
-
----
-
-## 5. Database schema (Supabase)
-
-### `mcqs` (primary table)
-
-| Column | Type | Notes |
+| Level | Servable target | Basis |
 |---|---|---|
-| `id` | uuid | primary key |
-| `exam_level` | text | One of the 5 valid levels (see VALID_LEVELS constant) |
-| `blueprint_tag` | text | Topic/subtopic tag |
-| `stem` | text | Clinical vignette |
-| `choices` | jsonb | Array of 5 choice strings (`["A...", "B...", ...]`) |
-| `correct_answer` | text | A/B/C/D/E |
-| `explanation` | text | Teaching explanation |
-| `status` | text | `'pending_review'` \| `'approved'` \| `'rejected'` |
-| `is_approved` | boolean | Convenience flag; may be redundant with `status` |
-| `reviewed_at` | timestamptz | When vetted |
-| `reviewed_by` | text | Reviewer identifier (default `'admin'`) |
-| `content_hash` | text | Dedupe hash on stem |
-| `created_at` | timestamptz | Generation timestamp |
-| `cueing_flag` | text | **PENDING** — added by `supabase-migration.sql` |
-| `cueing_notes` | text | **PENDING** — added by `supabase-migration.sql` |
-| `cueing_checked_at` | timestamptz | **PENDING** — added by `supabase-migration.sql` |
+| ABIM Endocrinology | ~175 | 25 per major topic × 7 |
+| ABIM Internal Medicine | ~165 | 15 per subspecialty × 11 |
+| USMLE Step 1 | ~150 | 10 per organ system × 15 |
+| USMLE Step 2 CK | ~180 | 15 per system × 12 |
+| USMLE Step 3 | ~150 | 15 per system × 10 |
 
-### `user_responses`
+### Supabase Oct-30-2026 Data API change
 
-Tracks every `mcq_id` each user has answered. Used by `serve_next_mcq` RPC to exclude already-seen questions.
+New `public` tables/functions created after Oct 30 2026 won't auto-expose to the Data API. Existing objects (incl. `serve_next_mcq`, `fetch_unseen_mcqs` if already shipped) keep their grants. **Verify those two RPCs carry explicit `GRANT EXECUTE`** (they shipped inside the at-risk window). See `SUPABASE_OCT2026_FALLBACK_PLAN.md`. New-object grant convention is now mandatory — see §10.
 
-### RLS
+-----
 
-Enabled. The publishable key respects RLS; the secret key bypasses it. **Never** ship `sb_secret_*` to the client.
+## 5. Database schema (Supabase) — `mcqs` (25 columns)
 
----
+Key columns: `id` (uuid PK), `exam_level`, `topic`, `stem`, `choices` (jsonb), `correct_answer`, `explanation`, `created_at`, **`status`** (authoritative approval column: `pending_review` | `approved` | `rejected`), `specialty_group`, `blueprint_tag`, `difficulty`, `reviewed_at`, `reviewed_by` (**uuid** — never write `'admin'`; generally NULL), `generation_model` (e.g. `claude-sonnet-4-6`; populated per-row since C2; NULL on pre-C2 rows), `content_hash` (hash-only dedup — does NOT catch semantic near-dupes), `times_served`, `updated_at`, **`approval_status`** (**deprecated** parallel column — see §12), `cueing_flag` (**boolean**), `cueing_notes`, `cueing_checked_at`.
+
+Deprecated / drop-candidates (future migration, not urgent): `quality_score`, `flagged_reason`, `approval_status`, the `cueing_*` trio.
+
+`user_responses` tracks each user's answered `mcq_id` (used by `serve_next_mcq` to exclude seen rows). RLS enabled; publishable key respects RLS, secret key bypasses it.
+
+-----
 
 ## 6. Clinical accuracy standards (the most important section)
 
-This platform is staked on clinical rigor. Every MCQ must meet ABIM/NBME item-writing standards. The two files that enforce this are `generate-mcq.js` and `scripts/bulk-generate.js`, which share an identical `TOPIC_GUARDRAILS` array.
+Enforcement lives in `generate-mcq.js` and `scripts/bulk-generate.js`, sharing an identical `TOPIC_GUARDRAILS` array, an `integrityRules` block (A–M), and a validator stack.
 
-### TOPIC_GUARDRAILS structure
+### TOPIC_GUARDRAILS
+- **L1 — Foundational Anchors:** hard clinical facts (thresholds, named trials, guideline years, contraindications, formulas).
+- **L2 — Cognitive Complexity:** forbids Tier 1–2 trivia; requires Tier 3+ angles.
 
-Each entry is keyed by topic and contains two layers:
+### Clinical anchors locked
+DKA/HHS (K⁺-before-insulin) · Hypoglycemia/Insulinoma (proinsulin pmol/L; Whipple) · Thyroid storm (ATA 2016) · Adrenal incidentaloma (AACE/ESE 2023) · Subclinical hypothyroidism (TRUST) · LT4 dosing · **DI / posterior pituitary** (water deprivation contraindicated when Na > 145 / osm > 295–300; direct DDAVP/copeptin — ESE 2018) · **A1 adrenal-insufficiency replacement monitoring** (no reliable biochemical GC marker; clinical titration; ES 2016) · **A2 post-stroke anticoagulation timing** (EHRA 1-3-6-12 vs ELAN 2023 / AHA-ASA 2024).
 
-- **L1 — Foundational Anchors:** hard-coded clinical facts the LLM must respect (numeric thresholds, named trials, current guideline years, contraindications, formulas).
-- **L2 — Cognitive Complexity:** forbids Tier 1–2 trivial stems and requires Tier 3+ angles (e.g., recognizing euglycemic DKA on SGLT2i, distinguishing factitious from endogenous hyperinsulinism, IV-to-SQ insulin transition).
+### Integrity rules A–M
+A–H pre-existing (H = anti-cueing). I/J/K = v7.5.6 ABIM canon. **L** = lab-value reproduction lock; **M** = single-best-answer discriminator.
 
-### Topics with tightened guardrails (shipped May 15–16, 2026)
+### Validator stack
+`detectAntiCueingViolation`, `validateConsistency` (stem↔explanation lab mismatch backstop), `validateDemographics`, `validateChoiceCompleteness`, the v7.5.6 canon validators (`validateLeadInType` etc.), and **`validateCitationYears` + `ALLOWED_GUIDELINE_CITATIONS`** (per-society allow-list; inspects years within ~25 chars of a recognized society token). Plus `checkUnseededCitations` warn-mode (`WARN_GUIDELINE_TOKENS`) — non-blocking "verify edition" flag, wired on both paths.
 
-- DKA / HHS
-- Hypoglycemia / Insulinoma (corrected proinsulin units to pmol/L; locked Whipple triad criteria; locked endogenous hyperinsulinism panel)
-- Thyroid storm (locked synthesis-before-release sequence; corrected fabricated ATA citations to ATA 2016)
-- Adrenal incidentaloma (locked AACE/ESE 2023 size and washout criteria)
-- Subclinical hypothyroidism (locked TRUST trial findings; corrected wrong TSH targets)
-- Hypothyroidism / Levothyroxine dosing
+> Wiring differs: gen-mcq chains validators with `&&`; bulk uses guard-clause `return recordDrop("name")` (14 guards; the C1 drop-reason tally). In bulk, citation runs before anti-cueing (anti-cueing is dead last — its drops can be masked; re-evaluate ordering with multi-batch data, don't reorder blind).
 
-### Validators enforced in code
-
-| Validator | Purpose |
-|---|---|
-| `detectAntiCueingViolation()` | Rejects MCQs where choices telegraph the correct answer (Rule H) |
-| `validateConsistency()` | Catches lab-value mismatches between stem and explanation (e.g., stem calcium 10.1 vs explanation calcium 145) |
-| `validateDemographics()` | Catches contradictions between demographic statements |
-| `5-point self-verification` | Final LLM self-check before output |
-
-### Citation rules (CRITICAL)
-
-- **Never fabricate guideline years.** Use these specific anchors:
-  - ATA 2016 (thyroid)
-  - Endocrine Society 2009 (hypoglycemia)
-  - AACE/ESE 2023 (adrenal incidentaloma)
-  - AACE 2022 (some thyroid topics)
-  - Jonklaas et al. 2014 (LT4 therapy)
-  - ADA 2026 (diabetes)
-  - TRUST trial (subclinical hypothyroidism in older adults)
-- If a citation is uncertain, leave it general ("per current guidelines") rather than invent a year.
+### Citation lock — COMPLETE (closed May 29)
+Per-society allow-list with bounded rolling windows for annual bodies; verified to publication year for episodic bodies; warn-mode for un-promoted bodies. Final map (both files, byte-identical): Endocrine Society {2008,09,14,16,18,22,24,25} · ATA {2014,15,16,17,25} (2024 rejected) · AACE {2020,22,23,25,26} · ESE {2018,23,24} · ADA {2024,25,26} · AHA {2017–2026} · ASA {2018,19,21,22,26} · KDIGO {2021,22,24,25} · GOLD {2024,25,26} · GINA {2024,25,26} · EULAR {2022,23} · ACR {2017,23} · EHRA {2021} · Jonklaas {2014}. Warn-mode: USPSTF, ACG, AASLD, AGA, ASH, IDSA, SSC, ASPEN, ATTD, ASAS. `CITATION_LOCK_ENFORCE = true`. **Note:** Endocrine Society **2011 is intentionally NOT seeded** (founder decision — real guideline but declined to widen; the lock correctly rejects it).
 
 ### Forbidden stem patterns
+"First step / next step / best fluid" Tier-1 trivia · stems contradicting their own explanation · 4-obviously-wrong choices (cueing) · NOT/EXCEPT/LEAST lead-ins · gratuitous race/demographic descriptors (Rule I) · "all/none of the above."
 
-- "First step in DKA?" / "What is the next step?" / "Best fluid for DKA?" — Tier 1 trivia, automatic reject
-- Stems that contradict their own explanation (lab values, demographics, timeline)
-- Choices where 4 are obviously wrong (cueing violation)
-- Generic Vogue-style demographic vignettes that don't pressure-test clinical reasoning
-
----
+-----
 
 ## 7. Workflows
 
-### Single question generation (user-facing)
-
-User clicks Next Question → frontend POST → `generate-mcq.js` → Claude/Gemini → Supabase insert with `status: pending_review` → returned to user.
+### Single question (user-facing)
+Frontend → `serve_next_mcq` (DB-first). No-match → `generate-mcq.js` → Claude/Gemini → insert `status: pending_review`. Newly generated rows are **never served until vetted.**
 
 ### Bulk generation (admin)
+GitHub → **Actions** → **Bulk MCQ Generator** → run with `Count`, `Level` (specific or blank for round-robin), `Mode: standard`. Confirm the banner version (`… (v7.5.9)`) in the log before vetting a batch. Summary prints `Saved to DB: N`, `DB errors: M`, the **C1 validator-drop breakdown** by reason, gen-failures, and unseeded-citation warns.
 
-GitHub → repo → **Actions** → **Bulk MCQ Generator** → Run workflow with `Count` (e.g., 100), `Level` (specific or blank for round-robin), `Mode: standard`. Output summary line: `Saved to DB: N, DB errors: M`.
+**B3 topic-distribution control (v7.5.9):** `buildWorkQueue` draws **without replacement** — shuffles the distinct `{level, topic}` concepts and emits round-robin, reshuffling when the pool empties, so each concept appears at most `ceil(count / N_concepts)` times, evenly spread. Replaces the old weighted-with-replacement sampler that let high-weight topics recur within a batch (the April clustering `content_hash` couldn't catch). The `FILTER_TOPIC && FILTER_LEVEL` single-topic path and the nutrition-injection hook are preserved. **Smoke-confirmed May 30** (Endo count=10 → 7 saved, 7 distinct concepts across 6 subspecialty groups, zero repeats). Note: B3 spreads at the *topic* level; semantic near-dupes *within* a topic remain the job of a future semantic-dedup pass.
 
-### Vetting
+### Vetting (manual, SQL-driven)
+`status` is authoritative. Safe approval write (mirrors the deprecated column harmlessly):
+```sql
+UPDATE mcqs SET status='approved', approval_status='approved', reviewed_at=now() WHERE id='<row_id>';
+```
+Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by scoping `created_at > now() - interval '2 hours' AND status='pending_review'`. **Always run a WHERE-clause verification SELECT (using a unique stem substring) before any UPDATE.**
 
-Pending rows are reviewed in Supabase SQL Editor or via the admin vetting panel (HTML file in Codespace, not deployed). Approved → `status='approved'`, `reviewed_at=now()`. Rejected → `DELETE` row.
+-----
 
-### Re-vetting (one-off, pending today)
+## 8. Current state (as of May 30, 2026)
 
-Run `node revet.js` (dry run) → `node revet.js --apply` to classify existing rows against new rules (e.g., anti-cueing). Sets `cueing_flag` column.
+### Question bank — servable
 
----
+| Level | Servable | ~Flip target | Gap |
+|---|---|---|---|
+| ABIM Internal Medicine | 87 | ~165 | ~78 |
+| ABIM Endocrinology | 50 | ~175 | ~125 |
+| USMLE Step 1 | 21 | ~150 | ~129 |
+| USMLE Step 3 | 19 | ~150 | ~131 |
+| USMLE Step 2 CK | 16 | ~180 | ~164 |
+| **Total servable** | **193** | | |
 
-## 8. Current state (as of May 16, 2026)
+Pending (not servable until vetted): ~35 Endo v7.5.7 candidates + 3 night-verified + 7 from the May 30 B3 smoke. **IM-36 recovery block** identified: exactly **36** rows `status='pending_review' AND approval_status='approved'` (April pre-canon; spread cleanly across subspecialties — GI/Hep 8, Cardiology 8, Pulm 6, Gen IM 5, Nephro 4, Rheum 3, +Heme/Onc, ID, Ethics). Recovery = triage (promote/edit/drop), not blanket promotion.
 
-**Question bank:**
-- ~113 approved
-- ~56 pending review (generated before tightened guardrails; should be re-vetted or regenerated)
-- 3 rejected
+### Generators
+**v7.5.9**, HEAD `abd3ccd`, pushed. B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
 
-**Distribution skews heavily toward ABIM IM and ABIM Endo.** USMLE Step 1/2 CK/3 are thin (single digits each).
+### Lead funnel (Option A — LIVE May 30)
+`medboard-widget.js` v1.1 deployed: **email gate removed** — answering reveals the full explanation + "Start your free trial" CTA immediately (drive trials directly). UTM tags intact. Email-capture machinery (`gateBlock`/`bindGate`/`captureLead`, `capture-lead.js`, `leads` schema) is **parked, not deleted** — for a future non-blocking, post-explanation optional email ask. Landing page picks this up automatically (the `DailyQuestionWidget` React component only injects `/medboard-widget.js`; no `index.html` change needed).
 
-**Security posture (closed today):**
-- Migrated from Supabase JWT keys to opaque key system
-- All hardcoded JWT fallbacks stripped from source
-- JWT-based API keys disabled in Supabase project
-- Leaked `service_role` JWT permanently revoked
-- New keys: `sb_publishable_*` (Netlify env var, GitHub Actions secret, `public/index.html`), `sb_secret_*` (local admin scripts only, never deployed)
+### Security posture (closed May 16)
+Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publishable_*` client-side; `sb_secret_*` local admin only.
 
----
+-----
 
 ## 9. Roadmap priorities (in order)
 
-1. **Run `supabase-migration.sql`** — adds `cueing_flag` columns. ~5 min.
-2. **Run `revet.js --apply`** — classify the ~172 existing rows for anti-cueing violations. ~15–30 min.
-3. **Bulk-approve clean rows** — SQL to flip cueing-clear rows to `is_approved=true`.
-4. **Build the DB-first RPC (`serve_next_mcq`) + frontend hybrid** — drops user latency from 22s to ~0.1s for 95% of calls. Highest UX-impact item on the roadmap. ~1–2 hours.
-5. **No-signup demo mode** — let prospective subscribers try a question without creating an account.
-6. **30-fellow outreach** — measure willingness-to-pay before further engineering.
-7. **Bulk-generate fresh batches** under tightened guardrails (target: 80–100 approved per level).
-8. **Spaced-repetition engine v2** — Q4 2026.
-9. **Mobile PWA optimization** — Q4 2026.
+1. **IM-36 recovery** — triage the 36 `pending_review/approved` rows (promote clean → `status='approved', reviewed_at=now()`; edit-promote; drop dup/mis-key; hold rewrites). Fastest IM bank growth.
+2. **Resolve two May-30 smoke findings before any scaled IM *generation* run** (see §12): (a) `validateLeadInType` rejecting `most_appropriate_clinical_intervention` at Endo — confirm canon-correct vs over-strict; (b) recurring "truncated choice A" — likely generation/parse defect.
+3. **Staged IM bulk generation** (only after B3 confirmed — done — and #2 resolved): moderate batches (count 20–30), vet to keep pace; new rows = `pending_review`.
+4. **Vet the ~35 Endo bulk candidates** (50 → up to ~85). Expect SGLT2i/hypoglycemia clustering (predate B3).
+5. **Rewrite 3 held items:** `425cf587` (NIPHS), `a660f8af` (LT4 + fabricated ATA 2025), `93191d92` (TCA + bicarbonate).
+6. **Disposition edge-case rows:** IM has 1 `rejected/approved` + 2 `pending/rejected`; bank-wide 2 `rejected/approved`. Excluded from serving; rescue or confirm.
+7. **Image integration Phase 1 decision** — fold `requires_image`/`image_spec` generator flagging into a release, or defer (Phase 0 policy lock still open; see `IMAGE_INTEGRATION_PLAN.md`). Does NOT block MVP.
+8. Continue bulk generation toward thresholds · No-signup demo mode · 30-fellow willingness-to-pay outreach · trial-cancellation survey (the real funnel leak).
+9. Spaced-repetition v2 · Mobile PWA — Q4 2026.
 
----
+-----
 
 ## 10. Coding conventions
 
-- **No build step on frontend.** `public/index.html` is the deployed file. Edits to it are immediately live after Netlify auto-deploy.
-- **Env vars are required, not optional.** All Netlify functions and scripts must fail-fast (`throw new Error(...)`) if `SUPABASE_URL` or `SUPABASE_ANON_KEY` is unset. Never use `|| "fallback-value"` for secrets.
-- **Brand colors:** Navy `#002868`, Gold `#C9A84C`. Used consistently across UI.
-- **Disclaimers required** on any user-facing content: "educational use only, not medical advice."
-- **Pending → approved gate is non-negotiable.** No row ever serves to users with `status != 'approved'`.
-- **Single-purpose commits.** Security commits should not include feature work and vice versa.
+- **No build step on frontend.** Edits to `index.html` / `public/index.html` are immediately live.
+- **Env vars required, not optional.** Fail-fast (`throw`) on missing secrets; never `|| "fallback"`.
+- **Brand colors:** Navy `#002868`, Gold `#C9A84C`. (See `MEDBOARD_DESIGN.md`.)
+- **Disclaimers required** on user-facing content: "educational use only, not medical advice."
+- **Approval gate is non-negotiable.** No row serves with `status != 'approved'`.
+- **`status` is authoritative (D1 closed — option b).** Serve gates on `status` only. Mirror `approval_status` on approvals (harmless, future-proof). Do NOT introduce new logic that reads `approval_status` for serving.
+- **Generator parity mandatory.** Diff `TOPIC_GUARDRAILS` / `integrityRules` / `ALLOWED_GUIDELINE_CITATIONS` after every edit. (Bulk-only changes like B3 are exempt by design.)
+- **Supabase grant convention (Oct-2026):** every migration creating a table/function in `public` MUST include explicit `GRANT` statements in the same migration. No "grant later." Prefer `SECURITY INVOKER` for functions unless there's a clear reason for DEFINER.
+- **Single-purpose commits.** Security ≠ feature ≠ guardrail.
 
----
+-----
 
 ## 11. Security
 
-- **Never paste secrets back into chat.** Even after revocation, hygiene matters.
-- **`sb_secret_*` keys are local-only.** Never commit, never deploy, never embed in client code.
-- **`sb_publishable_*` is safe in client code** (that's literally what "publishable" means in Supabase's model).
-- **RLS protects everything** — but the secret key bypasses RLS, which is why it cannot ship to clients.
-- **Stripe URLs in source are safe:** `billing.stripe.com/p/login/*` and `buy.stripe.com/*` are public by design.
-- **Anthropic/Gemini API keys** live in Netlify env vars only.
+- Never paste secrets back into chat. `sb_secret_*` = local-only. `sb_publishable_*` safe client-side. RLS protects everything; secret key bypasses it. Stripe `billing.stripe.com/p/login/*` + `buy.stripe.com/*` are public by design. Anthropic/Gemini keys in Netlify env vars only. `capture-lead.js` uses `SUPABASE_SERVICE_ROLE` server-side only. If a credential leaks: rotate, audit, never paste it.
 
-If a credential is ever exposed: rotate first, audit second, never paste the leaked value back into any chat or issue.
-
----
+-----
 
 ## 12. Known gotchas
 
-- **Netlify function timeout is 26 seconds.** Current AI generation runs 19–25s. Cold starts add 1–3s. First call after deploy almost always fails or runs slow. Once DB-first ships, this becomes a non-issue for 95% of calls.
-- **Cold-start "Unable to reach QBank" errors** are almost never auth issues — they're function timeouts. If you suspect auth, look for `<1 second` failures with `401`/`403` codes in the browser console. Timeouts after 26+ seconds are infrastructure, not auth.
-- **`public/index.html` line 39** holds `SB_KEY` as a constant — this is the publishable key. Frontend cannot read `process.env`, so the key is necessarily hardcoded here. This is by design and secure.
-- **The base64 headshot on line ~388 of `public/index.html`** is ~100KB embedded as a data URI. Don't accidentally select it during edits. Moving it to a separate `.jpg` file is a small future optimization but not a priority.
-- **Validator rejections during bulk-generate are a feature, not a bug.** Look for `[validateConsistency] Mismatch` etc. in logs — those rows were correctly killed before they could pollute the bank.
+### `approval_status` deprecated — `status` authoritative (D1 RESOLVED May 30, option b)
+Both serve functions gate on `status`. `approval_status` is stale; legacy rows are inconsistent across the two columns. The 2-of-2 gate was rejected (footgun: a promotion that forgets `approval_status` silently de-serves rows). Edge-case rows (`status='rejected'` + `approval_status='approved'`) are excluded from serving — disposition pending.
 
----
+### May-30 smoke findings (OPEN — gate the scaled IM generation run)
+- **`validateLeadInType` rejecting `most_appropriate_clinical_intervention` at ABIM Endocrinology** (4/14 drops in a 10-count run). "Most appropriate intervention/next step" is a core ABIM management lead-in; confirm whether the level-map restriction is canon-correct or over-strict (it'll bite IM harder — IM is management-heavy).
+- **Recurring "truncated choice A"** (`validateChoiceCompleteness`, 4/14). Systematic, always choice A → likely a generation token-cutoff or choice-extraction parse defect, not content. Investigate before scaling.
+
+### Frontend — `saveResponse()` row match is fragile
+In `index.html`, `saveResponse()` looks up the row by `eq("stem", question.stem)` even though the DB-first path already returns the real `id` as `question.id`. Exact long-text matching is brittle (whitespace/encoding drift → response silently not saved → corrupted analytics). Fix: use `question.id` directly when `_source === "db"`; only fall back to a lookup for AI-generated items.
+
+### Generation-outage debugging rule
+If a bulk run returns 0, **read the surfaced HTTP cause first** (error-surfacing patch prints it) and check the most recent commit that touched the generation path **before** suspecting keys/billing. The May-29 outage was a `ReferenceError` (missing constant), not the API. The Anthropic key is confirmed present in Actions secrets.
+
+### Citation lock — blind spots CLOSED
+Full seed list + warn-mode shipped May 29. Remaining residual: journals/trials (NEJM, JAMA, etc.) and FDA/UpToDate are deliberately unguarded (no canonical year); warn-mode surfaces unseeded TitleCase-bodies. `±25-char window takes the FIRST year in range` → adjacent citations can mis-attribute (backlog).
+
+### `TOPIC_GUARDRAILS` drift between generators
+Reconciled in `ed36ef9`. Always diff after a guardrail edit. A pre-commit parity assertion would catch this automatically (backlog).
+
+### Semantic near-duplicates
+`content_hash` dedupes exact stems only. B3 fixes *topic-level* clustering; semantic near-dupes within a topic still survive (real fix = semantic dedup, backlog).
+
+### Doc/file drift (cleanup)
+- `INTEGRATION.md` documents the widget at `/widget/medboard-widget.js`; it is actually live at the root `/medboard-widget.js`.
+- The leads schema is committed as `Spabase_lead_schema` (typo, no `.sql`); docs call it `supabase-leads-schema.sql`.
+
+### Other
+- Netlify function timeout = 26s; gen runs 19–25s. Off the critical path now (DB-first serves ~95%). Cold-start "Unable to reach QBank" ≈ timeout, not auth (auth fails are `<1s` with 401/403).
+- `index.html` / `public/index.html` line ~39 holds `SB_KEY` (publishable) as a constant — by design, secure.
+- Base64 headshot ~line 388 is ~100KB; don't select it during edits.
+- `reviewed_by` is **uuid**, never `'admin'`. `cueing_flag` is **boolean**.
+- **Watch the aldosterone consistency-rejection rate** — Rule L (prompt) isn't fully landing on aldosterone values; `validateConsistency` is the backstop. The May-30 run showed only 1 consistency drop (TSH), better than prior aldosterone-heavy runs.
+
+### Backlog (carry forward)
+Model-literal consolidation (fetch bodies hardcode `claude-sonnet-4-6`; point at `BULK_CLAUDE_MODEL`) · guard-order decision (anti-cueing last) · pre-commit parity assertion · pre-C2 `generation_model` backfill (359 NULL rows → `pre-c2-unknown`) · A1 keyword-shadowing check · integrityRules A–J parity diff · semantic dedup · ±25-char citation-window mis-attribution.
+
+-----
 
 ## 13. Sequencing principle
 
-When in doubt, follow this order:
+1. Schema first (DB before dependent code). 2. Server-side second (functions, bulk scripts). 3. Frontend last. 4. Production-deploy validation always — smoke test in incognito after every deploy (question loads, choices render, explanation appears); roll back via Netlify Deploys → Publish previous deploy.
 
-1. **Schema first** — DB changes before code changes that depend on them.
-2. **Server-side second** — Netlify functions and bulk scripts.
-3. **Frontend last** — `public/index.html` only after server is verified.
-4. **Production-deploy validation always** — smoke test in a private/incognito window after every deploy. Pass = question loads, choices render, explanation appears. Fail = roll back via Netlify Deploys → Publish previous deploy.
-
----
+-----
 
 ## 14. Founder voice and product positioning
 
-- Tone: senior attending walking a junior through a high-yield case. Clinically rigorous, never condescending.
-- Position: academic-credibility-first (founder's titles and program director role lead). Not flashy. Not gamified.
-- Compete on: Endocrinology depth, clinical rigor, price.
-- Do NOT compete on: breadth, flashcard volume, gamification, social features.
+- Tone: senior attending walking a junior through a high-yield case. Rigorous, never condescending.
+- Position: academic-credibility-first. Not flashy, not gamified.
+- Compete on: Endocrinology depth, clinical rigor, price. NOT on breadth, flashcards, gamification, social.
 
----
+-----
 
 *End of CLAUDE.md*
