@@ -1,5 +1,5 @@
 // generate-mcq.js — MedBoard Pro
-// v7.5.8 — citation-year lock + lab-value lock + single-best guard + AI/AC monitoring + post-stroke AC anchors
+// v7.5.11 — lipid non-statin escalation keyed by LDL-lowering magnitude (2026 ACC/AHA/PREVENT canon), AACE unseeded → 2025; parity with bulk-generate.js v7.5.11
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.7 — 2026-05-24):
 // - ADDED (Patch 2): lead_in_type enum (17 values) added to MCQ_TOOL.input_schema
