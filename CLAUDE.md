@@ -1,8 +1,8 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: **May 30, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed:** 2018 cholesterol guideline retired; 2026 ACC/AHA Dyslipidemia Guideline + AACE 2025 anchored; dyslipidemia anchor added to both generators' `TOPIC_GUARDRAILS`.
-> Generators at **v7.5.10** — dyslipidemia `TOPIC_GUARDRAILS` anchor added to both files (apply `patch_lipid_anchor.py`, `node --check`, then push). Prior stable: v7.5.9 (HEAD `abd3ccd`).
+> Last updated: **May 30, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
+> Generators at **v7.5.10** — lipid blocks refreshed in both files via `patch_lipid_refresh.py` (`node --check`, parity-diff, then push). Prior stable: v7.5.9 (HEAD `abd3ccd`).
 
 -----
 
