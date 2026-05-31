@@ -715,18 +715,26 @@ REQUIRED Tier 2-3 angles:
   },
   {
     keywords: ["lipid", "dyslipidemia", "statin", "ascvd", "pcsk9", "ezetimibe", "bempedoic"],
-    l1: `LIPID FOUNDATIONAL ANCHORS (AHA 2024):
-- Use PREVENT calculator (race-neutral, includes kidney function). PCE (2013) is LEGACY.
-- LDL not at goal on max-tolerated statin: add ezetimibe → add PCSK9i.
-- Bempedoic acid: option for statin-intolerant patients.
-- Statin myopathy: CK >10x ULN = discontinue. Always rechallenge with alternate statin before declaring complete intolerance.
-- Inclisiran: siRNA, q6-monthly dosing after two initial doses.`,
+    l1: `LIPID FOUNDATIONAL ANCHORS (2026 ACC/AHA/Multisociety Dyslipidemia Guideline — RETIRES & REPLACES the 2018 Blood Cholesterol Guideline):
+- RISK-BASED LDL-C GOALS RESTORED (2018 set none; do NOT write items to "intensity, not goal" logic):
+  - Clinical ASCVD: <55 mg/dL very-high-risk; <70 not very-high-risk.
+  - Primary, LDL-C >=190: <100 (<70 if HeFH, >=1 ASCVD risk factor, or subclinical atherosclerosis).
+  - Primary, LDL-C 70-189: <100 at low/borderline/intermediate PREVENT risk; <70 at high PREVENT risk.
+  - Subclinical (CAC): <100 if CAC 1-99 AU and <75th pct; <70 if CAC 100-299 AU or >=75th pct; <55 if CAC >=1000 AU.
+- RISK TOOL: AHA PREVENT equations REPLACE the Pooled Cohort Equations for primary prevention, ages 30-79 (race-neutral; includes eGFR/UACR and HbA1c; 10- and 30-year risk). PCE (2013) is LEGACY.
+- Lp(a): universal once-in-a-lifetime screening (causal, independent of LDL-C). apoB and non-HDL-C are secondary targets.
+- Escalation when LDL above goal on maximally-tolerated statin: add ezetimibe -> add PCSK9i (evolocumab/alirocumab). Bempedoic acid for statin-intolerant. Inclisiran: siRNA, doses at 0 and 3 months, then every 6 months.
+- Statin myopathy: CK >10x ULN -> discontinue; always rechallenge with an alternate statin before declaring complete intolerance.
+- AACE 2025 (Patel/Wyne, Endocr Pract 2025;31:236-262) = GRADE nonstatin focused update; niacin NOT recommended as add-on in hypertriglyceridemia 150-499 mg/dL with or at risk of ASCVD. Where AACE 2025 and 2026 ACC/AHA conflict on risk tooling, PREVENT (2026) governs.`,
     l2: `LIPID COGNITIVE COMPLEXITY:
-FORBIDDEN basic stems: "First-line for hyperlipidemia?", "Diagnosis of FH?"
+FORBIDDEN basic stems: "First-line for hyperlipidemia?", "Diagnosis of FH?", "Target LDL?" stated without risk stratification.
+FORBIDDEN: keying "treat to statin intensity, no numeric goal" as correct — retired 2018 logic; 2026 restores numeric, risk-based goals.
+FORBIDDEN: using the Pooled Cohort Equations as the correct primary-prevention risk tool for ages 30-79 — PREVENT supersedes it.
 REQUIRED Tier 2-3 angles:
 - Statin intolerance workup and structured rechallenge
 - Familial hypercholesterolemia management with PCSK9i
-- Elevated lp(a) management strategy
+- LDL-C goal selection by risk stratum; nonstatin sequencing (ezetimibe -> bempedoic acid / PCSK9i)
+- Elevated Lp(a) interpretation and cascade screening
 - Lipid management in pregnancy when statin contraindicated`
   },
   {
@@ -849,27 +857,25 @@ CRITICAL THYROID ANCHORS:
    - FORBIDDEN Tier 1: "TSH 9.8 + low T4 — start levo?"
    - REQUIRED Tier 3+: "Stable patient on levo develops elevated TSH — most likely cause?"
    - REQUIRED Tier 4: "Post-thyroidectomy DTC — TSH 1.2, Tg undetectable, anti-Tg rising — interpretation?"` },
-  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2018 AHA/ACC/Multisociety Cholesterol Guideline (Grundy et al., Circulation 2019); 2019 ACC/AHA Primary Prevention Guideline (Arnett et al.); 2022 ACC Expert Consensus on Non-Statin Therapies (Lloyd-Jones et al.); 2024 AHA Scientific Statement on PREVENT Calculator.
+  { keywords: ["lipid", "dyslipidemia", "cholesterol", "statin", "ascvd", "pcsk9", "ezetimibe", "triglyceride", "lpa", "lp(a)", "familial hypercholesterolemia", "bempedoic", "inclisiran", "fenofibrate"], citation: `2026 ACC/AHA/Multisociety Guideline on the Management of Dyslipidemia (Blumenthal et al., Circulation 2026) — RETIRES & REPLACES the 2018 Blood Cholesterol Guideline; AACE 2025 CPG on Pharmacologic Management of Adults with Dyslipidemia (Patel SB, Wyne KL, Endocr Pract 2025;31:236-262); 2022 ACC Expert Consensus Decision Pathway on Non-Statin Therapies (Lloyd-Jones et al.).
 
-⚠️ FABRICATED CITATION WARNING:
-- "AACE 2026 Lipid Guidelines" DOES NOT EXIST. Last comprehensive AACE lipid guideline: Jellinger et al. 2017.
+⚠️ FABRICATED / RETIRED CITATION WARNINGS:
+- "AACE 2026 Lipid Guidelines" DOES NOT EXIST. AACE's dyslipidemia guideline is 2025 (Patel/Wyne; GRADE nonstatin focused update of the 2017 Jellinger guideline).
+- The 2018 AHA/ACC Cholesterol Guideline (Grundy et al.) is RETIRED (replaced by 2026) AND pre-2023 — BANNED for new items; never cite it as current.
 
-CRITICAL LIPID ANCHORS:
+CRITICAL LIPID ANCHORS (2026 ACC/AHA):
 1. RISK CALCULATOR — USE PREVENT, NOT PCE:
-   - PREVENT calculator (AHA 2023) is current ASCVD risk tool — race-neutral, includes kidney function, age 30–79.
-   - Pooled Cohort Equations (PCE, 2013) are LEGACY — overestimate risk in many populations.
-2. RISK CATEGORIES (2018 AHA/ACC):
-   - ASCVD ≥7.5% → high-intensity statin.
-   - ASCVD 5–<7.5% → intermediate; risk-enhancers guide decision.
-   - Risk enhancers: Lp(a) ≥125 nmol/L, hsCRP ≥2, ABI <0.9, premature ASCVD family history, CKD.
-   - CAC: 0 → defer (unless DM, smoker, FH); ≥100 → treat.
-3. NON-STATIN ESCALATION:
-   - LDL not at goal on max statin → ezetimibe FIRST.
-   - Still not at goal → PCSK9i.
-   - Statin-intolerant + high risk → bempedoic acid + ezetimibe → PCSK9i.
-   - Inclisiran: siRNA, 2x/year after 2 initial doses.
-4. STATIN INTOLERANCE: CK >10× ULN → discontinue. Always rechallenge with alternate statin before declaring complete intolerance.
-5. PREGNANCY: statins contraindicated.` },
+   - PREVENT (AHA) is the current primary-prevention risk tool — race-neutral, includes kidney function, ages 30-79, 10- and 30-year risk. The 2026 guideline formally adopts PREVENT over PCE.
+   - Pooled Cohort Equations (PCE, 2013) are LEGACY.
+2. RISK-BASED LDL-C GOALS (RESTORED 2026; the 2018 threshold-only framework is retired):
+   - Clinical ASCVD: <55 (very-high-risk) or <70 (not very-high-risk).
+   - Primary, LDL-C >=190: <100 (<70 if HeFH, >=1 RF, or subclinical atherosclerosis).
+   - Primary, LDL-C 70-189: <100 or <70 by PREVENT risk.
+   - CAC: 1-99 AU and <75th pct -> <100; 100-299 AU or >=75th pct -> <70; >=1000 AU -> <55.
+3. Lp(a): universal once-in-a-lifetime screening; causal, independent of LDL-C. apoB / non-HDL-C secondary targets.
+4. NON-STATIN ESCALATION: LDL above goal on max-tolerated statin -> ezetimibe -> PCSK9i. Statin-intolerant + high risk -> bempedoic acid + ezetimibe -> PCSK9i. Inclisiran: siRNA, 0 and 3 months then every 6 months. AACE 2025: niacin NOT recommended as add-on in hypertriglyceridemia 150-499 with/at risk of ASCVD.
+5. STATIN INTOLERANCE: CK >10x ULN -> discontinue; always rechallenge with an alternate statin before declaring complete intolerance.
+6. PREGNANCY: statins contraindicated.` },
   { keywords: ["obesity", "bariatric", "metabolic syndrome", "wegovy", "tirzepatide weight", "semaglutide obesity"], citation: `AHA/ACC 2023 Obesity Guideline; AACE 2023 Obesity Algorithm; ADA 2026 Standards of Care.
 
 CRITICAL OBESITY ANCHORS:
