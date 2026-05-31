@@ -1,8 +1,8 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: **May 30, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded.
-> Generators at **v7.5.9**, pushed (HEAD `abd3ccd`).
+> Last updated: **May 30, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed:** 2018 cholesterol guideline retired; 2026 ACC/AHA Dyslipidemia Guideline + AACE 2025 anchored; dyslipidemia anchor added to both generators' `TOPIC_GUARDRAILS`.
+> Generators at **v7.5.10** — dyslipidemia `TOPIC_GUARDRAILS` anchor added to both files (apply `patch_lipid_anchor.py`, `node --check`, then push). Prior stable: v7.5.9 (HEAD `abd3ccd`).
 
 -----
 
@@ -120,7 +120,7 @@ Enforcement lives in `generate-mcq.js` and `scripts/bulk-generate.js`, sharing a
 - **L2 — Cognitive Complexity:** forbids Tier 1–2 trivia; requires Tier 3+ angles.
 
 ### Clinical anchors locked
-DKA/HHS (K⁺-before-insulin) · Hypoglycemia/Insulinoma (proinsulin pmol/L; Whipple) · Thyroid storm (ATA 2016) · Adrenal incidentaloma (AACE/ESE 2023) · Subclinical hypothyroidism (TRUST) · LT4 dosing · **DI / posterior pituitary** (water deprivation contraindicated when Na > 145 / osm > 295–300; direct DDAVP/copeptin — ESE 2018) · **A1 adrenal-insufficiency replacement monitoring** (no reliable biochemical GC marker; clinical titration; ES 2016) · **A2 post-stroke anticoagulation timing** (EHRA 1-3-6-12 vs ELAN 2023 / AHA-ASA 2024).
+DKA/HHS (K⁺-before-insulin) · Hypoglycemia/Insulinoma (proinsulin pmol/L; Whipple) · Thyroid storm (ATA 2016) · Adrenal incidentaloma (AACE/ESE 2023) · Subclinical hypothyroidism (TRUST) · LT4 dosing · **DI / posterior pituitary** (water deprivation contraindicated when Na > 145 / osm > 295–300; direct DDAVP/copeptin — ESE 2018) · **A1 adrenal-insufficiency replacement monitoring** (no reliable biochemical GC marker; clinical titration; ES 2016) · **A2 post-stroke anticoagulation timing** (EHRA 1-3-6-12 vs ELAN 2023 / AHA-ASA 2024) · **Dyslipidemia / lipid-lowering** (2026 ACC/AHA/Multisociety Dyslipidemia Guideline — **RETIRES & REPLACES the 2018 Blood Cholesterol Guideline**; risk-based LDL-C goals restored: very-high-risk ASCVD <55, ASCVD <70; primary ≥190 → <100 (<70 w/ HeFH·RF·subclinical); 70–189 → <100/<70 by PREVENT; CAC strata <100/<70/<55; **PREVENT replaces Pooled Cohort Equations ages 30–79**; universal Lp(a) screening; apoB/non-HDL-C secondary targets. AACE 2025 [Patel/Wyne, Endocr Pract 2025;31:236–262] = GRADE nonstatin focused update; **PREVENT governs on conflict**. The 2018 guideline is BANNED — retired AND pre-2023).
 
 ### Integrity rules A–M
 A–H pre-existing (H = anti-cueing). I/J/K = v7.5.6 ABIM canon. **L** = lab-value reproduction lock; **M** = single-best-answer discriminator.
@@ -131,7 +131,7 @@ A–H pre-existing (H = anti-cueing). I/J/K = v7.5.6 ABIM canon. **L** = lab-val
 > Wiring differs: gen-mcq chains validators with `&&`; bulk uses guard-clause `return recordDrop("name")` (14 guards; the C1 drop-reason tally). In bulk, citation runs before anti-cueing (anti-cueing is dead last — its drops can be masked; re-evaluate ordering with multi-batch data, don't reorder blind).
 
 ### Citation lock — COMPLETE (closed May 29)
-Per-society allow-list with bounded rolling windows for annual bodies; verified to publication year for episodic bodies; warn-mode for un-promoted bodies. Final map (both files, byte-identical): Endocrine Society {2008,09,14,16,18,22,24,25} · ATA {2014,15,16,17,25} (2024 rejected) · AACE {2020,22,23,25,26} · ESE {2018,23,24} · ADA {2024,25,26} · AHA {2017–2026} · ASA {2018,19,21,22,26} · KDIGO {2021,22,24,25} · GOLD {2024,25,26} · GINA {2024,25,26} · EULAR {2022,23} · ACR {2017,23} · EHRA {2021} · Jonklaas {2014}. Warn-mode: USPSTF, ACG, AASLD, AGA, ASH, IDSA, SSC, ASPEN, ATTD, ASAS. `CITATION_LOCK_ENFORCE = true`. **Note:** Endocrine Society **2011 is intentionally NOT seeded** (founder decision — real guideline but declined to widen; the lock correctly rejects it).
+Per-society allow-list with bounded rolling windows for annual bodies; verified to publication year for episodic bodies; warn-mode for un-promoted bodies. Final map (both files, byte-identical): Endocrine Society {2008,09,14,16,18,22,24,25} · ATA {2014,15,16,17,25} (2024 rejected) · AACE {2020,22,23,25,26} · ESE {2018,23,24} · ADA {2024,25,26} · AHA {2017–2026} · ASA {2018,19,21,22,26} · KDIGO {2021,22,24,25} · GOLD {2024,25,26} · GINA {2024,25,26} · EULAR {2022,23} · ACR {2017,23} · EHRA {2021} · Jonklaas {2014}. Warn-mode: USPSTF, ACG, AASLD, AGA, ASH, IDSA, SSC, ASPEN, ATTD, ASAS. `CITATION_LOCK_ENFORCE = true`. **Note:** Endocrine Society **2011 is intentionally NOT seeded** (founder decision — real guideline but declined to widen; the lock correctly rejects it). **Lipid refresh (2026):** the AHA window already spans 2026 and AACE already includes 2025 — **no allow-list *year* change is required**. Two open items: (1) there is no `ACC` society token — alias `ACC → AHA` window or write lipid citations as "AHA"; (2) confirm the seeded `AACE 2026` maps to a real document — AACE's dyslipidemia guideline is **2025**, so a bare "AACE 2026" lipid citation is a phantom-risk and should warn/reject.
 
 ### Forbidden stem patterns
 "First step / next step / best fluid" Tier-1 trivia · stems contradicting their own explanation · 4-obviously-wrong choices (cueing) · NOT/EXCEPT/LEAST lead-ins · gratuitous race/demographic descriptors (Rule I) · "all/none of the above."
