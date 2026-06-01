@@ -1,8 +1,8 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: **May 30, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
-> Generators at **v7.5.10** — lipid blocks refreshed in both files via `patch_lipid_refresh.py` (`node --check`, parity-diff, then push). Prior stable: v7.5.9 (HEAD `abd3ccd`).
+> Last updated: **May 31, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
+> Generators at **v7.5.11**, pushed (HEAD `71cd081`) — header/banner parity fixed, both files byte-consistent on the conventional-ladder decision; re-audit workstream opened (`re_audit` status added). Prior: v7.5.10 (lipid refresh), v7.5.9 (HEAD `abd3ccd`).
 
 -----
 
@@ -54,7 +54,7 @@ medboard-pro/                   # REPO ROOT (= /workspaces/medboard-pro in Codes
 ├── public/
 │   └── index.html              # (single-file React frontend; base64 headshot ~line 388)
 ├── scripts/
-│   └── bulk-generate.js        # Batch MCQ generator run via GitHub Actions (v7.5.9)
+│   └── bulk-generate.js        # Batch MCQ generator run via GitHub Actions (v7.5.11)
 ├── .github/
 │   └── workflows/              # Bulk MCQ Generator workflow lives here
 ├── supabase-migration.sql      # cueing_* migration (historical)
@@ -103,9 +103,9 @@ New `public` tables/functions created after Oct 30 2026 won't auto-expose to the
 
 ## 5. Database schema (Supabase) — `mcqs` (25 columns)
 
-Key columns: `id` (uuid PK), `exam_level`, `topic`, `stem`, `choices` (jsonb), `correct_answer`, `explanation`, `created_at`, **`status`** (authoritative approval column: `pending_review` | `approved` | `rejected`), `specialty_group`, `blueprint_tag`, `difficulty`, `reviewed_at`, `reviewed_by` (**uuid** — never write `'admin'`; generally NULL), `generation_model` (e.g. `claude-sonnet-4-6`; populated per-row since C2; NULL on pre-C2 rows), `content_hash` (hash-only dedup — does NOT catch semantic near-dupes), `times_served`, `updated_at`, **`approval_status`** (**deprecated** parallel column — see §12), `cueing_flag` (**boolean**), `cueing_notes`, `cueing_checked_at`.
+Key columns: `id` (uuid PK), `exam_level`, `topic`, `stem`, `choices` (jsonb), `correct_answer`, `explanation`, `created_at`, **`status`** (authoritative approval column; CHECK allows `draft` | `pending_review` | `approved` | `rejected` | `retired` | `re_audit` — `re_audit` added 2026-05-31, see §12), `specialty_group`, `blueprint_tag`, `difficulty`, `reviewed_at`, `reviewed_by` (**uuid** — never write `'admin'`; generally NULL), `generation_model` (e.g. `claude-sonnet-4-6`; populated per-row since C2; NULL on pre-C2 rows), `content_hash` (hash-only dedup — does NOT catch semantic near-dupes), `times_served`, `updated_at`, **`approval_status`** (**deprecated** parallel column — see §12), `cueing_flag` (**boolean**), `cueing_notes`, `cueing_checked_at`.
 
-Deprecated / drop-candidates (future migration, not urgent): `quality_score`, `flagged_reason`, `approval_status`, the `cueing_*` trio.
+Deprecated / drop-candidates (future migration, not urgent): `quality_score`, `flagged_reason`, the `cueing_*` trio. **`approval_status` is no longer a clean drop candidate** — the re-audit workstream repurposes it as a provenance marker (see §12); do not drop it while the re-audit is active.
 
 `user_responses` tracks each user's answered `mcq_id` (used by `serve_next_mcq` to exclude seen rows). RLS enabled; publishable key respects RLS, secret key bypasses it.
 
@@ -144,7 +144,7 @@ Per-society allow-list with bounded rolling windows for annual bodies; verified 
 Frontend → `serve_next_mcq` (DB-first). No-match → `generate-mcq.js` → Claude/Gemini → insert `status: pending_review`. Newly generated rows are **never served until vetted.**
 
 ### Bulk generation (admin)
-GitHub → **Actions** → **Bulk MCQ Generator** → run with `Count`, `Level` (specific or blank for round-robin), `Mode: standard`. Confirm the banner version (`… (v7.5.9)`) in the log before vetting a batch. Summary prints `Saved to DB: N`, `DB errors: M`, the **C1 validator-drop breakdown** by reason, gen-failures, and unseeded-citation warns.
+GitHub → **Actions** → **Bulk MCQ Generator** → run with `Count`, `Level` (specific or blank for round-robin), `Mode: standard`. Confirm the banner version (`… (v7.5.11)`) in the log before vetting a batch. Summary prints `Saved to DB: N`, `DB errors: M`, the **C1 validator-drop breakdown** by reason, gen-failures, and unseeded-citation warns.
 
 **B3 topic-distribution control (v7.5.9):** `buildWorkQueue` draws **without replacement** — shuffles the distinct `{level, topic}` concepts and emits round-robin, reshuffling when the pool empties, so each concept appears at most `ceil(count / N_concepts)` times, evenly spread. Replaces the old weighted-with-replacement sampler that let high-weight topics recur within a batch (the April clustering `content_hash` couldn't catch). The `FILTER_TOPIC && FILTER_LEVEL` single-topic path and the nutrition-injection hook are preserved. **Smoke-confirmed May 30** (Endo count=10 → 7 saved, 7 distinct concepts across 6 subspecialty groups, zero repeats). Note: B3 spreads at the *topic* level; semantic near-dupes *within* a topic remain the job of a future semantic-dedup pass.
 
@@ -157,23 +157,25 @@ Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by sco
 
 -----
 
-## 8. Current state (as of May 30, 2026)
+## 8. Current state (as of May 31, 2026)
 
 ### Question bank — servable
 
 | Level | Servable | ~Flip target | Gap |
 |---|---|---|---|
-| ABIM Internal Medicine | 87 | ~165 | ~78 |
-| ABIM Endocrinology | 50 | ~175 | ~125 |
-| USMLE Step 1 | 21 | ~150 | ~129 |
+| ABIM Internal Medicine | 120 | ~165 | ~45 |
+| ABIM Endocrinology | 52 | ~175 | ~123 |
+| USMLE Step 1 | 22 | ~150 | ~128 |
 | USMLE Step 3 | 19 | ~150 | ~131 |
 | USMLE Step 2 CK | 16 | ~180 | ~164 |
-| **Total servable** | **193** | | |
+| **Total servable** | **229** | | |
+
+> 229 = `status='approved'` = servable (0 approved rows cueing-flagged). 2 rows demoted to `re_audit` this session (1 IM + 1 Endo) → removed from serving. Verified live 2026-05-31.
 
 Pending (not servable until vetted): ~35 Endo v7.5.7 candidates + 3 night-verified + 7 from the May 30 B3 smoke. **IM-36 recovery block** identified: exactly **36** rows `status='pending_review' AND approval_status='approved'` (April pre-canon; spread cleanly across subspecialties — GI/Hep 8, Cardiology 8, Pulm 6, Gen IM 5, Nephro 4, Rheum 3, +Heme/Onc, ID, Ethics). Recovery = triage (promote/edit/drop), not blanket promotion.
 
 ### Generators
-**v7.5.9**, HEAD `abd3ccd`, pushed. B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
+**v7.5.11**, pushed (HEAD `71cd081`). Lipid non-statin escalation = corrected **conventional ladder** (the night-log "magnitude-keying" was never built — only the bad bempedoic-before-PCSK9i order was fixed). B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
 
 ### Lead funnel (Option A — LIVE May 30)
 `medboard-widget.js` v1.1 deployed: **email gate removed** — answering reveals the full explanation + "Start your free trial" CTA immediately (drive trials directly). UTM tags intact. Email-capture machinery (`gateBlock`/`bindGate`/`captureLead`, `capture-lead.js`, `leads` schema) is **parked, not deleted** — for a future non-blocking, post-explanation optional email ask. Landing page picks this up automatically (the `DailyQuestionWidget` React component only injects `/medboard-widget.js`; no `index.html` change needed).
@@ -221,6 +223,9 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 
 ### `approval_status` deprecated — `status` authoritative (D1 RESOLVED May 30, option b)
 Both serve functions gate on `status`. `approval_status` is stale; legacy rows are inconsistent across the two columns. The 2-of-2 gate was rejected (footgun: a promotion that forgets `approval_status` silently de-serves rows). Edge-case rows (`status='rejected'` + `approval_status='approved'`) are excluded from serving — disposition pending.
+
+### Re-audit workstream (OPENED 2026-05-31)
+Premise: `status='approved'` reflects sign-off under *older* guardrails, not current-standard compliance — re-certifying the approved bank. Migration `add_re_audit_to_mcqs_status_check` expanded the status CHECK to `draft | pending_review | approved | rejected | retired | re_audit`. **Demotion** sets `status='re_audit'` and **preserves** `approval_status='approved'` (cohort = `WHERE status='re_audit' AND approval_status='approved'`); this removes the row from serving immediately (serving gates on `status='approved'`) and repurposes the deprecated `approval_status` as a provenance marker. Lifecycle out: re-certified → `status='approved'`; unsalvageable → `status='rejected', approval_status='rejected'`. Tier-2 suspicion set = the 122 legacy-format (no emoji-labeled sections) approved rows; thyroid + lipids first. Per-row dispositions in `RE_AUDIT_LEDGER.md`. First two hits demoted 2026-05-31: `fe5ceb27` (Endo thyroid, SEVERE mis-key — rewrite pending) and `102e3b34` (IM lipid HeFH — retired-cite edit pending).
 
 ### May-30 smoke findings (OPEN — gate the scaled IM generation run)
 - **`validateLeadInType` rejecting `most_appropriate_clinical_intervention` at ABIM Endocrinology** (4/14 drops in a 10-count run). "Most appropriate intervention/next step" is a core ABIM management lead-in; confirm whether the level-map restriction is canon-correct or over-strict (it'll bite IM harder — IM is management-heavy).
