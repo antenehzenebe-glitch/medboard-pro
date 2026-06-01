@@ -1,5 +1,5 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.9 — citation-year lock + lab-value lock + single-best guard + AI/AC monitoring + post-stroke AC anchors
+// v7.5.11 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.11
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.6):
 // - ADDED: 8 canon-aligned validators sourced from ABIM Question Writing
@@ -2502,7 +2502,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.9)    ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.11)   ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
