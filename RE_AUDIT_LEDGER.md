@@ -93,3 +93,11 @@ FLAGGED (clinically correct; policy decision pending — NOT acted on):
 WATCH: 0240b8a6 / d06921e1 / a0ab9097 are 3 semantic near-dupes ("high-suspicion US + normal TSH → FNA") — future dedup candidate, not a defect.
 
 ATA-2025 canon correction held up: zero thyroid rows were defective on the basis of citing a non-2015 ATA year.
+
+## 2026-06-01 — ES-2011 modernization + FNA dedup (closed)
+MODERNIZED (ES 2011 Melmed -> 2023 Pituitary Society Consensus, Petersenn et al., Nat Rev Endocrinol 2023; verified real):
+- ad3a0545  macroprolactinoma key A — citation updated; clinical content unchanged
+- e942717a  PRL -> pituitary MRI key B — 2 citations updated; clinical content unchanged
+RETIRED (semantic dedup): d06921e1 (status='retired') — generic FNA dup; kept a0ab9097 + 0240b8a6
+Servable 239 -> 238 (Endo 53 -> 52). Carry-forward decisions CLOSED.
+Carry-forward (code): add "Pituitary Society {2023}" to ALLOWED_GUIDELINE_CITATIONS + CLAUDE.md §6.

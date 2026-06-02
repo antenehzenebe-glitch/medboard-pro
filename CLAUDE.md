@@ -90,8 +90,7 @@ Both serving functions gate on `status` only. `serve_next_mcq` additionally filt
 | Level | Servable target | Basis |
 |---|---|---|
 | ABIM Endocrinology | ~175 | 25 per major topic × 7 |
-| ABIM Internal Medicine | ~165 | 15 per subspecialty × 11 |
-| USMLE Step 1 | ~150 | 10 per organ system × 15 |
+| ABIM Internal Medicine | 129 | 15 per subspecialty × 11 | ~36 | USMLE Step 1 | ~150 | 10 per organ system × 15 |
 | USMLE Step 2 CK | ~180 | 15 per system × 12 |
 | USMLE Step 3 | ~150 | 15 per system × 10 |
 
@@ -157,18 +156,18 @@ Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by sco
 
 -----
 
-## 8. Current state (as of May 31, 2026)
+## 8. Current state (as of June 1, 2026)
 
 ### Question bank — servable
 
 | Level | Servable | ~Flip target | Gap |
 |---|---|---|---|
-| ABIM Internal Medicine | 120 | ~165 | ~45 |
+| ABIM Internal Medicine | 129 | ~165 | ~36 |
 | ABIM Endocrinology | 52 | ~175 | ~123 |
 | USMLE Step 1 | 22 | ~150 | ~128 |
 | USMLE Step 3 | 19 | ~150 | ~131 |
 | USMLE Step 2 CK | 16 | ~180 | ~164 |
-| **Total servable** | **229** | | |
+| **Total servable** | **238** | | |
 
 > 229 = `status='approved'` = servable (0 approved rows cueing-flagged). 2 rows demoted to `re_audit` this session (1 IM + 1 Endo) → removed from serving. Verified live 2026-05-31.
 
