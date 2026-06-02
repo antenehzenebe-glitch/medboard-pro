@@ -130,3 +130,11 @@ with other explanation structures passed the citation screen but were not key-ch
 
 Citation lock: "Pituitary Society {2023}" added to ALLOWED_GUIDELINE_CITATIONS (both generators)
 + CLAUDE.md sec 6 -- commit 3388cf8 (2026-06-02). Closes the ES-2011 carry-forward code item.
+
+## 2026-06-02 -- Data hygiene: contradictory rows + exam_level normalization (closed)
+RESOLVED 2 contradictory status='rejected' / approval_status='approved' rows (confirm-reject; status authoritative):
+- 6625e5bd  IM (ITP) key B -- clinically correct but cueing-heavy (stem eliminates 4/5 distractors); honor prior reject. approval_status -> rejected.
+- f02e8b96  Endo (macroprolactinoma) key A -- key correct but S2 distractor letter-map fully scrambled + dubious "2023 ES Pituitary Incidentaloma" cite + redundant with ad3a0545. approval_status -> rejected.
+NORMALIZED exam_level 'ABIM Internal Medicine boards (residents)' -> 'ABIM Internal Medicine'
+  (2 rejected Rule-I race-descriptor rows: 122cc313 CAP, 14d4424a GI bleed). Domain now 5 canonical values.
+Verified live: 0 contradictions, 0 stray labels, servable 238 unchanged.
