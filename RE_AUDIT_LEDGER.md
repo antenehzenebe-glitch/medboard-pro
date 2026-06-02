@@ -71,3 +71,25 @@ REJECTED:
 - 3edb718b  dup of PCSK9i cohort + two-PCSK9 ambiguity + impossible "rosuvastatin 80 mg" distractor
 
 Servable: 233 → 239 (IM 123 → 129). #2 CLOSED.
+
+## 2026-06-01 — Tier-2 re-audit: thyroid/pituitary slice (10 legacy-format approved rows)
+FIXED (served item, letter-map defect — key was correct):
+- d95f822e  Endo Thyroid Cancer  key B Anaplastic — S1 header said "WHY CHOICE A IS CORRECT" (A=lymphoma distractor); realigned to "CHOICE B". Clinical content excellent. Re-certified.
+
+RE-CERTIFIED CLEAN (key + ATA-scope + letter-map all correct):
+- 25e815fc  Thyroid Storm        key A  PTU→SSKI→hydrocortisone→propranolol (PTU-before-iodine; BWPS pearl OK). Soft note: A-vs-D beta-blocker timing, defensible given hypotension.
+- 2c59716a  Endo (PTC dx)        key E  classic nuclei + normal calcitonin; ATA 2015/2016 + ACR TI-RADS 2017
+- 415cf306  Hyperthyroid/Graves  key A  confirm overt vs subclinical before etiologic w/u; ATA 2016
+- a0ab9097  Thyroid Cancer       key D  fixed nodule, normal TSH → FNA; ATA 2015
+- 0240b8a6  Endo (nodule)        key B  new high-suspicion 1.3cm in Hashimoto, normal TSH → FNA; ATA 2015
+- d06921e1  Endo (nodule)        key E  1.4cm high-suspicion, normal TSH → FNA; ATA 2015
+- fdb95df7  Endo (nodule)        key C  no prior US → TSH + ultrasound first; ATA 2015
+
+FLAGGED (clinically correct; policy decision pending — NOT acted on):
+- ad3a0545  pituitary (macroprolactinoma) key A — cites ES 2011 (Melmed); unseeded year
+- e942717a  pituitary (PRL → MRI)        key B — cites ES 2011 (Melmed); unseeded year
+  → Decision mirror of ECDP: keep ES 2011 (real, still the ES prolactinoma CPG) vs modernize to 2023 Pituitary Society consensus (Petersenn).
+
+WATCH: 0240b8a6 / d06921e1 / a0ab9097 are 3 semantic near-dupes ("high-suspicion US + normal TSH → FNA") — future dedup candidate, not a defect.
+
+ATA-2025 canon correction held up: zero thyroid rows were defective on the basis of citing a non-2015 ATA year.
