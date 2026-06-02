@@ -101,3 +101,32 @@ MODERNIZED (ES 2011 Melmed -> 2023 Pituitary Society Consensus, Petersenn et al.
 RETIRED (semantic dedup): d06921e1 (status='retired') — generic FNA dup; kept a0ab9097 + 0240b8a6
 Servable 239 -> 238 (Endo 53 -> 52). Carry-forward decisions CLOSED.
 Carry-forward (code): add "Pituitary Society {2023}" to ALLOWED_GUIDELINE_CITATIONS + CLAUDE.md §6.
+
+## 2026-06-02 -- Tier-2 re-audit: IM legacy block + full-cohort automated screen (closed)
+
+PRIOR-ENTRY RECONCILIATION (disposition table at top is stale):
+- fe5ceb27 -- table's "re-key C" finding was OVERTURNED 2026-06-01. Key E (childhood neck
+  irradiation) was CORRECT; real defect was scrambled explanation letter-map + AJCC-8th staging
+  mis-attribution. Explanation rewritten (letters realigned, AJCC-8th fixed, ATA 2025 retained --
+  ATA 2025 is REAL: Ringel et al., Thyroid 2025), key E unchanged. Now status='approved'.
+- 102e3b34 -- edited 2026-06-01: dropped 2018/Grundy + 2022 ACC ECDP -> 2026 ACC/AHA; restored
+  very-high-risk LDL goal <55. Now status='approved'.
+  => re_audit cohort now EMPTY (0 rows).
+
+IM LEGACY BLOCK (80 rows) -- automated defect screen (header-letter vs key; retired citations):
+- FIXED: 9297b3f4 IM (SLE flare) key E -- S1 header said "WHY CHOICE B IS CORRECT"; key E correct
+  (moderate non-renal flare -> prednisone 0.5 mg/kg/day + MMF; PCR 0.18 rules out nephritis).
+  Realigned header B->E. Re-certified.
+- 0 retired-citation hits; 0 other letter-map mismatches; 0 wrong keys.
+
+FULL-COHORT SCREEN (remaining legacy: Endo non-thyroid + Step 1/2CK/3, ~32 rows): 0 flags.
+
+Tier-2 automated pass COMPLETE across all ~122 legacy rows. Defect tally: 3 scrambled-header
+fixes (fe5ceb27, d95f822e, 9297b3f4), 0 retired citations, 0 wrong keys. Pattern confirmed --
+re-audit defects are label/format, never clinical reasoning.
+Blind spot: header-mismatch detector only screens rows USING the "WHY CHOICE X" header; rows
+with other explanation structures passed the citation screen but were not key-checked
+(clinical re-read = low expected yield, deferred).
+
+Citation lock: "Pituitary Society {2023}" added to ALLOWED_GUIDELINE_CITATIONS (both generators)
++ CLAUDE.md sec 6 -- commit 3388cf8 (2026-06-02). Closes the ES-2011 carry-forward code item.
