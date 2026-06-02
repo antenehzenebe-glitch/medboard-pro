@@ -1,6 +1,19 @@
 // bulk-generate.js — MedBoard Pro
 // v7.5.12 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.12
 // ---------------------------------------------------------------
+// CHANGELOG (v7.5.12 — 2026-06-02):
+// - REPOINTED: Primary Aldosteronism citation -> ES 2025 (Adler et al.),
+//   retiring the superseded 2016 (Funder) CPG in the adrenal GUIDELINE_MAP.
+// - FIXED: PA cognitive-complexity anchor (l2) — removed "adding amiloride"
+//   steer (now anti-guideline); encodes 2025 canon (up-titrate MRA to raise
+//   renin; spironolactone preferred; MRAs over ENaC inhibitors).
+// - ADDED: validateNoPhantomCitations() + BANNED_CITATION_PATTERNS — hard
+//   reject gate for fabricated/superseded (society, year, topic) tuples the
+//   per-year allow-list cannot catch. Bulk: recordDrop("phantomCitation");
+//   gen-mcq: phantomOk in both isValid chains. Bornstein-2016 PAI +
+//   Lenders-2014 pheo intentionally pass.
+// - No ALLOWED_GUIDELINE_CITATIONS change (ES already permits 2014/16/24/25).
+// ---------------------------------------------------------------
 // CHANGELOG (v7.5.6):
 // - ADDED: 8 canon-aligned validators sourced from ABIM Question Writing
 //   Guidelines (Sections B.1, B.3, C.1, C.2.a, C.2.b, D.4-D.7) and
