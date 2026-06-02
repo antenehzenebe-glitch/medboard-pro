@@ -49,3 +49,25 @@ Servable = `status='approved'` (0 approved rows are cueing-flagged, so approved 
 ## Next
 1. Rewrite `fe5ceb27` + edit `102e3b34`, verify, re-certify -> `status='approved'`.
 2. Pull the 122 legacy-format approved rows in topic batches -- thyroid, then lipids first -- and log each disposition here.
+
+## 2026-06-01 — #2 pending-lipid dispositions (ECDP-drop policy applied)
+Policy: 2022 ACC ECDP (Lloyd-Jones) DROPPED bank-wide (pre-2023; 2026 ACC/AHA + AACE 2025 carry every claim).
+
+PROMOTED (stripped ECDP / Blumenthal):
+- 3c52e136  IM lipid  key A evolocumab — 2× ECDP refs removed
+- 7fd8760e  IM lipid  key A alirocumab — 1× ECDP ref removed
+- df1b0da1  IM lipid  key D ezetimibe-first — 2× ECDP refs + "Blumenthal et al." author tag removed
+
+PROMOTED (Rule-M two-PCSK9 fix — inclisiran distractor swapped):
+- cd8ead16  IM lipid  key C evolocumab — D inclisiran → icosapent ethyl; Choice-D para rewritten
+- 9047c7e1  IM lipid  key C evolocumab — B inclisiran → bempedoic acid; Choice-B para rewritten
+
+PROMOTED (choice-B fix):
+- 58d9d3e9  IM lipid  key A evolocumab — malformed choice B → "Switch rosuvastatin to atorvastatin 80 mg daily"
+
+REJECTED:
+- 1d11cd97  key C "discontinue statin + bempedoic" (counterproductive; raises LDL)
+- 37c03116  key C "discontinue statin + bempedoic" (same defect)
+- 3edb718b  dup of PCSK9i cohort + two-PCSK9 ambiguity + impossible "rosuvastatin 80 mg" distractor
+
+Servable: 233 → 239 (IM 123 → 129). #2 CLOSED.
