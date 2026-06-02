@@ -1,7 +1,7 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: **May 31, 2026** — B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
+> Last updated: **June 2, 2026** — Pituitary Society 2023 added to the citation lock (prolactinoma rows modernized 2026-06-01); §4 threshold table repaired. Prior (May 31): B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
 > Generators at **v7.5.11**, pushed (HEAD `71cd081`) — header/banner parity fixed, both files byte-consistent on the conventional-ladder decision; re-audit workstream opened (`re_audit` status added). Prior: v7.5.10 (lipid refresh), v7.5.9 (HEAD `abd3ccd`).
 
 -----
@@ -90,7 +90,8 @@ Both serving functions gate on `status` only. `serve_next_mcq` additionally filt
 | Level | Servable target | Basis |
 |---|---|---|
 | ABIM Endocrinology | ~175 | 25 per major topic × 7 |
-| ABIM Internal Medicine | 129 | 15 per subspecialty × 11 | ~36 | USMLE Step 1 | ~150 | 10 per organ system × 15 |
+| ABIM Internal Medicine | ~165 | 15 per subspecialty × 11 |
+| USMLE Step 1 | ~150 | 10 per organ system × 15 |
 | USMLE Step 2 CK | ~180 | 15 per system × 12 |
 | USMLE Step 3 | ~150 | 15 per system × 10 |
 
@@ -130,7 +131,7 @@ A–H pre-existing (H = anti-cueing). I/J/K = v7.5.6 ABIM canon. **L** = lab-val
 > Wiring differs: gen-mcq chains validators with `&&`; bulk uses guard-clause `return recordDrop("name")` (14 guards; the C1 drop-reason tally). In bulk, citation runs before anti-cueing (anti-cueing is dead last — its drops can be masked; re-evaluate ordering with multi-batch data, don't reorder blind).
 
 ### Citation lock — COMPLETE (closed May 29)
-Per-society allow-list with bounded rolling windows for annual bodies; verified to publication year for episodic bodies; warn-mode for un-promoted bodies. Final map (both files, byte-identical): Endocrine Society {2008,09,14,16,18,22,24,25} · ATA {2014,15,16,17,25} (2024 rejected) · AACE {2020,22,23,25,26} · ESE {2018,23,24} · ADA {2024,25,26} · AHA {2017–2026} · ASA {2018,19,21,22,26} · KDIGO {2021,22,24,25} · GOLD {2024,25,26} · GINA {2024,25,26} · EULAR {2022,23} · ACR {2017,23} · EHRA {2021} · Jonklaas {2014}. Warn-mode: USPSTF, ACG, AASLD, AGA, ASH, IDSA, SSC, ASPEN, ATTD, ASAS. `CITATION_LOCK_ENFORCE = true`. **Note:** Endocrine Society **2011 is intentionally NOT seeded** (founder decision — real guideline but declined to widen; the lock correctly rejects it). **Lipid refresh (2026):** the AHA window already spans 2026 and AACE already includes 2025 — **no allow-list *year* change is required**. Two open items: (1) there is no `ACC` society token — alias `ACC → AHA` window or write lipid citations as "AHA"; (2) confirm the seeded `AACE 2026` maps to a real document — AACE's dyslipidemia guideline is **2025**, so a bare "AACE 2026" lipid citation is a phantom-risk and should warn/reject.
+Per-society allow-list with bounded rolling windows for annual bodies; verified to publication year for episodic bodies; warn-mode for un-promoted bodies. Final map (both files, byte-identical): Endocrine Society {2008,09,14,16,18,22,24,25} · ATA {2014,15,16,17,25} (2024 rejected) · AACE {2020,22,23,25,26} · ESE {2018,23,24} · ADA {2024,25,26} · AHA {2017–2026} · ASA {2018,19,21,22,26} · KDIGO {2021,22,24,25} · GOLD {2024,25,26} · GINA {2024,25,26} · EULAR {2022,23} · ACR {2017,23} · EHRA {2021} · Jonklaas {2014} · Pituitary Society {2023}. Warn-mode: USPSTF, ACG, AASLD, AGA, ASH, IDSA, SSC, ASPEN, ATTD, ASAS. `CITATION_LOCK_ENFORCE = true`. **Note:** Endocrine Society **2011 is intentionally NOT seeded** (founder decision — real guideline but declined to widen; the lock correctly rejects it). Prolactinoma rows now cite the **2023 Pituitary Society International Consensus** (Petersenn et al., Nat Rev Endocrinol 2023), added to the map above as the modern successor to ES 2011. **Lipid refresh (2026):** the AHA window already spans 2026 and AACE already includes 2025 — **no allow-list *year* change is required**. Two open items: (1) there is no `ACC` society token — alias `ACC → AHA` window or write lipid citations as "AHA"; (2) confirm the seeded `AACE 2026` maps to a real document — AACE's dyslipidemia guideline is **2025**, so a bare "AACE 2026" lipid citation is a phantom-risk and should warn/reject.
 
 ### Forbidden stem patterns
 "First step / next step / best fluid" Tier-1 trivia · stems contradicting their own explanation · 4-obviously-wrong choices (cueing) · NOT/EXCEPT/LEAST lead-ins · gratuitous race/demographic descriptors (Rule I) · "all/none of the above."
@@ -169,7 +170,7 @@ Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by sco
 | USMLE Step 2 CK | 16 | ~180 | ~164 |
 | **Total servable** | **238** | | |
 
-> 229 = `status='approved'` = servable (0 approved rows cueing-flagged). 2 rows demoted to `re_audit` this session (1 IM + 1 Endo) → removed from serving. Verified live 2026-05-31.
+> 238 = `status='approved' AND cueing_flag IS NOT TRUE` = servable. Verified live 2026-06-01 (post #2 lipid dispositions: +6 IM promotes, 3 rejects; Tier-2 thyroid slice; 1 FNA near-dupe retired). `re_audit` cohort currently empty — the two 2026-05-31 demotions were re-certified to `approved` on 2026-06-01.
 
 Pending (not servable until vetted): ~35 Endo v7.5.7 candidates + 3 night-verified + 7 from the May 30 B3 smoke. **IM-36 recovery block** identified: exactly **36** rows `status='pending_review' AND approval_status='approved'` (April pre-canon; spread cleanly across subspecialties — GI/Hep 8, Cardiology 8, Pulm 6, Gen IM 5, Nephro 4, Rheum 3, +Heme/Onc, ID, Ethics). Recovery = triage (promote/edit/drop), not blanket promotion.
 

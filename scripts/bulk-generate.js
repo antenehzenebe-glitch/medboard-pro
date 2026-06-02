@@ -1611,7 +1611,8 @@ const ALLOWED_GUIDELINE_CITATIONS = {
   "EULAR": new Set(["2022", "2023"]),
   "ACR":   new Set(["2017", "2023"]),
   "EHRA":  new Set(["2021"]),
-  "Jonklaas": new Set(["2014"])
+  "Jonklaas": new Set(["2014"]),
+  "Pituitary Society": new Set(["2023"])
 };
 // Match longest society names first so "Endocrine Society" wins over substrings.
 const GUIDELINE_TOKENS = Object.keys(ALLOWED_GUIDELINE_CITATIONS)
