@@ -1,5 +1,5 @@
 // generate-mcq.js — MedBoard Pro
-// v7.5.11 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only) (2026 ACC/AHA/PREVENT canon), AACE unseeded → 2025; parity with bulk-generate.js v7.5.11
+// v7.5.12 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only) (2026 ACC/AHA/PREVENT canon), AACE unseeded → 2025; parity with bulk-generate.js v7.5.12
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.7 — 2026-05-24):
 // - ADDED (Patch 2): lead_in_type enum (17 values) added to MCQ_TOOL.input_schema
@@ -388,7 +388,7 @@ REQUIRED Tier 3+ angles:
 - AVS interpretation: lateralization ratio ≥4:1 post-ACTH stimulation
 - Failed AVS (non-dominant vein cannulation) — repeat vs alternative options
 - Spironolactone-on-board patient — washout vs MRA-sparing testing
-- Refractory PA on max MRA — adding amiloride vs surgical reconsideration
+- Refractory PA on MRA with suppressed renin — up-titrate the MRA to raise renin (ES 2025 Adler: spironolactone preferred over other MRAs; MRAs preferred over ENaC inhibitors such as amiloride) vs surgical reconsideration
 - Familial hyperaldosteronism types and genetic testing`
   },
   {
@@ -1115,7 +1115,7 @@ CRITICAL SEPSIS/ID ANCHORS:
    - Native valve Staph: nafcillin (MSSA), vancomycin (MRSA).
    - Prosthetic valve: vancomycin + gentamicin + rifampin.` },
   { keywords: ["men1", "multiple endocrine neoplasia type 1", "wermer", "men2", "men 2a", "men 2b", "ret mutation", "prophylactic thyroidectomy"], citation: `Endocrine Society Clinical Practice Guidelines for MEN1 (2012) and MEN2/MTC (2015). Do not cite guidelines newer than these.` },
-  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma", "addison", "cortisol", "acth", "metanephrine", "phenoxybenzamine", "spironolactone adrenal", "eplerenone"], citation: `Endocrine Society 2008 Cushing Syndrome Diagnostic CPG (Nieman et al.) + 2015 Treatment CPG; Pituitary Society 2023 Consensus on Cushing Disease; Endocrine Society 2016 Primary Aldosteronism CPG; Endocrine Society 2014 Pheochromocytoma/Paraganglioma CPG.
+  { keywords: ["cushing", "adrenal", "aldosterone", "pheochromocytoma", "paraganglioma", "addison", "cortisol", "acth", "metanephrine", "phenoxybenzamine", "spironolactone adrenal", "eplerenone"], citation: `Endocrine Society 2008 Cushing Syndrome Diagnostic CPG (Nieman et al.) + 2015 Treatment CPG; Pituitary Society 2023 Consensus on Cushing Disease; Endocrine Society 2025 Primary Aldosteronism CPG (Adler et al.); Endocrine Society 2014 Pheochromocytoma/Paraganglioma CPG.
 
 CRITICAL ADRENAL ANCHORS:
 
@@ -1712,6 +1712,44 @@ function validateCitationYears(p) {
   return true;
 }
 
+// ============================================================
+// PHANTOM-CITATION HARD BLOCK (added 2026-06-02)
+// ============================================================
+// validateCitationYears() checks (society, year) only. It cannot catch a
+// citation whose year is individually valid for the society but whose
+// (society, year, TOPIC) tuple is fabricated or superseded -- e.g. a real ES
+// year (2016/2024) attached to a guideline that does not exist for that topic.
+// Curated, extensible block-list for the demonstrated phantoms.
+// Confirmed 2026-06-02: ES Primary Aldosteronism CPG is 2025 (Adler et al.);
+// the 2016 (Funder) edition is superseded and "ES 2024 PA"/"Funder 2024" never
+// existed; no 2024 ES pheochromocytoma/paraganglioma CPG exists (real: Lenders
+// 2014). Bornstein 2016 (Primary Adrenal Insufficiency) is current and is
+// intentionally NOT matched here.
+const BANNED_CITATION_PATTERNS = [
+  { re: /Endocrine Society[^.]{0,60}(?:Primary Aldosteronism|aldosteronism)[^.]{0,25}\b20(?:0\d|1\d|2[0-4])\b/i,
+    why: "ES Primary Aldosteronism CPG is 2025 (Adler); 2016 superseded, 2024 never existed" },
+  { re: /\b20(?:0\d|1\d|2[0-4])\b[^.]{0,45}Endocrine Society[^.]{0,45}(?:Primary Aldosteronism|aldosteronism)/i,
+    why: "ES Primary Aldosteronism CPG is 2025 (Adler); 2016 superseded, 2024 never existed" },
+  { re: /Funder[^.]{0,45}\b2024\b/i,
+    why: "No 2024 Funder PA guideline (Funder chaired 2016; 2025 lead is Adler)" },
+  { re: /Endocrine Society[^.]{0,60}(?:pheochromocytoma|paraganglioma|SDHx|SDHB|MIBG)[^.]{0,25}\b2024\b/i,
+    why: "No 2024 ES pheochromocytoma/paraganglioma CPG (real: Lenders 2014)" },
+  { re: /\b2024\b[^.]{0,60}Endocrine Society[^.]{0,60}(?:pheochromocytoma|paraganglioma|SDHx|SDHB|MIBG)/i,
+    why: "No 2024 ES pheochromocytoma/paraganglioma CPG (real: Lenders 2014)" }
+];
+
+function validateNoPhantomCitations(p) {
+  if (!p || !p.explanation) return true;
+  const text = String(p.explanation);
+  for (const { re, why } of BANNED_CITATION_PATTERNS) {
+    if (re.test(text)) {
+      console.warn(`[validateNoPhantomCitations] Phantom/superseded citation blocked \u2014 ${why}.`);
+      return false;
+    }
+  }
+  return true;
+}
+
 function validateChoiceCompleteness(p) {
   if (!p || !p.choices || !p.stem || !p.explanation) return false;
   
@@ -2290,10 +2328,11 @@ exports.handler = async function (event) {
       const aotaOk        = validateNoAllOrNoneOfTheAbove(p);
       const siteOfCareOk  = validateSiteOfCare(p);
       const citationOk    = validateCitationYears(p);
+      const phantomOk     = validateNoPhantomCitations(p);
       isValid = demoOk && consistencyOk && choicesOk && cueingFree
              && leadInOk && negFormOk && assocOk && vagueOk
              && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk
-             && citationOk;
+             && citationOk && phantomOk;
 
       if (!isValid && attempts === 3) {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
@@ -2311,7 +2350,8 @@ exports.handler = async function (event) {
                && validatePejorativeLanguage(p)
                && validateNoAllOrNoneOfTheAbove(p)
                && validateSiteOfCare(p)
-               && validateCitationYears(p);
+               && validateCitationYears(p)
+               && validateNoPhantomCitations(p);
       }
     }
 
