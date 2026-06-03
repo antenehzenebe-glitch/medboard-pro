@@ -234,9 +234,12 @@ async function saveResponse(question, choice, isCorrect) {
   try {
     const {data:{session}} = await sb.auth.getSession();
     if (!session) return;
-    const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
-    const mcqId = mcqRes.data?.[0]?.id;
-    if (!mcqId) return;
+    let mcqId = (question._source === "db") ? question.id : null;
+    if (!mcqId) {
+      const mcqRes = await sb.from("mcqs").select("id").eq("stem", question.stem).limit(1);
+      mcqId = mcqRes.data?.[0]?.id;
+    }
+    if (!mcqId) { console.error("saveResponse: could not resolve mcq_id", { source: question._source, id: question.id }); return; }
     await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
   } catch (e) {
     console.error(e);
