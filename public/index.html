@@ -240,7 +240,7 @@ async function saveResponse(question, choice, isCorrect) {
       mcqId = mcqRes.data?.[0]?.id;
     }
     if (!mcqId) { console.error("saveResponse: could not resolve mcq_id", { source: question._source, id: question.id }); return; }
-    await sb.from("user_responses").insert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect });
+    await sb.from("user_responses").upsert({ user_id: session.user.id, mcq_id: mcqId, selected_choice: choice, is_correct: isCorrect }, { onConflict: "user_id,mcq_id", ignoreDuplicates: true });
   } catch (e) {
     console.error(e);
   }
