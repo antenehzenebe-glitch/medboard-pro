@@ -1,6 +1,15 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.12 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.12
+// v7.5.13 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.13
 // ---------------------------------------------------------------
+// CHANGELOG (v7.5.13 — 2026-06-03):
+// - FIXED (2a): added "most_appropriate_clinical_intervention" to ABIM Internal Medicine
+//   and ABIM Endocrinology allow-lists in ALLOWED_LEAD_INS_BY_LEVEL (was permitted at
+//   Step 2 CK / Step 3 only; ABIM is management-heavy and was silently dropping valid
+//   intervention-tier items — ~4/14 at Endo smoke). Brings ABIM into §C.1 parity.
+// - HARDENED (2b): added minLength:3 to choices A-E in emit_mcq tool schema as a
+//   generation-time nudge against stub/empty first-option emits (validateChoiceCompleteness
+//   remains the hard backstop; schema minLength is advisory to the model, not API-enforced).
+//
 // CHANGELOG (v7.5.12 — 2026-06-02):
 // - REPOINTED: Primary Aldosteronism citation -> ES 2025 (Adler et al.),
 //   retiring the superseded 2016 (Funder) CPG in the adrenal GUIDELINE_MAP.
@@ -1451,6 +1460,7 @@ const ALLOWED_LEAD_INS_BY_LEVEL = {
     "next_step_in_management",
     "mixed_management_with_comorbidity",
     "most_appropriate_pharmacotherapy",
+    "most_appropriate_clinical_intervention",
     "most_accurate_diagnostic_test",
     "next_step_in_diagnostic_workup",
     "risk_of_future_adverse_event_or_complication",
@@ -1462,6 +1472,7 @@ const ALLOWED_LEAD_INS_BY_LEVEL = {
     "next_step_in_management",
     "mixed_management_with_comorbidity",
     "most_appropriate_pharmacotherapy",
+    "most_appropriate_clinical_intervention",
     "next_step_in_diagnostic_workup",
     "most_accurate_diagnostic_test",
     "risk_of_future_adverse_event_or_complication",
@@ -1944,7 +1955,7 @@ const MCQ_TOOL = {
       stem:              { type: "string" },
       choices: {
         type: "object",
-        properties: { A: { type: "string" }, B: { type: "string" }, C: { type: "string" }, D: { type: "string" }, E: { type: "string" } },
+        properties: { A: { type: "string", minLength: 3 }, B: { type: "string", minLength: 3 }, C: { type: "string", minLength: 3 }, D: { type: "string", minLength: 3 }, E: { type: "string", minLength: 3 } },
         required: ["A", "B", "C", "D", "E"]
       },
       correct:      { type: "string", enum: ["A","B","C","D","E"] },
@@ -2555,7 +2566,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.12)   ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.13)   ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
