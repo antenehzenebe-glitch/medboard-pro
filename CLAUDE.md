@@ -163,16 +163,16 @@ Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by sco
 
 | Level | Servable | ~Flip target | Gap |
 |---|---|---|---|
-| ABIM Internal Medicine | 129 | ~165 | ~36 |
-| ABIM Endocrinology | 52 | ~175 | ~123 |
+| ABIM Internal Medicine | 148 | ~165 | ~17 |
+| ABIM Endocrinology | 84 | ~175 | ~91 |
 | USMLE Step 1 | 22 | ~150 | ~128 |
 | USMLE Step 3 | 19 | ~150 | ~131 |
 | USMLE Step 2 CK | 16 | ~180 | ~164 |
-| **Total servable** | **238** | | |
+| **Total servable** | **289** | | |
 
-> 238 = `status='approved' AND cueing_flag IS NOT TRUE` = servable. Verified live 2026-06-01 (post #2 lipid dispositions: +6 IM promotes, 3 rejects; Tier-2 thyroid slice; 1 FNA near-dupe retired). `re_audit` cohort currently empty — the two 2026-05-31 demotions were re-certified to `approved` on 2026-06-01.
+> 289 = `status='approved' AND cueing_flag IS NOT TRUE` = servable. Verified live 2026-06-03 PM. This session: IM-36 recovery COMPLETE (IM 129→148, pending 0); Endo pending-triage workstream opened — 5 clusters dispositioned (Type 2, Hypoglycemia, Primary Aldosteronism, DKA/HHS, SGLT2i), Endo 52→84, Endo pending 208→139. `re_audit` cohort empty.
 
-Pending (not servable until vetted): ~35 Endo v7.5.7 candidates + 3 night-verified + 7 from the May 30 B3 smoke. **IM-36 recovery block** identified: exactly **36** rows `status='pending_review' AND approval_status='approved'` (April pre-canon; spread cleanly across subspecialties — GI/Hep 8, Cardiology 8, Pulm 6, Gen IM 5, Nephro 4, Rheum 3, +Heme/Onc, ID, Ethics). Recovery = triage (promote/edit/drop), not blanket promotion.
+Pending (not servable until vetted): **Endo 139** (down from 208; 5 clusters triaged this session at ~45% yield — backlog is heavily template-redundant, `content_hash`-blind), plus Step1 16 / Step3 9 / Step2CK 13. IM pending = 0 (IM-36 recovery COMPLETE). Remaining Endo clusters by size: Cushing 11, GLP-1 10, PCOS 8, Type 1 Insulin 8, Hyperthyroid/Graves 7, Osteoporosis 7, Prolactinoma 7, then the gland/thyroid/bone tail. Triage rule in force: **keep ≤2 distinct sub-angles per concept.**
 
 ### Generators
 **v7.5.13** (2026-06-03); prior **v7.5.12** (HEAD `71cd081`). Lipid non-statin escalation = corrected **conventional ladder** (the night-log "magnitude-keying" was never built — only the bad bempedoic-before-PCSK9i order was fixed). B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
@@ -187,12 +187,12 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 
 ## 9. Roadmap priorities (in order)
 
-1. **IM-36 recovery** — triage the 36 `pending_review/approved` rows (promote clean → `status='approved', reviewed_at=now()`; edit-promote; drop dup/mis-key; hold rewrites). Fastest IM bank growth.
+1. **IM-36 recovery — COMPLETE** (IM pending = 0; servable 148). **Endo pending-triage is now the lever** — 139 rows across 30 topics; cluster-by-cluster full-content batches, ≤2 sub-angles/concept. Then a moderate Endo generation run to close the residual ~25–30 gap to ~175 (triage first, never onto an untriaged backlog).
 2. **May-30 smoke findings — RESOLVED (v7.5.13, 2026-06-03).** (a) `most_appropriate_clinical_intervention` added to the ABIM Internal Medicine + ABIM Endocrinology lead-in allow-lists (was over-strict — now parity with Step 2 CK / Step 3). (b) "truncated choice A" = `emit_mcq` schema permitted an empty first option; `minLength:3` added to choices A–E, `validateChoiceCompleteness` remains the hard backstop. **Scaled IM generation gate is CLEAR.**
 3. **Staged IM bulk generation** (only after B3 confirmed — done — and #2 resolved): moderate batches (count 20–30), vet to keep pace; new rows = `pending_review`.
 4. **Vet the ~35 Endo bulk candidates** (50 → up to ~85). Expect SGLT2i/hypoglycemia clustering (predate B3).
 5. **Rewrite 3 held items:** `425cf587` (NIPHS), `a660f8af` (LT4 + fabricated ATA 2025), `93191d92` (TCA + bicarbonate).
-6. **Disposition edge-case rows:** IM has 1 `rejected/approved` + 2 `pending/rejected`; bank-wide 2 `rejected/approved`. Excluded from serving; rescue or confirm.
+6. **Disposition edge-case rows:** IM `pending/rejected` pair resolved (rescued during IM-36). Bank-wide `rejected/approved` pair still open. Excluded from serving; rescue or confirm.
 7. **Image integration Phase 1 decision** — fold `requires_image`/`image_spec` generator flagging into a release, or defer (Phase 0 policy lock still open; see `IMAGE_INTEGRATION_PLAN.md`). Does NOT block MVP.
 8. Continue bulk generation toward thresholds · No-signup demo mode · 30-fellow willingness-to-pay outreach · trial-cancellation survey (the real funnel leak).
 9. Spaced-repetition v2 · Mobile PWA — Q4 2026.
@@ -220,6 +220,9 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 -----
 
 ## 12. Known gotchas
+
+### SGLT2i dapa-vs-empa soft single-best (generator defect — v7.5.x candidate)
+The generator routinely offers dapagliflozin AND empagliflozin as separate options at an eGFR where both are labeled → unanswerable single-best (Rule M). Hit 5/11 in the 2026-06-03 SGLT2i triage. Guardrail: SGLT2i-class "select the agent" stems must offer at most ONE SGLT2i, unless the stem sits in the eGFR 20–25 window where dapa (≥25) and empa (≥20) legitimately diverge — the only valid two-SGLT2i single-best.
 
 ### `approval_status` deprecated — `status` authoritative (D1 RESOLVED May 30, option b)
 Both serve functions gate on `status`. `approval_status` is stale; legacy rows are inconsistent across the two columns. The 2-of-2 gate was rejected (footgun: a promotion that forgets `approval_status` silently de-serves rows). Edge-case rows (`status='rejected'` + `approval_status='approved'`) are excluded from serving — disposition pending.
