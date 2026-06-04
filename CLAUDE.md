@@ -1,7 +1,7 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: **June 3, 2026** — Pituitary Society 2023 added to the citation lock (prolactinoma rows modernized 2026-06-01); §4 threshold table repaired. **v7.5.12 (2026-06-02):** PA citation repointed to ES 2025 (Adler) + `validateNoPhantomCitations` phantom-citation hard block added. Prior (May 31): B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
+> Last updated: **June 4, 2026** — Endo pending-triage: 6 clusters dispositioned (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis); Endo 84→110 servable, total 289→315. **SURPASS-CVOT (NEJM 2025) clinical-canon shift** recorded (tirzepatide CV data — "lacks CVOT" items now stale; servable `6cf8c36d` fixed). Four citation phantoms flagged for the generator pass (see §6). Prior (June 3): Pituitary Society 2023 added to the citation lock; §4 threshold table repaired. **v7.5.12 (2026-06-02):** PA citation repointed to ES 2025 (Adler) + `validateNoPhantomCitations` phantom-citation hard block added. Prior (May 31): B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
 > Generators at **v7.5.13** (2026-06-03; +2a lead-in allow-list, +2b choices minLength), prior **v7.5.12** (HEAD `71cd081`) — header/banner parity fixed, both files byte-consistent on the conventional-ladder decision; re-audit workstream opened (`re_audit` status added). Prior: v7.5.10 (lipid refresh), v7.5.9 (HEAD `abd3ccd`).
 
 -----
@@ -164,15 +164,15 @@ Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by sco
 | Level | Servable | ~Flip target | Gap |
 |---|---|---|---|
 | ABIM Internal Medicine | 148 | ~165 | ~17 |
-| ABIM Endocrinology | 84 | ~175 | ~91 |
+| ABIM Endocrinology | 110 | ~175 | ~65 |
 | USMLE Step 1 | 22 | ~150 | ~128 |
 | USMLE Step 3 | 19 | ~150 | ~131 |
 | USMLE Step 2 CK | 16 | ~180 | ~164 |
-| **Total servable** | **289** | | |
+| **Total servable** | **315** | | |
 
-> 289 = `status='approved' AND cueing_flag IS NOT TRUE` = servable. Verified live 2026-06-03 PM. This session: IM-36 recovery COMPLETE (IM 129→148, pending 0); Endo pending-triage workstream opened — 5 clusters dispositioned (Type 2, Hypoglycemia, Primary Aldosteronism, DKA/HHS, SGLT2i), Endo 52→84, Endo pending 208→139. `re_audit` cohort empty.
+> 315 = `status='approved' AND cueing_flag IS NOT TRUE` = servable. Verified live 2026-06-04. This session: 6 Endo clusters triaged (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis) — 26 promoted, 24 rejected; Endo 84→110, Endo pending 139→89. Plus servable `6cf8c36d` fixed in place (SURPASS-CVOT staleness). One keeper (`994f0def`, AFF) staged but not yet applied. `re_audit` cohort empty.
 
-Pending (not servable until vetted): **Endo 139** (down from 208; 5 clusters triaged this session at ~45% yield — backlog is heavily template-redundant, `content_hash`-blind), plus Step1 16 / Step3 9 / Step2CK 13. IM pending = 0 (IM-36 recovery COMPLETE). Remaining Endo clusters by size: Cushing 11, GLP-1 10, PCOS 8, Type 1 Insulin 8, Hyperthyroid/Graves 7, Osteoporosis 7, Prolactinoma 7, then the gland/thyroid/bone tail. Triage rule in force: **keep ≤2 distinct sub-angles per concept.**
+Pending (not servable until vetted): **Endo 89** (down from 139; 6 clusters triaged 2026-06-04), plus Step1 16 / Step3 9 / Step2CK 13. IM pending = 0. Remaining Endo clusters by size: Prolactinoma 7, Hypopituitarism 6, Thyroid Storm 6, Acromegaly 5, Adrenal Insufficiency 5, CGM/AID 5, Hypothyroidism/Hashimotos 5, Male Hypogonadism 5, then the DI/parathyroid/insulinoma/thyroid/MEN tail. Triage rule in force: **keep ≤2 distinct sub-angles per concept.** Two reject classes seen heavily this session: (a) "two co-valid agents" soft single-best (see §12) and (b) **mis-keyed** items where the labs/organ/guideline-rank contradict the keyed answer (need a human clinical read; no validator catches them).
 
 ### Generators
 **v7.5.13** (2026-06-03); prior **v7.5.12** (HEAD `71cd081`). Lipid non-statin escalation = corrected **conventional ladder** (the night-log "magnitude-keying" was never built — only the bad bempedoic-before-PCSK9i order was fixed). B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
@@ -187,7 +187,7 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 
 ## 9. Roadmap priorities (in order)
 
-1. **IM-36 recovery — COMPLETE** (IM pending = 0; servable 148). **Endo pending-triage is now the lever** — 139 rows across 30 topics; cluster-by-cluster full-content batches, ≤2 sub-angles/concept. Then a moderate Endo generation run to close the residual ~25–30 gap to ~175 (triage first, never onto an untriaged backlog).
+1. **Endo pending-triage — IN PROGRESS** (servable 110; pending 89). 6 of ~13 clusters done (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis). Continue cluster-by-cluster down the §8 list (Prolactinoma next), ≤2 sub-angles/concept. Then a moderate Endo generation run to close the residual gap to ~175 (triage first, never onto an untriaged backlog). **Before the gen run:** clear the citation-canon pass (§6) + the interchangeable-agent guardrail (§12).
 2. **May-30 smoke findings — RESOLVED (v7.5.13, 2026-06-03).** (a) `most_appropriate_clinical_intervention` added to the ABIM Internal Medicine + ABIM Endocrinology lead-in allow-lists (was over-strict — now parity with Step 2 CK / Step 3). (b) "truncated choice A" = `emit_mcq` schema permitted an empty first option; `minLength:3` added to choices A–E, `validateChoiceCompleteness` remains the hard backstop. **Scaled IM generation gate is CLEAR.**
 3. **Staged IM bulk generation** (only after B3 confirmed — done — and #2 resolved): moderate batches (count 20–30), vet to keep pace; new rows = `pending_review`.
 4. **Vet the ~35 Endo bulk candidates** (50 → up to ~85). Expect SGLT2i/hypoglycemia clustering (predate B3).
@@ -221,8 +221,16 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 
 ## 12. Known gotchas
 
-### SGLT2i dapa-vs-empa soft single-best (generator defect — v7.5.x candidate)
-The generator routinely offers dapagliflozin AND empagliflozin as separate options at an eGFR where both are labeled → unanswerable single-best (Rule M). Hit 5/11 in the 2026-06-03 SGLT2i triage. Guardrail: SGLT2i-class "select the agent" stems must offer at most ONE SGLT2i, unless the stem sits in the eGFR 20–25 window where dapa (≥25) and empa (≥20) legitimately diverge — the only valid two-SGLT2i single-best.
+### "Two co-valid agents" soft single-best (generator defect — v7.5.x candidate)
+The generator routinely offers two interchangeably-labeled agents from the same class as separate options when the stem cannot distinguish them → unanswerable single-best (Rule M). Confirmed instances: **SGLT2i** dapa vs empa (5/11, 2026-06-03); **basal insulin** degludec vs glargine U-300 (2026-06-04 Type 1 Insulin); **anabolic osteoporosis** romosozumab vs teriparatide (Osteoporosis); **Cushing steroidogenesis inhibitors** metyrapone vs osilodrostat (both hepatic, both raise 11-DOC → the 7-item sub-pool even self-contradicted on which agent to key). **Guardrail:** for "select the agent" stems, the choice set must contain at most ONE member of an interchangeable class **unless the stem encodes the specific feature that breaks the tie** — e.g., SGLT2i eGFR 20–25 window (dapa ≥25, empa ≥20); QTc prolongation → metyrapone (osilodrostat/keto/pasireotide prolong QT); CKD-with-albuminuria → semaglutide (FLOW) over tirzepatide.
+
+### Citation phantoms found 2026-06-04 (generator/doc pass before next gen run)
+Recurring fabrication class. Purge/repoint in both generators (parity) and `validateNoPhantomCitations`/`BANNED_CITATION_PATTERNS`:
+- **"2024 ES Cushing CPG"** and **"2024 ES Adrenal Incidentaloma guideline"** — do not exist. Real: ES Cushing **treatment 2015** / **dx 2008**; **Pituitary Society 2021** (Fleseriu); **ESE/ENSAT 2023** (Fassnacht).
+- **MEN1 "2022 consensus (Thakker)"** — does not exist. Real: **Thakker, JCEM 2012** + **AACE 2025** MEN1 consensus.
+- **"AACE 2025 Osteoporosis"** — does not exist. Real: **AACE/ACE 2020** (Camacho). (AACE-2025 token is seeded for other docs; ensure the osteoporosis (society, year) tuple is blocked.)
+- **"2024 ATA" hyperthyroidism** — mis-dated. Real: **ATA 2016** (Ross) + **ATA 2017** pregnancy (Alexander).
+- **ADD: SURPASS-CVOT** (Nicholls, NEJM 2025;393:2409-2420) to the citation canon — tirzepatide CV-outcomes; "tirzepatide lacks CVOT" is now a stale/false claim. Sweep servable + pending for residual stale phrasing.
 
 ### `approval_status` deprecated — `status` authoritative (D1 RESOLVED May 30, option b)
 Both serve functions gate on `status`. `approval_status` is stale; legacy rows are inconsistent across the two columns. The 2-of-2 gate was rejected (footgun: a promotion that forgets `approval_status` silently de-serves rows). Edge-case rows (`status='rejected'` + `approval_status='approved'`) are excluded from serving — disposition pending.
