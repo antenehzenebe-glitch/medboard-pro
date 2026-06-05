@@ -1641,7 +1641,7 @@ function validateSiteOfCare(p) {
 // Runs at GENERATION time only; stored rows are untouched.
 const ALLOWED_GUIDELINE_CITATIONS = {
   // Endocrine core — verified to publication year (AM pass; SESSION_LOG_2026_05_29_AM)
-  "Endocrine Society": new Set(["2008", "2009", "2014", "2016", "2018", "2022", "2024", "2025"]),
+  "Endocrine Society": new Set(["2008", "2009", "2012", "2014", "2016", "2018", "2022", "2024", "2025"]),
   "ATA":   new Set(["2014", "2015", "2016", "2017", "2025"]),
   "AACE":  new Set(["2020", "2022", "2023", "2025", "2026"]),
   "ESE":   new Set(["2018", "2023", "2024"]),
