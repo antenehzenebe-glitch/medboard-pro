@@ -1648,7 +1648,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 function checkUnseededCitations(p) {
@@ -1720,6 +1720,43 @@ const BANNED_CITATION_PATTERNS = [
   { re: /\b2024\b[^.]{0,60}Endocrine Society[^.]{0,60}(?:pheochromocytoma|paraganglioma|SDHx|SDHB|MIBG)/i,
     why: "No 2024 ES pheochromocytoma/paraganglioma CPG (real: Lenders 2014)" }
 ];
+
+// ── Interchangeable-agent soft-single-best flag (v7.5.14, warn-mode) ──
+// Surfaces (does not drop) "select the agent" sets offering >=2 members of one
+// interchangeable drug class when the stem lacks the tie-breaking feature. Rule M.
+const INTERCHANGEABLE_AGENT_CLASSES = [
+  { cls: "SGLT2i", tieBreak: /e\.?gfr\D{0,10}2[0-4]\b/i, members: [
+    { id: "dapagliflozin", pat: /dapagliflozin/ }, { id: "empagliflozin", pat: /empagliflozin/ },
+    { id: "canagliflozin", pat: /canagliflozin/ }, { id: "ertugliflozin", pat: /ertugliflozin/ },
+    { id: "bexagliflozin", pat: /bexagliflozin/ } ] },
+  { cls: "basal insulin", tieBreak: null, members: [
+    { id: "degludec", pat: /degludec/ }, { id: "glargine-u300", pat: /glargine\s*u-?\s*300/ },
+    { id: "glargine-u100", pat: /glargine\s*u-?\s*100/ }, { id: "detemir", pat: /detemir/ } ] },
+  { cls: "anabolic osteoporosis", tieBreak: /myocardial infarction|recent (mi|stroke)|\bstroke\b|cardiovascular (event|disease)|ascvd/i, members: [
+    { id: "romosozumab", pat: /romosozumab/ }, { id: "teriparatide", pat: /teriparatide/ }, { id: "abaloparatide", pat: /abaloparatide/ } ] },
+  { cls: "Cushing steroidogenesis inhibitor", tieBreak: /qtc|prolonged qt|hepatotox|transaminas|hepatic impair|liver (injury|disease)/i, members: [
+    { id: "metyrapone", pat: /metyrapone/ }, { id: "osilodrostat", pat: /osilodrostat/ },
+    { id: "ketoconazole", pat: /ketoconazole/ }, { id: "levoketoconazole", pat: /levoketoconazole/ } ] },
+  { cls: "GLP-1 / incretin", tieBreak: /albuminuria|uacr|\bckd\b|flow trial|established (ascvd|cardiovascular)/i, members: [
+    { id: "semaglutide", pat: /semaglutide/ }, { id: "dulaglutide", pat: /dulaglutide/ },
+    { id: "liraglutide", pat: /liraglutide/ }, { id: "tirzepatide", pat: /tirzepatide/ }, { id: "exenatide", pat: /exenatide/ } ] },
+];
+
+function flagInterchangeableAgents(p) {
+  if (!p || !p.choices) return [];
+  const raw = Array.isArray(p.choices) ? p.choices
+    : (typeof p.choices === "object" ? Object.values(p.choices) : []);
+  const opts = raw.map(o => String(o == null ? "" : (typeof o === "object" ? (o.text || o.value || "") : o)).toLowerCase());
+  const stem = String(p.stem || "").toLowerCase();
+  const notices = [];
+  for (const { cls, members, tieBreak } of INTERCHANGEABLE_AGENT_CLASSES) {
+    const present = members.filter(m => opts.some(o => m.pat.test(o))).map(m => m.id);
+    if (new Set(present).size >= 2 && !(tieBreak && tieBreak.test(stem))) {
+      notices.push(`[interchangeable] ${present.length} ${cls} agents in one set (${present.join(", ")}) with no tie-breaking stem feature \u2014 soft single-best (Rule M); confirm one dominant answer.`);
+    }
+  }
+  return notices;
+}
 
 function validateNoPhantomCitations(p) {
   if (!p || !p.explanation) return true;
@@ -2223,6 +2260,7 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   if (!validateNoPhantomCitations(p)) return recordDrop("phantomCitation");
   if (detectAntiCueingViolation(p)) return recordDrop("antiCueing");
   checkUnseededCitations(p); // PART 2: non-blocking warn on the accepted item, past all reject gates
+  { const _ia = flagInterchangeableAgents(p); if (_ia.length) { _ia.forEach(n => console.warn(n)); dropTally._warnInterchange += _ia.length; } } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
@@ -2600,6 +2638,7 @@ async function main() {
   for (const [reason, n] of validatorDrops) console.log(`║    • ${reason}: ${n}`);
   console.log(`║  Gen failures (both engines): ${String(dropTally._genFailed).padEnd(17)}║`);
   console.log(`║  Unseeded-citation warns: ${String(dropTally._warnUnseeded).padEnd(21)}║`);
+  console.log(`║  Interchangeable-agent warns: ${String(dropTally._warnInterchange).padEnd(17)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
 }
