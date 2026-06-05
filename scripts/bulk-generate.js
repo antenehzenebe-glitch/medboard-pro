@@ -1,6 +1,16 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.13 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.13
+// v7.5.14 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.14
 // ---------------------------------------------------------------
+// CHANGELOG (v7.5.14 — 2026-06-04):
+// - ADDED: warn-mode interchangeable-agent soft-single-best flag (Rule M) on both paths.
+//   flagInterchangeableAgents() + INTERCHANGEABLE_AGENT_CLASSES (SGLT2i, basal insulin,
+//   anabolic osteo, Cushing steroidogenesis inhibitors, GLP-1/incretin). Flags choice sets
+//   offering >=2 members of one class unless a tie-breaking stem feature is present
+//   (e.g. eGFR 20-24 for SGLT2i, prior MI/stroke for romosozumab, QTc/hepatic for metyrapone,
+//   CKD+albuminuria for semaglutide). NON-BLOCKING: never drops — mirrors checkUnseededCitations
+//   at PART 2, past all reject gates. Bulk increments dropTally._warnInterchange (shown in run
+//   summary); gen-mcq console.warns (no dropTally on single-question path).
+//
 // CHANGELOG (v7.5.13 — 2026-06-03):
 // - FIXED (2a): added "most_appropriate_clinical_intervention" to ABIM Internal Medicine
 //   and ABIM Endocrinology allow-lists in ALLOWED_LEAD_INS_BY_LEVEL (was permitted at
@@ -2604,7 +2614,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.13)   ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.14)   ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
