@@ -1,6 +1,16 @@
 // bulk-generate.js — MedBoard Pro
-// v7.5.14 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; parity with generate-mcq.js v7.5.14
+// v7.5.15 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; interchangeable-agent flag tuned (warn-mode, precision+recall); parity with generate-mcq.js v7.5.15
 // ---------------------------------------------------------------
+// CHANGELOG (v7.5.15 — 2026-06-05):
+// - TUNED: flagInterchangeableAgents precision + recall (warn-mode only; no
+//   reject-gate change). (E1) GLP-1 tie-break now matches spelled-out cardiorenal
+//   terms (atherosclerotic cardiovascular / chronic kidney disease /
+//   albumin-to-creatinine / \bascvd\b). (E2) ketoconazole member gains (?<!levo)
+//   lookbehind so levoketoconazole is one drug, not a self-pair. (E3) flag now
+//   requires matched members to occupy >=2 distinct options (kills single-option
+//   "e.g., X or Y" exemplar listings). Backtest over live Endo/IM bank:
+//   11 -> 8 warn-hits, 0 true positives lost; IM clean.
+//
 // CHANGELOG (v7.5.14 — 2026-06-04):
 // - ADDED: warn-mode interchangeable-agent soft-single-best flag (Rule M) on both paths.
 //   flagInterchangeableAgents() + INTERCHANGEABLE_AGENT_CLASSES (SGLT2i, basal insulin,
@@ -1746,8 +1756,8 @@ const INTERCHANGEABLE_AGENT_CLASSES = [
     { id: "romosozumab", pat: /romosozumab/ }, { id: "teriparatide", pat: /teriparatide/ }, { id: "abaloparatide", pat: /abaloparatide/ } ] },
   { cls: "Cushing steroidogenesis inhibitor", tieBreak: /qtc|prolonged qt|hepatotox|transaminas|hepatic impair|liver (injury|disease)/i, members: [
     { id: "metyrapone", pat: /metyrapone/ }, { id: "osilodrostat", pat: /osilodrostat/ },
-    { id: "ketoconazole", pat: /ketoconazole/ }, { id: "levoketoconazole", pat: /levoketoconazole/ } ] },
-  { cls: "GLP-1 / incretin", tieBreak: /albuminuria|uacr|\bckd\b|flow trial|established (ascvd|cardiovascular)/i, members: [
+    { id: "ketoconazole", pat: /(?<!levo)ketoconazole/ }, { id: "levoketoconazole", pat: /levoketoconazole/ } ] },
+  { cls: "GLP-1 / incretin", tieBreak: /albuminuria|uacr|albumin-to-creatinine|\bckd\b|chronic kidney disease|flow trial|\bascvd\b|atherosclerotic cardiovascular|established cardiovascular/i, members: [
     { id: "semaglutide", pat: /semaglutide/ }, { id: "dulaglutide", pat: /dulaglutide/ },
     { id: "liraglutide", pat: /liraglutide/ }, { id: "tirzepatide", pat: /tirzepatide/ }, { id: "exenatide", pat: /exenatide/ } ] },
 ];
@@ -1761,9 +1771,12 @@ function flagInterchangeableAgents(p) {
   const notices = [];
   for (const { cls, members, tieBreak } of INTERCHANGEABLE_AGENT_CLASSES) {
     const present = members.filter(m => opts.some(o => m.pat.test(o))).map(m => m.id);
-    if (new Set(present).size >= 2 && !(tieBreak && tieBreak.test(stem))) {
-      notices.push(`[interchangeable] ${present.length} ${cls} agents in one set (${present.join(", ")}) with no tie-breaking stem feature \u2014 soft single-best (Rule M); confirm one dominant answer.`);
-    }
+    if (new Set(present).size < 2) continue;
+    if (tieBreak && tieBreak.test(stem)) continue;
+    let optsWithMember = 0;
+    for (const o of opts) { if (members.some(m => m.pat.test(o))) optsWithMember++; }
+    if (optsWithMember < 2) continue;
+    notices.push(`[interchangeable] ${present.length} ${cls} agents in one set (${present.join(", ")}) with no tie-breaking stem feature \u2014 soft single-best (Rule M); confirm one dominant answer.`);
   }
   return notices;
 }
@@ -2614,7 +2627,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.14)   ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.15)   ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
