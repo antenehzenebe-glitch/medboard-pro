@@ -1803,6 +1803,43 @@ const INTERCHANGEABLE_AGENT_CLASSES = [
     { id: "liraglutide", pat: /liraglutide/ }, { id: "tirzepatide", pat: /tirzepatide/ }, { id: "exenatide", pat: /exenatide/ } ] },
 ];
 
+// -- Cardiorenal SGLT2i-deprioritization mis-key flag (warn-mode, both paths; added 2026-06-06) --
+// Non-blocking. H1: HFrEF stem keying a GLP-1 RA while an SGLT2i is offered. H2: explanation
+// asserting SGLT2i cause/worsen hyperkalemia (they are potassium-neutral to K-lowering).
+// Mirrors flagInterchangeableAgents. Backtest 2026-06-06: recall 3/3 (ec94b12a, c6714248,
+// 12f5f085); approved-bank false positives 0 (H1) + 1 benign (H2). Keep warn-mode for >=2
+// batches; promote to hard-reject only after multi-batch precision/recall data.
+function flagCardiorenalMiskey(p) {
+  if (!p) return [];
+  const warns = [];
+  const stem = String(p.stem || "");
+  const expl = String(p.explanation || "");
+  const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
+  const choicesText = choicesArr.join(" | ");
+  let keyText = "";
+  if (p.correct_answer != null) {
+    if (choicesObj && choicesObj[p.correct_answer] != null) {
+      keyText = String(choicesObj[p.correct_answer]);
+    } else if (/^[A-E]$/i.test(String(p.correct_answer))) {
+      const _i = String(p.correct_answer).toUpperCase().charCodeAt(0) - 65;
+      if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
+    } else {
+      keyText = String(p.correct_answer);
+    }
+  }
+  const hfref = /HFrEF|reduced ejection fraction|EF \b[1-3]\d\b|NYHA class (III|IV)/i.test(stem);
+  const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
+  const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-1/i;
+  if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText)) {
+    warns.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
+  }
+  if (/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i.test(expl)) {
+    warns.push("SGLT2i are K-neutral/lowering -- verify any hyperkalemia claim attributing risk to an SGLT2i.");
+  }
+  return warns;
+}
+
 function flagInterchangeableAgents(p) {
   if (!p || !p.choices) return [];
   const raw = Array.isArray(p.choices) ? p.choices
@@ -2442,6 +2479,8 @@ exports.handler = async function (event) {
     if (!isValid) throw new Error("Failed to generate a valid MCQ after maximum retries.");
     checkUnseededCitations(p); // PART 2: non-blocking warn for unseeded citation bodies on the accepted item
     { const _ia = flagInterchangeableAgents(p); if (_ia.length) _ia.forEach(n => console.warn(n)); } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
+    // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
+    { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { for (const _w of _crmk) console.warn("[warn] cardiorenal mis-key:", _w); } }
 
     p.topic = pd.resolvedTopic;
     const letters      = ['A', 'B', 'C', 'D', 'E'];

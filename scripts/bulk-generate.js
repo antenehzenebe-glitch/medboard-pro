@@ -1668,7 +1668,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 function checkUnseededCitations(p) {
@@ -1761,6 +1761,43 @@ const INTERCHANGEABLE_AGENT_CLASSES = [
     { id: "semaglutide", pat: /semaglutide/ }, { id: "dulaglutide", pat: /dulaglutide/ },
     { id: "liraglutide", pat: /liraglutide/ }, { id: "tirzepatide", pat: /tirzepatide/ }, { id: "exenatide", pat: /exenatide/ } ] },
 ];
+
+// -- Cardiorenal SGLT2i-deprioritization mis-key flag (warn-mode, both paths; added 2026-06-06) --
+// Non-blocking. H1: HFrEF stem keying a GLP-1 RA while an SGLT2i is offered. H2: explanation
+// asserting SGLT2i cause/worsen hyperkalemia (they are potassium-neutral to K-lowering).
+// Mirrors flagInterchangeableAgents. Backtest 2026-06-06: recall 3/3 (ec94b12a, c6714248,
+// 12f5f085); approved-bank false positives 0 (H1) + 1 benign (H2). Keep warn-mode for >=2
+// batches; promote to hard-reject only after multi-batch precision/recall data.
+function flagCardiorenalMiskey(p) {
+  if (!p) return [];
+  const warns = [];
+  const stem = String(p.stem || "");
+  const expl = String(p.explanation || "");
+  const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
+  const choicesText = choicesArr.join(" | ");
+  let keyText = "";
+  if (p.correct_answer != null) {
+    if (choicesObj && choicesObj[p.correct_answer] != null) {
+      keyText = String(choicesObj[p.correct_answer]);
+    } else if (/^[A-E]$/i.test(String(p.correct_answer))) {
+      const _i = String(p.correct_answer).toUpperCase().charCodeAt(0) - 65;
+      if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
+    } else {
+      keyText = String(p.correct_answer);
+    }
+  }
+  const hfref = /HFrEF|reduced ejection fraction|EF \b[1-3]\d\b|NYHA class (III|IV)/i.test(stem);
+  const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
+  const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-1/i;
+  if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText)) {
+    warns.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
+  }
+  if (/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i.test(expl)) {
+    warns.push("SGLT2i are K-neutral/lowering -- verify any hyperkalemia claim attributing risk to an SGLT2i.");
+  }
+  return warns;
+}
 
 function flagInterchangeableAgents(p) {
   if (!p || !p.choices) return [];
@@ -2284,6 +2321,8 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   if (detectAntiCueingViolation(p)) return recordDrop("antiCueing");
   checkUnseededCitations(p); // PART 2: non-blocking warn on the accepted item, past all reject gates
   { const _ia = flagInterchangeableAgents(p); if (_ia.length) { _ia.forEach(n => console.warn(n)); dropTally._warnInterchange += _ia.length; } } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
+  // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
+  { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { dropTally._warnCardiorenal++; for (const _w of _crmk) console.warn("[warn] cardiorenal mis-key:", _w); } }
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
