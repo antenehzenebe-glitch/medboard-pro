@@ -1,7 +1,16 @@
 # CLAUDE.md — MedBoard Pro
 
 > Project context for Claude. Read this before making any changes to the codebase.
-> Last updated: **June 5, 2026** — **v7.5.16:** Endocrine Society 2012 added to citation allow-list (real ES MEN1 CPG — Thakker, JCEM 2012); **v7.5.15:** interchangeable-agent validator tuning. Endo tail-cluster triage (CGM/AID, Hashimoto's, Male Hypogonadism, thyroid/Ca): 14 promoted (incl. 5 citation/terminology repoints — 3 phantom "2024 ES" survivors purged), 4 rejected (T1D-finerenone, Klinefelter-mislabel, sorafenib-renal-error, SGLT2i-K⁺-error); Endo 110→141, total 315→346. **Prior (June 4):** Endo pending-triage: 6 clusters dispositioned(GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis); Endo 84→110 servable, total 289→315. **SURPASS-CVOT (NEJM 2025) clinical-canon shift** recorded (tirzepatide CV data — "lacks CVOT" items now stale; servable `6cf8c36d` fixed). Four citation phantoms flagged for the generator pass (see §6). Prior (June 3): Pituitary Society 2023 added to the citation lock; §4 threshold table repaired. **v7.5.12 (2026-06-02):** PA citation repointed to ES 2025 (Adler) + `validateNoPhantomCitations` phantom-citation hard block added. Prior (May 31): B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
+ "> Last updated: **June 6, 2026** — **Cardiorenal SGLT2i-deprioritization guardrail shipped** "
+            "(commits `c260ad1` L2 + `4e7e0e2` L1): L1 `TOPIC_GUARDRAILS` anchor (SGLT2i = Class I for HFrEF, "
+            "initiated to eGFR 20, potassium-neutral; cardiorenal indications T2D-specific) + "
+            "`flagCardiorenalMiskey` warn-mode validator (H1 HFrEF-keys-GLP-1-over-SGLT2i; H2 false-hyperkalemia "
+            "rationale), both files parity, no banner bump. Backtest recall 3/3; approved-bank FP 0 H1 / 1 benign H2. "
+            "**2026-06-06 ABIM-Endo fresh batch (14) triaged & promoted** — first guardrail-live run, 0 cardiorenal "
+            "warns; Endo servable 163\u2192177, **~175 flip target MET**. **Prior (June 5) — v7.5.16:**"
+        ),
+    ),
+        ), Endocrine Society 2012 added to citation allow-list (real ES MEN1 CPG — Thakker, JCEM 2012); **v7.5.15:** interchangeable-agent validator tuning. Endo tail-cluster triage (CGM/AID, Hashimoto's, Male Hypogonadism, thyroid/Ca): 14 promoted (incl. 5 citation/terminology repoints — 3 phantom "2024 ES" survivors purged), 4 rejected (T1D-finerenone, Klinefelter-mislabel, sorafenib-renal-error, SGLT2i-K⁺-error); Endo 110→141, total 315→346. **Prior (June 4):** Endo pending-triage: 6 clusters dispositioned(GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis); Endo 84→110 servable, total 289→315. **SURPASS-CVOT (NEJM 2025) clinical-canon shift** recorded (tirzepatide CV data — "lacks CVOT" items now stale; servable `6cf8c36d` fixed). Four citation phantoms flagged for the generator pass (see §6). Prior (June 3): Pituitary Society 2023 added to the citation lock; §4 threshold table repaired. **v7.5.12 (2026-06-02):** PA citation repointed to ES 2025 (Adler) + `validateNoPhantomCitations` phantom-citation hard block added. Prior (May 31): B3 topic-distribution control shipped; D1 closed; citation lock complete; generation-outage fix recorded. **Lipid canon refreshed in place:** existing lipid `TOPIC_GUARDRAILS` (l1/l2) and the lipid citation-map entry rewritten to the **2026 ACC/AHA/Multisociety Dyslipidemia Guideline + AACE 2025**; the **2018 Grundy citation retired** (was instructing generation to cite a retired, pre-2023 guideline) and the false "no AACE lipid guideline since 2017" warning corrected.
 > Generators at **v7.5.13** (2026-06-03; +2a lead-in allow-list, +2b choices minLength), prior **v7.5.12** (HEAD `71cd081`) — header/banner parity fixed, both files byte-consistent on the conventional-ladder decision; re-audit workstream opened (`re_audit` status added). Prior: v7.5.10 (lipid refresh), v7.5.9 (HEAD `abd3ccd`).
 
 -----
@@ -120,13 +129,25 @@ Enforcement lives in `generate-mcq.js` and `scripts/bulk-generate.js`, sharing a
 - **L2 — Cognitive Complexity:** forbids Tier 1–2 trivia; requires Tier 3+ angles.
 
 ### Clinical anchors locked
-DKA/HHS (K⁺-before-insulin) · Hypoglycemia/Insulinoma (proinsulin pmol/L; Whipple) · Thyroid storm (ATA 2016) · Adrenal incidentaloma (AACE/ESE 2023) · Subclinical hypothyroidism (TRUST) · LT4 dosing · **DI / posterior pituitary** (water deprivation contraindicated when Na > 145 / osm > 295–300; direct DDAVP/copeptin — ESE 2018) · **A1 adrenal-insufficiency replacement monitoring** (no reliable biochemical GC marker; clinical titration; ES 2016) · **A2 post-stroke anticoagulation timing** (EHRA 1-3-6-12 vs ELAN 2023 / AHA-ASA 2024) · **Dyslipidemia / lipid-lowering** (2026 ACC/AHA/Multisociety Dyslipidemia Guideline — **RETIRES & REPLACES the 2018 Blood Cholesterol Guideline**; risk-based LDL-C goals restored: very-high-risk ASCVD <55, ASCVD <70; primary ≥190 → <100 (<70 w/ HeFH·RF·subclinical); 70–189 → <100/<70 by PREVENT; CAC strata <100/<70/<55; **PREVENT replaces Pooled Cohort Equations ages 30–79**; universal Lp(a) screening; apoB/non-HDL-C secondary targets. AACE 2025 [Patel/Wyne, Endocr Pract 2025;31:236–262] = GRADE nonstatin focused update; **PREVENT governs on conflict**. The 2018 guideline is BANNED — retired AND pre-2023). · **Primary Aldosteronism** (ES 2025 Adler et al. — RETIRES & REPLACES the 2016 Funder CPG; spironolactone preferred over other MRAs; MRAs preferred over ENaC inhibitors [amiloride/triamterene]; uncontrolled-on-MRA + suppressed renin → up-titrate the MRA to raise renin; CT + AVS before deciding medical vs surgical).
+DKA/HHS (K⁺-before-insulin) · Hypoglycemia/Insulinoma (proinsulin pmol/L; Whipple) · Thyroid storm (ATA 2016) · Adrenal incidentaloma (AACE/ESE 2023) · Subclinical hypothyroidism (TRUST) · LT4 dosing · **DI / posterior pituitary** (water deprivation contraindicated when Na > 145 / osm > 295–300; direct DDAVP/copeptin — ESE 2018) · **A1 adrenal-insufficiency replacement monitoring** (no reliable biochemical GC marker; clinical titration; ES 2016) · **A2 post-stroke anticoagulation timing** (EHRA 1-3-6-12 vs ELAN 2023 / AHA-ASA 2024) · **Dyslipidemia / lipid-lowering** (2026 ACC/AHA/Multisociety Dyslipidemia Guideline — **RETIRES & REPLACES the 2018 Blood Cholesterol Guideline**; risk-based LDL-C goals restored: very-high-risk ASCVD <55, ASCVD <70; primary ≥190 → <100 (<70 w/ HeFH·RF·subclinical); 70–189 → <100/<70 by PREVENT; CAC strata <100/<70/<55; **PREVENT replaces Pooled Cohort Equations ages 30–79**; universal Lp(a) screening; apoB/non-HDL-C secondary targets. AACE 2025 [Patel/Wyne, Endocr Pract 2025;31:236–262] = GRADE nonstatin focused update; **PREVENT governs on conflict**. The 2018 guideline is BANNED — retired AND pre-2023). · **Primary Aldosteronism** (ES 2025 Adler et al. — RETIRES & REPLACES the 2016 Funder CPG; spironolactone preferred over other MRAs; MRAs preferred over ENaC inhibitors [amiloride/triamterene]; uncontrolled-on-MRA + suppressed renin → up-titrate the MRA to raise renin; "CT + AVS before deciding medical vs surgical). · **Cardiorenal (T2D) — SGLT2i vs GLP-1** "
+            "(SGLT2i [empagliflozin, dapagliflozin] = Class I for HFrEF [EMPEROR-Reduced, DAPA-HF], initiated to "
+            "eGFR 20; potassium-neutral to K-lowering — do NOT cause hyperkalemia; reduced glycemic efficacy below "
+            "eGFR 45 does NOT remove the HF/cardiorenal indication; prefer SGLT2i over a GLP-1 RA for the HF "
+            "indication. Finerenone / SGLT2i-glycemic / GLP-1-renal indications are T2D-specific — never "
+            "extrapolate to T1D)."
+        ),
+    ),
 
 ### Integrity rules A–M
 A–H pre-existing (H = anti-cueing). I/J/K = v7.5.6 ABIM canon. **L** = lab-value reproduction lock; **M** = single-best-answer discriminator.
 
 ### Validator stack
-`detectAntiCueingViolation`, `validateConsistency` (stem↔explanation lab mismatch backstop), `validateDemographics`, `validateChoiceCompleteness`, the v7.5.6 canon validators (`validateLeadInType` etc.), and **`validateCitationYears` + `ALLOWED_GUIDELINE_CITATIONS`** (per-society allow-list; inspects years within ~25 chars of a recognized society token). Plus `checkUnseededCitations` warn-mode (`WARN_GUIDELINE_TOKENS`) — non-blocking "verify edition" flag, wired on both paths. Plus **`validateNoPhantomCitations` + `BANNED_CITATION_PATTERNS`** (v7.5.12) — HARD reject gate for fabricated/superseded (society, year, *topic*) tuples the per-year list can't catch (ES Primary Aldosteronism ≠ 2025; Funder 2024; ES 2024 pheo incl. SDHx/MIBG); Bornstein-2016 PAI and Lenders-2014 pheo intentionally pass.
+`detectAntiCueingViolation`, `validateConsistency` (stem↔explanation lab mismatch backstop), `validateDemographics`, `validateChoiceCompleteness`, the v7.5.6 canon validators (`validateLeadInType` etc.), and **`validateCitationYears` + `ALLOWED_GUIDELINE_CITATIONS`** (per-society allow-list; inspects years within ~25 chars of a recognized society token). Plus `checkUnseededCitations` warn-mode (`WARN_GUIDELINE_TOKENS`) — non-blocking "verify edition" flag, wired on both paths. Plus **`validateNoPhantomCitations` + `BANNED_CITATION_PATTERNS`** (v7.5.12) — HARD reject gate for fabricated/superseded (society, year, *topic*) tuples the per-year list can't catch (ES Primary Aldosteronism ≠ 2025; Funder 2024; ES 2024 pheo incl. SDHx/MIBG); "Bornstein-2016 PAI and Lenders-2014 pheo intentionally pass. Plus **`flagCardiorenalMiskey`** "
+            "(warn-mode, both paths; 2026-06-06) — non-blocking surfacing of the SGLT2i-deprioritization mis-key "
+            "class (H1 HFrEF stem keying a GLP-1 RA over an offered SGLT2i; H2 explanation asserting SGLT2i cause "
+            "hyperkalemia); see §12."
+        ),
+    ),
 
 > Wiring differs: gen-mcq chains validators with `&&`; bulk uses guard-clause `return recordDrop("name")` (14 guards; the C1 drop-reason tally). In bulk, citation runs before anti-cueing (anti-cueing is dead last — its drops can be masked; re-evaluate ordering with multi-batch data, don't reorder blind).
 
@@ -157,25 +178,45 @@ Reject mirrors with `'rejected'`, or `DELETE`. Bulk-approve a fresh batch by sco
 
 -----
 
-## 8. Current state (as of June 1, 2026)
+"## 8. Current state (as of June 6, 2026)",
+    ),
 
 ### Question bank — servable
 
 | Level | Servable | ~Flip target | Gap |
 |---|---|---|---|
 | ABIM Internal Medicine | 148 | ~165 | ~17 |
-| ABIM Endocrinology | 141 | ~175 | ~34 |
+"| ABIM Endocrinology | 177 | ~175 | **met** |",
+    ),
 | USMLE Step 1 | 22 | ~150 | ~128 |
 | USMLE Step 3 | 19 | ~150 | ~131 |
 | USMLE Step 2 CK | 16 | ~180 | ~164 |
-| **Total servable** | **346** | | |
+"| **Total servable** | **382** | | |",
+    ),
+"> 382 = `status='approved' AND cueing_flag IS NOT TRUE` = servable.",
+    ), Verified live 2026-06-05 PM-2 (tail-cluster triage: +14 promote, −4 reject; keeper `994f0def` AFF now applied). Prior 315 verified 2026-06-04. This session: 6 Endo clusters triaged (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis) — 26 promoted, 24 rejected; Endo 84→110, Endo pending 139→89. Plus servable `6cf8c36d` fixed in place (SURPASS-CVOT staleness). Keeper `994f0def` (AFF) applied 2026-06-05. "`re_audit` cohort empty. **2026-06-06:** Endo 141\u2192177 servable (06-05 night triage + 06-06 "
+            "fresh-batch promote of 14), total 346\u2192382; Endo pending 41\u219237. **ABIM Endocrinology ~175 flip "
+            "target MET (177).** Cardiorenal guardrail shipped + first live read clean (0 warns on the fresh batch)."
+        ),
+    ),
 
-> 346 = `status='approved' AND cueing_flag IS NOT TRUE` = servable. Verified live 2026-06-05 PM-2 (tail-cluster triage: +14 promote, −4 reject; keeper `994f0def` AFF now applied). Prior 315 verified 2026-06-04. This session: 6 Endo clusters triaged (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis) — 26 promoted, 24 rejected; Endo 84→110, Endo pending 139→89. Plus servable `6cf8c36d` fixed in place (SURPASS-CVOT staleness). Keeper `994f0def` (AFF) applied 2026-06-05. `re_audit` cohort empty.
-
-Pending (not servable until vetted): **Endo 41** (tail clusters CGM/AID, Hashimoto's, Male Hypogonadism, thyroid/Ca triaged 2026-06-05; 4 rows held for founder decision: `b7b5bf5b`, `26edb833`, `4de2771d`, `69797382`), plus Step1 14 / Step3 9 / Step2CK 11. IM pending = 0. Remaining Endo clusters by size: Prolactinoma 7, Hypopituitarism 6, Thyroid Storm 6, Acromegaly 5, Adrenal Insufficiency 5, CGM/AID 5, Hypothyroidism/Hashimotos 5, Male Hypogonadism 5, then the DI/parathyroid/insulinoma/thyroid/MEN tail. Triage rule in force: **keep ≤2 distinct sub-angles per concept.** Two reject classes seen heavily this session: (a) "two co-valid agents" soft single-best (see §12) and (b) **mis-keyed** items where the labs/organ/guideline-rank contradict the keyed answer (need a human clinical read; no validator catches them).
+"Pending (not servable until vetted): **Endo 37** (residual backlog; the 2026-06-06 fresh batch of 14 "
+            "was triaged and promoted), plus Step1 14 / Step3 9 / Step2CK 11. IM pending = 0. Endo pending by "
+            "cluster (2026-06-06): Diabetes Insipidus 4, Hyperparathyroidism 4, Insulinoma 4, Medical nutrition "
+            "(ADA 2026) 4, DM/Hypoglycemia 3, Hypercalcemia 3, Pheochromocytoma 3, Adrenal Insufficiency 2, "
+            "Bone/Ca/PTH 2, MEN2 2, Selenium/Zinc 2, Ketogenic diet 1, MEN1 1, Nutritional osteoporosis 1, "
+            "Thyroid Storm 1 (Prolactinoma & Hypopituitarism cleared; the 4 previously-held rows "
+            "`b7b5bf5b`/`26edb833`/`4de2771d`/`69797382` were dispositioned 2026-06-05 night). Backlog still holds "
+            "2 real cardiorenal H1 mis-keys (`ccae9922`, `dd4e9fb4`) flagged for rejection."
+        ),
+    ), Triage rule in force: **keep ≤2 distinct sub-angles per concept.** Two reject classes seen heavily this session: (a) "two co-valid agents" soft single-best (see §12) and (b) **mis-keyed** items where the labs/organ/guideline-rank contradict the keyed answer (need a human clinical read; no validator catches them).
 
 ### Generators
-> Generators at **v7.5.16** (2026-06-05; +ES-2012 citation allow-list, +`flagInterchangeableAgents` tuning), prior **v7.5.13** (2026-06-03; +2a lead-in allow-list, +2b choices minLength). Lipid non-statin escalation = corrected **conventional ladder** (the night-log "magnitude-keying" was never built — only the bad bempedoic-before-PCSK9i order was fixed). B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
+"Generators at **v7.5.16** (2026-06-05; +ES-2012 citation allow-list, +`flagInterchangeableAgents` "
+            "tuning), **+cardiorenal SGLT2i guardrail (2026-06-06: L1 anchor + `flagCardiorenalMiskey` warn-mode, "
+            "no banner bump)**"
+        ),
+    ), prior **v7.5.13** (2026-06-03; +2a lead-in allow-list, +2b choices minLength). Lipid non-statin escalation = corrected **conventional ladder** (the night-log "magnitude-keying" was never built — only the bad bempedoic-before-PCSK9i order was fixed). B3 shipped + smoke-confirmed. Citation lock complete. C1 (drop-reason breakdown) + C2 (`generation_model` per-row) shipped. **Generation outage fixed** (`BULK_CLAUDE_MODEL` use-before-declare introduced by C2 → every bulk run produced 0; declared at module scope, line 68). Error-surfacing patch live (catch blocks log HTTP status + body + per-attempt cause) — keep it; it named the outage in one run.
 
 ### Lead funnel (Option A — LIVE May 30)
 `medboard-widget.js` v1.1 deployed: **email gate removed** — answering reveals the full explanation + "Start your free trial" CTA immediately (drive trials directly). UTM tags intact. Email-capture machinery (`gateBlock`/`bindGate`/`captureLead`, `capture-lead.js`, `leads` schema) is **parked, not deleted** — for a future non-blocking, post-explanation optional email ask. Landing page picks this up automatically (the `DailyQuestionWidget` React component only injects `/medboard-widget.js`; no `index.html` change needed).
@@ -187,7 +228,8 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 
 ## 9. Roadmap priorities (in order)
 
-1. **Endo pending-triage — IN PROGRESS** (servable 110; pending 89). 6 of ~13 clusters done (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis). Continue cluster-by-cluster down the §8 list (Prolactinoma next), ≤2 sub-angles/concept. Then a moderate Endo generation run to close the residual gap to ~175 (triage first, never onto an untriaged backlog). **Before the gen run:** clear the citation-canon pass (§6) + the interchangeable-agent guardrail (§12).
+"1. **Endo pending-triage — IN PROGRESS** (servable 177; pending 37 — Endo ~175 flip target MET).",
+    ), 6 of ~13 clusters done (GLP-1, Cushing, PCOS, Type 1 Insulin, Hyperthyroid/Graves, Osteoporosis). Continue cluster-by-cluster down the §8 list (Prolactinoma next), ≤2 sub-angles/concept. Then a moderate Endo generation run to close the residual gap to ~175 (triage first, never onto an untriaged backlog). **Before the gen run:** clear the citation-canon pass (§6) + the interchangeable-agent guardrail (§12).
 2. ### Tail-cluster triage learnings (NEW 2026-06-05)
 - **Phantom *survivors*.** Repointing an item's *primary* citation does NOT clean phantoms in individual choice rationales — `e6c4928f` kept a "2024 Endocrine Society" subclinical-hypothyroid clause in Choice A after its lead cite was fixed earlier the same day. Grep the *entire* explanation for every society token when repointing. Purged this session: `e6c4928f` (→ATA 2014 Jonklaas), `af368bfc` CHH (→2015 European Consensus, Boehm + 2019 Young, Endocr Rev), `3a054e55` (→ATA 2015 Haugen), `f4d02b48` (→ATA 2017 Alexander pregnancy).
 - **T1D cardiorenal extrapolation = recurring invalid class.** Finerenone (FIDELIO/FIGARO), the SGLT2i glycemic indication, and GLP-1 renal indications are **T2D**; generators fabricate "regardless of T1D vs T2D" (`fd981d51` rejected; `6aefa349` rejected earlier same day). Backlog guardrail: flag these agents co-occurring with "type 1 diabetes."
@@ -228,7 +270,65 @@ Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publ
 ## 12. Known gotchas
 
 ### "Two co-valid agents" soft single-best (generator defect — v7.5.x candidate)
-The generator routinely offers two interchangeably-labeled agents from the same class as separate options when the stem cannot distinguish them → unanswerable single-best (Rule M). Confirmed instances: **SGLT2i** dapa vs empa (5/11, 2026-06-03); **basal insulin** degludec vs glargine U-300 (2026-06-04 Type 1 Insulin); **anabolic osteoporosis** romosozumab vs teriparatide (Osteoporosis); **Cushing steroidogenesis inhibitors** metyrapone vs osilodrostat (both hepatic, both raise 11-DOC → the 7-item sub-pool even self-contradicted on which agent to key). **Guardrail:** for "select the agent" stems, the choice set must contain at most ONE member of an interchangeable class **unless the stem encodes the specific feature that breaks the tie** — e.g., SGLT2i eGFR 20–25 window (dapa ≥25, empa ≥20); QTc prolongation → metyrapone (osilodrostat/keto/pasireotide prolong QT); CKD-with-albuminuria → semaglutide (FLOW) over tirzepatide.
+The generator routinely offers two interchangeably-labeled agents from the same class as separate options when the stem cannot distinguish them → unanswerable single-best (Rule M). Confirmed instances: **SGLT2i** dapa vs empa (5/11, 2026-06-03); **basal insulin** degludec vs glargine U-300 (2026-06-04 Type 1 Insulin); **anabolic osteoporosis** romosozumab vs teriparatide (Osteoporosis); **Cushing steroidogenesis inhibitors** metyrapone vs osilodrostat (both hepatic, both raise 11-DOC → the 7-item sub-pool even self-contradicted on which agent to key). **Guardrail:** for "select the agent" stems, the choice set must contain at most ONE member of an interchangeable class **unless the stem encodes the specific feature that breaks the tie** — e.g., SGLT2i eGFR 20–25 window (dapa ≥25, empa ≥20); QTc prolongation → metyrapone (osilodrostat/keto/pasireotide prolong QT); "CKD-with-albuminuria → semaglutide (FLOW) over tirzepatide.\n\n"
+            "### SGLT2i-deprioritization mis-key (warn-mode flagged \u2014 shipped 2026-06-06)\n"
+            "A clinically-wrong-but-validator-invisible key class, adjacent to the T1D cardiorenal-extrapolation "
+            "note (\u00a79): the generator keys a GLP-1 RA over an available SGLT2i in an HFrEF/CKD stem, justified by "
+            "a **false** \"SGLT2i cause/worsen hyperkalemia\" claim or the **irrelevant** \"SGLT2i lose glycemic "
+            "efficacy below eGFR 45\" argument. In HFrEF, SGLT2i is **Class I** (EMPEROR-Reduced/DAPA-HF), initiated "
+            "to eGFR 20, regardless of glucose; GLP-1 RAs reduce ASCVD events but **not** HF hospitalization; SGLT2i "
+            "are potassium-neutral to K-lowering. **`flagCardiorenalMiskey`** (warn-mode, both paths; mirrors "
+            "`flagInterchangeableAgents`, never drops): **H1** HFrEF stem + an SGLT2i offered + the keyed answer is "
+            "a GLP-1 RA; **H2** `SGLT2[^.]{0,60}hyperkalem` proximity in the explanation. Warns print via "
+            "`console.warn` on both paths; bulk also increments `dropTally._warnCardiorenal`. **L1 generation "
+            "anchor** added to the T2D management guardrail (the rate-reducer). Backtest 2026-06-06 (whole approved "
+            "bank + node unit test): recall 3/3 (`ec94b12a`, `c6714248` \u2192 H1; `12f5f085` \u2192 H2); approved-bank "
+            "false positives **0 (H1) + 1 benign (H2)** \u2014 `32278205`, a correct MRA-attribution sentence (expected "
+            "warn noise). **First live read (2026-06-06 fresh batch of 14): 0 warns** \u2014 the L1 anchor steered "
+            "generation away from the mis-key. **Warn-mode only for \u22652 batches** before any hard-reject decision. "
+            "Sibling `flagT1DCardiorenal` (finerenone/SGLT2i/GLP-1 keyed in a T1D stem) is the next candidate once "
+            "this validates. Note: 2 residual backlog instances (`ccae9922`, `dd4e9fb4`) await rejection."
+        ),
+    ),
+]
+
+
+def main():
+    try:
+        with io.open(PATH, "r", encoding="utf-8") as f:
+            src = f.read()
+    except FileNotFoundError:
+        print(f"ABORT: {PATH} not found (run from repo root).")
+        sys.exit(1)
+
+    applied, skipped, failed = 0, 0, 0
+    for i, e in enumerate(EDITS, 1):
+        if e["sentinel"] in src:
+            print(f"  [{i:>2}] SKIP (already applied)")
+            skipped += 1
+            continue
+        n = src.count(e["anchor"])
+        if n != 1:
+            print(f"  [{i:>2}] ABORT: anchor found {n}x (expected 1) -> {e['anchor'][:60]!r}")
+            failed += 1
+            continue
+        src = src.replace(e["anchor"], e["replace"], 1)
+        print(f"  [{i:>2}] OK")
+        applied += 1
+
+    print("-" * 60)
+    if failed:
+        print(f"FAILED: {failed} edit(s) could not anchor — NOTHING written (no partial corruption).")
+        sys.exit(1)
+
+    with io.open(PATH, "w", encoding="utf-8") as f:
+        f.write(src)
+    print(f"WROTE {PATH}: {applied} applied, {skipped} skipped.")
+    print("Now: git add CLAUDE.md && commit (single-purpose doc) && push.")
+
+
+if __name__ == "__main__":
+    main()
 
 ### Citation phantoms found 2026-06-04 (generator/doc pass before next gen run)
 Recurring fabrication class. Purge/repoint in both generators (parity) and `validateNoPhantomCitations`/`BANNED_CITATION_PATTERNS`:
