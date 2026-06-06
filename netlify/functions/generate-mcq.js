@@ -1,5 +1,5 @@
 // generate-mcq.js — MedBoard Pro
-// v7.5.15 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only) (2026 ACC/AHA/PREVENT canon), AACE unseeded → 2025; interchangeable-agent flag tuned (warn-mode, precision+recall); parity with bulk-generate.js v7.5.15
+// v7.5.16 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only) (2026 ACC/AHA/PREVENT canon), AACE unseeded → 2025; interchangeable-agent flag tuned (warn-mode, precision+recall); parity with bulk-generate.js v7.5.16
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.15 — 2026-06-05):
 // - TUNED: flagInterchangeableAgents precision + recall (warn-mode only; no
