@@ -220,6 +220,9 @@ REQUIRED Tier 3+ angles:
     l1: `T2DM FOUNDATIONAL ANCHORS (ADA 2026):
 - Diagnosis: HbA1c ≥6.5%, FPG ≥126 mg/dL, OGTT 2h ≥200 mg/dL, or random ≥200 + symptoms. Confirm on repeat unless symptomatic.
 - Cardiorenal-driven add-on: SGLT2i if HF/CKD, GLP-1 RA if ASCVD/obesity (regardless of A1c).
+- SGLT2i (empagliflozin, dapagliflozin) are CLASS I for HFrEF (EMPEROR-Reduced, DAPA-HF) and are initiated/continued down to eGFR 20; reduced GLYCEMIC efficacy below eGFR 45 does NOT remove the HF/cardiorenal indication. In a T2D + HFrEF stem an SGLT2i is preferred over a GLP-1 RA for the HF indication; GLP-1 RAs reduce ASCVD events but do NOT reduce HF hospitalization.
+- SGLT2i are potassium-NEUTRAL to mildly K-LOWERING and do NOT cause/worsen hyperkalemia (an advantage over MRAs/finerenone). Do NOT key a GLP-1 RA over an SGLT2i in an HFrEF stem on the basis of a hyperkalemia or a sub-eGFR-45 glycemic argument.
+- Finerenone, the SGLT2i GLYCEMIC indication, and GLP-1 renal indications are T2D-SPECIFIC (do NOT extrapolate to T1D).
 - Metformin: avoid if eGFR <30. Reduce dose at eGFR 30-44.
 - Avoid: sulfonylureas in elderly with hypoglycemia; TZDs in NYHA III/IV.`,
     l2: `T2DM COGNITIVE COMPLEXITY:
