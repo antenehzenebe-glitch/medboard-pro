@@ -1671,8 +1671,37 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _warnSemanticDup: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
+
+// --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
+function flagTopicMismatch(p) {
+  const topic = String((p && p.topic) || "").toLowerCase();
+  const stem  = String((p && p.stem)  || "");
+  const maleOpener   = /\b(?:a|an)\s+\d{1,3}[\s-]*year[\s-]*old\s+(?:man|male|gentleman|boy)\b/i.test(stem);
+  const femaleOpener = /\b(?:a|an)\s+\d{1,3}[\s-]*year[\s-]*old\s+(?:woman|female|lady|girl)\b/i.test(stem);
+  const pregMarker   = /(gestation|pregnan|trimester|prenatal|antenatal|intrapartum|postpartum|gravida|g\dp\d|fetal|fetus|labou?r and delivery|cervical ripening|preeclampsia|eclampsia|placenta|amnio)/i.test(stem);
+  const obgynTopic   = /(obstetric|gynecolog|gestational)/.test(topic);
+  // HARD: an obstetric/gestational/ob-gyn item with a male patient is never valid.
+  if (obgynTopic && maleOpener && !femaleOpener) {
+    return { hardReject: true, reason: 'topic-mismatch(HARD): male patient in obstetric/gestational topic "' + p.topic + '"' };
+  }
+  // HARD: a "gestational" item must contain pregnancy context.
+  if (/gestational/.test(topic) && !pregMarker) {
+    return { hardReject: true, reason: 'topic-mismatch(HARD): gestational topic "' + p.topic + '" with no pregnancy context' };
+  }
+  // WARN: pediatric/congenital topic with an adult patient and no peri-natal/congenital framing.
+  if (/(pediatric|congenital)/.test(topic)) {
+    const m = stem.match(/\b(\d{1,3})[\s-]*year[\s-]*old\b/);
+    const age = m ? parseInt(m[1], 10) : null;
+    const ctx = /(neonat|congenital|fetal|fetus|prenatal|gestation|pregnan|newborn|infant|adolescen|\bchild\b)/i.test(stem);
+    if (age !== null && age >= 18 && !ctx) {
+      return { warn: true, reason: 'topic-mismatch(warn): pediatric/congenital topic "' + p.topic + '" with adult patient (age ' + age + ')' };
+    }
+  }
+  return {};
+}
+
 
 function checkUnseededCitations(p) {
   if (!p || !p.explanation) return [];
@@ -2385,6 +2414,7 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   checkUnseededCitations(p); // PART 2: non-blocking warn on the accepted item, past all reject gates
   { const _ia = flagInterchangeableAgents(p); if (_ia.length) { _ia.forEach(n => console.warn(n)); dropTally._warnInterchange += _ia.length; } } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
   { const _sd = flagSemanticDup(p); if (_sd.dup) { console.warn(`⚠️  B4 semantic near-dup (sim=${_sd.score.toFixed(2)}) [${p.exam_level}] vs "${_sd.against}" :: "${String(p.stem||"").slice(0,80)}"`); dropTally._warnSemanticDup++; } } // PART 2c: intra-batch semantic near-dup flag (B4)
+  { const _tm = flagTopicMismatch(p); if (_tm.hardReject) { console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_topicMismatchRejected'); } if (_tm.warn) { console.warn('[warn] ' + _tm.reason); dropTally._warnTopicMismatch++; } } // PART 2d: topic-consistency guard (B2)
   // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
   { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { dropTally._warnCardiorenal++; for (const _w of _crmk) console.warn("[warn] cardiorenal mis-key:", _w); } }
 
