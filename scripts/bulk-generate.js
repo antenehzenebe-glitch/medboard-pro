@@ -1671,7 +1671,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _warnSemanticDup: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 function checkUnseededCitations(p) {
@@ -1771,6 +1771,66 @@ const INTERCHANGEABLE_AGENT_CLASSES = [
 // Mirrors flagInterchangeableAgents. Backtest 2026-06-06: recall 3/3 (ec94b12a, c6714248,
 // 12f5f085); approved-bank false positives 0 (H1) + 1 benign (H2). Keep warn-mode for >=2
 // batches; promote to hard-reject only after multi-batch precision/recall data.
+// ─── B4 SEMANTIC NEAR-DUP FINGERPRINT (intra-batch, warn-mode; bulk-only) ───────
+// Validated 2026-06-07 vs the 2026-06-06 reject clusters (CKD/HFrEF, Wernicke,
+// vitamin-D osteomalacia, sepsis/obstructive-pyelonephritis): token-containment
+// >= 0.35 OR bigram-containment >= 0.30, scoped WITHIN exam_level (topic is
+// model-mislabeled, so scoping on topic misses cross-topic dups). Pairwise
+// precision 1.00 / recall 0.85; per-row cluster recall 18/18. Distinct concepts
+// sharing a vignette frame (alcoholic ketoacidosis vs Wernicke) do NOT collide.
+// Warn-only; never drops. NOT mirrored to generate-mcq.js (live path doesn't batch).
+const B4_TOK_CONTAIN = 0.35;
+const B4_BI_CONTAIN  = 0.30;
+const _b4seen = new Map(); // exam_level -> [{tok:Set, bi:Set, head:string}]
+const _B4_STOP = new Set(`a an the of to in on at by for with and or as is are was were be been being he she his her him they them their it its this that these those patient man woman boy girl male female year old years presents present presented presenting evaluated evaluation seen brought clinic outpatient inpatient emergency department ed icu hospital admitted admission visit follow followup routine scheduled history reports report notes noted notable past medical takes taking current medications medication regimen examination exam physical reveals reveal show shows showed studies study laboratory labs lab results result vital vitals signs sign which following best most appropriate next step management explains explain explanation responsible mechanism over several months weeks days due no not has have had does who whom what bp hr rr temperature blood pressure pulse respirations heart rate weight bmi serum repeat initial reference`.split(/\s+/));
+function _b4OrderedTokens(stem) {
+  let s = String(stem || "").toLowerCase().replace(/,/g, "");
+  s = s.replace(/^\s*a\s+\d+-year-old\s+\w+/, " ");
+  s = s.replace(/[^a-z0-9./%-]+/g, " ");
+  const out = [];
+  for (let w of s.split(/\s+/)) {
+    w = w.replace(/^[.\-/]+|[.\-/]+$/g, "");
+    if (!w || _B4_STOP.has(w)) continue;
+    if (/^[a-z]+$/.test(w) && w.length <= 2) continue;
+    out.push(w);
+  }
+  return out;
+}
+function _b4Fingerprint(stem) {
+  const toks = _b4OrderedTokens(stem);
+  const tok = new Set(toks);
+  const bi = new Set();
+  for (let i = 0; i < toks.length - 1; i++) bi.add(toks[i] + "\u0001" + toks[i + 1]);
+  return { tok, bi, head: String(stem || "").slice(0, 80) };
+}
+function _b4Containment(a, b) {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  for (const x of small) if (big.has(x)) inter++;
+  return inter / small.size;
+}
+// Compares p vs prior ACCEPTED items of the same exam_level THIS BATCH, then records
+// p's fingerprint for later comparisons. Returns {dup, score, against}.
+function flagSemanticDup(p) {
+  if (!p || !p.stem) return { dup: false };
+  const lvl = String(p.exam_level || "");
+  const fpNew = _b4Fingerprint(p.stem);
+  const prior = _b4seen.get(lvl) || [];
+  let best = 0, bestHead = null;
+  for (const e of prior) {
+    const tc = _b4Containment(fpNew.tok, e.tok);
+    const bc = _b4Containment(fpNew.bi, e.bi);
+    if (tc >= B4_TOK_CONTAIN || bc >= B4_BI_CONTAIN) {
+      const sc = Math.max(tc, bc);
+      if (sc > best) { best = sc; bestHead = e.head; }
+    }
+  }
+  prior.push(fpNew);
+  _b4seen.set(lvl, prior);
+  return { dup: bestHead !== null, score: best, against: bestHead };
+}
+
 function flagCardiorenalMiskey(p) {
   if (!p) return [];
   const warns = [];
@@ -2324,6 +2384,7 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   if (detectAntiCueingViolation(p)) return recordDrop("antiCueing");
   checkUnseededCitations(p); // PART 2: non-blocking warn on the accepted item, past all reject gates
   { const _ia = flagInterchangeableAgents(p); if (_ia.length) { _ia.forEach(n => console.warn(n)); dropTally._warnInterchange += _ia.length; } } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
+  { const _sd = flagSemanticDup(p); if (_sd.dup) { console.warn(`⚠️  B4 semantic near-dup (sim=${_sd.score.toFixed(2)}) [${p.exam_level}] vs "${_sd.against}" :: "${String(p.stem||"").slice(0,80)}"`); dropTally._warnSemanticDup++; } } // PART 2c: intra-batch semantic near-dup flag (B4)
   // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
   { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { dropTally._warnCardiorenal++; for (const _w of _crmk) console.warn("[warn] cardiorenal mis-key:", _w); } }
 
@@ -2704,6 +2765,7 @@ async function main() {
   console.log(`║  Gen failures (both engines): ${String(dropTally._genFailed).padEnd(17)}║`);
   console.log(`║  Unseeded-citation warns: ${String(dropTally._warnUnseeded).padEnd(21)}║`);
   console.log(`║  Interchangeable-agent warns: ${String(dropTally._warnInterchange).padEnd(17)}║`);
+  console.log(`║  Semantic near-dup warns: ${String(dropTally._warnSemanticDup).padEnd(21)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
 }
