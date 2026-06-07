@@ -1671,7 +1671,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
@@ -1868,21 +1868,29 @@ function flagCardiorenalMiskey(p) {
   const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
   const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
   const choicesText = choicesArr.join(" | ");
+  // Resolve the keyed answer's TEXT. At validation time the parsed object carries
+  // p.correct (the letter A-E); p.correct_answer is only attached later when the DB
+  // record is assembled. Prefer whichever is present so the H1 key check is live.
+  const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
   let keyText = "";
-  if (p.correct_answer != null) {
-    if (choicesObj && choicesObj[p.correct_answer] != null) {
-      keyText = String(choicesObj[p.correct_answer]);
-    } else if (/^[A-E]$/i.test(String(p.correct_answer))) {
-      const _i = String(p.correct_answer).toUpperCase().charCodeAt(0) - 65;
+  if (keyRef != null) {
+    if (choicesObj && choicesObj[keyRef] != null) {
+      keyText = String(choicesObj[keyRef]);
+    } else if (/^[A-E]$/i.test(String(keyRef))) {
+      const _i = String(keyRef).toUpperCase().charCodeAt(0) - 65;
       if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
     } else {
-      keyText = String(p.correct_answer);
+      keyText = String(keyRef);
     }
   }
   const hfref = /HFrEF|reduced ejection fraction|EF \b[1-3]\d\b|NYHA class (III|IV)/i.test(stem);
   const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
   const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-1/i;
-  if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText)) {
+  // Tie-break: a GLP-1 RA can be the legitimate key in an HFrEF patient when the
+  // question is explicitly about glycemic efficacy or weight loss (not HF therapy),
+  // so H1 is suppressed for those lead-ins to avoid false hard-rejects.
+  const weightGlycemicFocus = /\b(weight loss|weight reduction|lose weight|most weight|greatest weight|glycemic control|glucose-lowering|glucose lowering|hemoglobin a1c|hba1c|a1c reduction|greatest a1c|lower(?:ing)? (?:the )?a1c)\b/i.test(stem);
+  if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText) && !weightGlycemicFocus) {
     warns.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
   }
   if (/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i.test(expl)) {
@@ -2415,8 +2423,8 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { const _ia = flagInterchangeableAgents(p); if (_ia.length) { _ia.forEach(n => console.warn(n)); dropTally._warnInterchange += _ia.length; } } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
   { const _sd = flagSemanticDup(p); if (_sd.dup) { console.warn(`⚠️  B4 semantic near-dup (sim=${_sd.score.toFixed(2)}) [${p.exam_level}] vs "${_sd.against}" :: "${String(p.stem||"").slice(0,80)}"`); dropTally._warnSemanticDup++; } } // PART 2c: intra-batch semantic near-dup flag (B4)
   { const _tm = flagTopicMismatch(p); if (_tm.hardReject) { console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_topicMismatchRejected'); } if (_tm.warn) { console.warn('[warn] ' + _tm.reason); dropTally._warnTopicMismatch++; } } // PART 2d: topic-consistency guard (B2)
-  // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
-  { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { dropTally._warnCardiorenal++; for (const _w of _crmk) console.warn("[warn] cardiorenal mis-key:", _w); } }
+  // SGLT2i-deprioritization cardiorenal mis-key (HARD-REJECT — promoted from warn; H1 key-resolution fixed + weight/glycemia tie-break)
+  { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { console.warn('[REJECT] cardiorenal mis-key :: ' + _crmk.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_cardiorenalRejected'); } }
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
@@ -2479,27 +2487,88 @@ async function saveToSupabase(records) {
 }
 
 // ─── BUILD WORK QUEUE ─────────────────────────────────────────────────────────
-function buildWorkQueue(count) {
+// ─── GENERATION CAP (B5): per-(exam_level, topic) saturation guard — bulk-only ──
+// B4 dedupes only WITHIN a batch and cannot see duplication against the existing
+// bank — the cross-batch saturation that drove the Step-3 spike (e.g. 6 generated
+// into a topic already holding 4). This soft cap budgets each topic at
+// max(0, ceiling - current servable+pending) and redistributes freed slots to
+// eligible topics, preserving target count. Tunable via env:
+//   GEN_CAP_CEILING  (default 8; <=0 disables the cap)
+//   GEN_CAP_EXEMPT   (pipe-delimited topic names exempt from the cap; default the
+//                     "Random -- All Specialties" catch-all bucket)
+// Bulk-only — the single-question gen-mcq path is user-topic-driven (same scope
+// exemption as B3/B4), so no parity mirror is required.
+const GEN_CAP_CEILING = parseInt(process.env.GEN_CAP_CEILING || "8", 10);
+const GEN_CAP_EXEMPT_TOPICS = new Set(
+  (process.env.GEN_CAP_EXEMPT || "Random -- All Specialties")
+    .split("|").map(s => s.trim()).filter(Boolean)
+);
+async function fetchTopicBudgets() {
+  const budgets = new Map(); // "level\u0001topic" -> remaining slots; absent => uncapped
+  if (!Number.isFinite(GEN_CAP_CEILING) || GEN_CAP_CEILING <= 0) {
+    console.log("🚦  Generation cap disabled (GEN_CAP_CEILING <= 0).");
+    return budgets;
+  }
+  let rows = [];
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/mcqs?select=exam_level,topic&status=in.(approved,pending_review)&limit=20000`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) { console.warn(`[gen-cap] count fetch failed (HTTP ${res.status}) — cap disabled this run`); return budgets; }
+    rows = await res.json();
+  } catch (e) {
+    console.warn(`[gen-cap] count fetch error (${e.message}) — cap disabled this run`);
+    return budgets;
+  }
+  const counts = new Map();
+  for (const r of rows) {
+    const k = `${r.exam_level}\u0001${r.topic}`;
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  // Register a budget for EVERY known topic (incl. zero-count ones -> budget = ceiling).
+  const register = (level, topic) => {
+    if (GEN_CAP_EXEMPT_TOPICS.has(topic)) return; // uncapped
+    const k = `${level}\u0001${topic}`;
+    if (!budgets.has(k)) budgets.set(k, Math.max(0, GEN_CAP_CEILING - (counts.get(k) || 0)));
+  };
+  for (const [level, topics] of Object.entries(TOPIC_DISTRIBUTION)) for (const t of topics) register(level, t.topic);
+  for (const [level, nlist]  of Object.entries(NUTRITION_BY_LEVEL))  for (const top of nlist) register(level, top);
+  const atCap = [...budgets].filter(([, b]) => b === 0).map(([k]) => k.replace("\u0001", " / "));
+  console.log(`🚦  Generation cap ON (ceiling ${GEN_CAP_CEILING}); ${atCap.length} topic(s) at/over cap → 0 new${atCap.length ? ": " + atCap.join("; ") : ""}.`);
+  return budgets;
+}
+
+function buildWorkQueue(count, budgets = new Map()) {
   const levels = FILTER_LEVEL ? [FILTER_LEVEL] : Object.keys(TOPIC_DISTRIBUTION);
   const queue  = [];
 
   if (FILTER_TOPIC && FILTER_LEVEL) {
+    // Explicit single-topic run bypasses the generation cap by design.
     for (let i = 0; i < count; i++) queue.push({ level: FILTER_LEVEL, topic: FILTER_TOPIC });
     return queue;
   }
 
+  const capKey = (lvl, top) => `${lvl}\u0001${top}`;
+  const emitted = new Map();
+  const budgetLeft = (lvl, top) => {
+    const k = capKey(lvl, top);
+    if (!budgets.has(k)) return Infinity;           // exempt / unknown -> uncapped
+    return budgets.get(k) - (emitted.get(k) || 0);
+  };
+  const bump = (lvl, top) => { const k = capKey(lvl, top); emitted.set(k, (emitted.get(k) || 0) + 1); };
+
   const flat = [];
   for (const level of levels) {
     const topics = TOPIC_DISTRIBUTION[level] || [];
-    for (const t of topics) flat.push({ level, topic: t.topic, w: t.weight });
+    for (const t of topics) {
+      if (budgetLeft(level, t.topic) <= 0) continue; // B5: omit already-saturated topics
+      flat.push({ level, topic: t.topic, w: t.weight });
+    }
   }
   // v7.5.9 (B3) — draw WITHOUT replacement to kill intra-batch concept clustering.
-  // Shuffle the distinct {level, topic} concepts and emit them round-robin,
-  // reshuffling whenever the pool is exhausted. Each concept therefore appears at
-  // most ceil(count / flat.length) times, evenly spread. This replaces the old
-  // weighted-WITH-replacement sampler that let high-weight topics (e.g. T2DM)
-  // recur within a single batch — semantic clustering that content_hash dedup
-  // cannot catch (the confirmed root of the April SGLT2i/DI/SIADH duplication).
+  // Shuffle distinct concepts and emit round-robin, reshuffling when exhausted;
+  // B5 budgets additionally drop a concept once its per-topic budget is spent.
   if (flat.length === 0) return queue;
   function shuffleConcepts(arr) {
     const a = arr.slice();
@@ -2511,15 +2580,19 @@ function buildWorkQueue(count) {
   }
   let pool = [];
   for (let i = 0; i < count; i++) {
-    if (pool.length === 0) pool = shuffleConcepts(flat);
+    if (pool.length === 0) {
+      pool = shuffleConcepts(flat).filter(it => budgetLeft(it.level, it.topic) > 0);
+      if (pool.length === 0) break;                 // every eligible topic hit its budget
+    }
     const item = pool.shift();
-    // Preserve the nutrition-injection hook (unchanged semantics).
+    // Preserve the nutrition-injection hook; respect the cap for injected topics too.
     const nTopics = NUTRITION_BY_LEVEL[item.level];
     if (nTopics && Math.random() < NUTRITION_INJECTION_RATE) {
       const randomNutrition = nTopics[Math.floor(Math.random() * nTopics.length)];
-      queue.push({ level: item.level, topic: randomNutrition });
+      if (budgetLeft(item.level, randomNutrition) > 0) { queue.push({ level: item.level, topic: randomNutrition }); bump(item.level, randomNutrition); }
+      else if (budgetLeft(item.level, item.topic) > 0) { queue.push({ level: item.level, topic: item.topic }); bump(item.level, item.topic); }
     } else {
-      queue.push({ level: item.level, topic: item.topic });
+      if (budgetLeft(item.level, item.topic) > 0) { queue.push({ level: item.level, topic: item.topic }); bump(item.level, item.topic); }
     }
   }
   return queue;
@@ -2765,7 +2838,8 @@ async function main() {
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
 
-  const queue   = buildWorkQueue(TARGET_COUNT);
+  const _budgets = await fetchTopicBudgets();
+  const queue   = buildWorkQueue(TARGET_COUNT, _budgets);
   const startMs = Date.now();
 
   let records;

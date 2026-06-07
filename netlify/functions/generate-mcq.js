@@ -1849,21 +1849,29 @@ function flagCardiorenalMiskey(p) {
   const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
   const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
   const choicesText = choicesArr.join(" | ");
+  // Resolve the keyed answer's TEXT. At validation time the parsed object carries
+  // p.correct (the letter A-E); p.correct_answer is only attached later when the DB
+  // record is assembled. Prefer whichever is present so the H1 key check is live.
+  const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
   let keyText = "";
-  if (p.correct_answer != null) {
-    if (choicesObj && choicesObj[p.correct_answer] != null) {
-      keyText = String(choicesObj[p.correct_answer]);
-    } else if (/^[A-E]$/i.test(String(p.correct_answer))) {
-      const _i = String(p.correct_answer).toUpperCase().charCodeAt(0) - 65;
+  if (keyRef != null) {
+    if (choicesObj && choicesObj[keyRef] != null) {
+      keyText = String(choicesObj[keyRef]);
+    } else if (/^[A-E]$/i.test(String(keyRef))) {
+      const _i = String(keyRef).toUpperCase().charCodeAt(0) - 65;
       if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
     } else {
-      keyText = String(p.correct_answer);
+      keyText = String(keyRef);
     }
   }
   const hfref = /HFrEF|reduced ejection fraction|EF \b[1-3]\d\b|NYHA class (III|IV)/i.test(stem);
   const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
   const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-1/i;
-  if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText)) {
+  // Tie-break: a GLP-1 RA can be the legitimate key in an HFrEF patient when the
+  // question is explicitly about glycemic efficacy or weight loss (not HF therapy),
+  // so H1 is suppressed for those lead-ins to avoid false hard-rejects.
+  const weightGlycemicFocus = /\b(weight loss|weight reduction|lose weight|most weight|greatest weight|glycemic control|glucose-lowering|glucose lowering|hemoglobin a1c|hba1c|a1c reduction|greatest a1c|lower(?:ing)? (?:the )?a1c)\b/i.test(stem);
+  if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText) && !weightGlycemicFocus) {
     warns.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
   }
   if (/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i.test(expl)) {
@@ -2483,10 +2491,11 @@ exports.handler = async function (event) {
       const citationOk    = validateCitationYears(p);
       const phantomOk     = validateNoPhantomCitations(p);
       const topicOk       = (() => { const _tm = flagTopicMismatch(p); if (_tm.hardReject) console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return !_tm.hardReject; })(); // B2 hard gate (parity)
+      const cardiorenalOk = (() => { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) console.warn('[REJECT] cardiorenal mis-key: ' + _crmk.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return _crmk.length === 0; })(); // cardiorenal hard gate (parity, promoted from warn)
       isValid = demoOk && consistencyOk && choicesOk && cueingFree
              && leadInOk && negFormOk && assocOk && vagueOk
              && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk
-             && citationOk && phantomOk && topicOk;
+             && citationOk && phantomOk && topicOk && cardiorenalOk;
 
       if (!isValid && attempts === 3) {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
@@ -2506,7 +2515,7 @@ exports.handler = async function (event) {
                && validateSiteOfCare(p)
                && validateCitationYears(p)
                && validateNoPhantomCitations(p)
-               && !flagTopicMismatch(p).hardReject; // B2 hard gate (parity)
+               && !flagTopicMismatch(p).hardReject && flagCardiorenalMiskey(p).length === 0; // B2 + cardiorenal hard gates (parity)
       }
     }
 
@@ -2514,7 +2523,7 @@ exports.handler = async function (event) {
     checkUnseededCitations(p); // PART 2: non-blocking warn for unseeded citation bodies on the accepted item
     { const _ia = flagInterchangeableAgents(p); if (_ia.length) _ia.forEach(n => console.warn(n)); } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
     // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
-    { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { for (const _w of _crmk) console.warn("[warn] cardiorenal mis-key:", _w); } }
+    // cardiorenal mis-key now hard-reject gated upstream in isValid (PART 2 warn retired)
     { const _tm = flagTopicMismatch(p); if (_tm.warn) console.warn('[warn] ' + _tm.reason); } // PART 2d: topic-consistency warn (B2); hard-reject gated upstream in isValid
 
     p.topic = pd.resolvedTopic;
