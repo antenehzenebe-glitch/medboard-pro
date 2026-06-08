@@ -1841,6 +1841,57 @@ const INTERCHANGEABLE_AGENT_CLASSES = [
 // Mirrors flagInterchangeableAgents. Backtest 2026-06-06: recall 3/3 (ec94b12a, c6714248,
 // 12f5f085); approved-bank false positives 0 (H1) + 1 benign (H2). Keep warn-mode for >=2
 // batches; promote to hard-reject only after multi-batch precision/recall data.
+function flagT1DCardiorenal(p) {
+  if (!p) return [];
+  const warns = [];
+  const stem = String(p.stem || "");
+  const expl = String(p.explanation || "");
+  const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
+  // Resolve the keyed answer's TEXT -- same convention as flagCardiorenalMiskey: prefer
+  // p.correct_answer, fall back to p.correct (the letter A-E present at validation time).
+  const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
+  let keyText = "";
+  if (keyRef != null) {
+    if (choicesObj && choicesObj[keyRef] != null) {
+      keyText = String(choicesObj[keyRef]);
+    } else if (/^[A-E]$/i.test(String(keyRef))) {
+      const _i = String(keyRef).toUpperCase().charCodeAt(0) - 65;
+      if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
+    } else {
+      keyText = String(keyRef);
+    }
+  }
+  // Index patient must be Type 1 diabetic. Explicit T1D language, OR an islet autoantibody
+  // stated POSITIVE (bare antibody names are excluded -- many T2D/MODY/MIDD work-ups cite them
+  // as NEGATIVE to rule T1D out, which must not trip this gate).
+  const t1d = /\btype[\s-]?1\s+diabet|\bT1DM?\b|insulin-dependent diabet|autoimmune diabet|(?:anti-?GAD(?:-?65)?|IA-?2|islet[\s-]?cell|ZnT8)[^.]{0,40}(?:positiv|elevat|detectab|\+)|(?:positiv|elevat|detectab)[^.]{0,40}(?:anti-?GAD|IA-?2|islet[\s-]?cell|ZnT8)/i.test(stem);
+  if (!t1d) return warns;
+  // Negation guard: a T2D/other stem that merely says "no history of type 1" must not fire.
+  const t1dNegated = /\b(?:no (?:history of |known )?|not |denies |without |rather than |excludes? )type[\s-]?1/i.test(stem);
+  if (t1dNegated) return warns;
+  // Suppress when the item is testing the HAZARD of these agents in T1D (euglycemic DKA,
+  // contraindication, discontinuation) rather than recommending them as therapy.
+  const hazardFraming = /euglyc[a-z]*emic (?:dka|ketoacidosis)|diabetic ketoacidosis|\bketoacidosis\b|contraindicat|\bnot (?:indicated|approved|recommended)\b|should not (?:be )?(?:use|receive|start|prescrib)|discontinue|stop (?:the|her|his) /i.test(stem + " || " + expl);
+  const FINERENONE = /finerenone/i;
+  const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|sotagliflozin|gliflozin|SGLT-?2/i;
+  const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-?1/i;
+  // H1: finerenone keyed in a T1D patient -- FIDELIO/FIGARO + KDIGO 2024 are T2D-specific.
+  if (FINERENONE.test(keyText)) {
+    warns.push("finerenone keyed in a Type 1 diabetes stem -- FIDELIO/FIGARO + KDIGO are T2D-specific; finerenone has no T1D indication/evidence. Verify key.");
+  }
+  // H2: SGLT2i keyed AS THERAPY in a T1D patient (not framed as the hazard) -- cardiorenal
+  // trials excluded T1D; euglycemic-DKA risk + no approved T1D glycemic indication.
+  if (SGLT2I.test(keyText) && !hazardFraming) {
+    warns.push("SGLT2i keyed as therapy in a Type 1 diabetes stem -- cardiorenal trials (DAPA-HF/EMPEROR/DAPA-CKD/CREDENCE) enrolled T2D/non-diabetic, not T1D; euglycemic-DKA risk + no approved T1D glycemic indication. Verify key.");
+  }
+  // H3: GLP-1 RA keyed in a T1D patient (not the hazard) -- indicated in T2D/obesity, not T1D.
+  if (GLP1.test(keyText) && !hazardFraming) {
+    warns.push("GLP-1 RA keyed in a Type 1 diabetes stem -- GLP-1 RAs are indicated in T2D/obesity, not T1D glycemic management. Verify key.");
+  }
+  return warns;
+}
+
 function flagCardiorenalMiskey(p) {
   if (!p) return [];
   const warns = [];
@@ -2524,6 +2575,7 @@ exports.handler = async function (event) {
     { const _ia = flagInterchangeableAgents(p); if (_ia.length) _ia.forEach(n => console.warn(n)); } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
     // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
     // cardiorenal mis-key now hard-reject gated upstream in isValid (PART 2 warn retired)
+    { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) _t1dcr.forEach(_w => console.warn('[warn] T1D cardiorenal mis-key: ' + _w)); } // PART 2e: T1D cardiorenal/pharmacotherapy mis-key (warn-mode)
     { const _tm = flagTopicMismatch(p); if (_tm.warn) console.warn('[warn] ' + _tm.reason); } // PART 2d: topic-consistency warn (B2); hard-reject gated upstream in isValid
 
     p.topic = pd.resolvedTopic;

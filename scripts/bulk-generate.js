@@ -1671,7 +1671,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
@@ -1858,6 +1858,57 @@ function flagSemanticDup(p) {
   prior.push(fpNew);
   _b4seen.set(lvl, prior);
   return { dup: bestHead !== null, score: best, against: bestHead };
+}
+
+function flagT1DCardiorenal(p) {
+  if (!p) return [];
+  const warns = [];
+  const stem = String(p.stem || "");
+  const expl = String(p.explanation || "");
+  const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
+  // Resolve the keyed answer's TEXT -- same convention as flagCardiorenalMiskey: prefer
+  // p.correct_answer, fall back to p.correct (the letter A-E present at validation time).
+  const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
+  let keyText = "";
+  if (keyRef != null) {
+    if (choicesObj && choicesObj[keyRef] != null) {
+      keyText = String(choicesObj[keyRef]);
+    } else if (/^[A-E]$/i.test(String(keyRef))) {
+      const _i = String(keyRef).toUpperCase().charCodeAt(0) - 65;
+      if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
+    } else {
+      keyText = String(keyRef);
+    }
+  }
+  // Index patient must be Type 1 diabetic. Explicit T1D language, OR an islet autoantibody
+  // stated POSITIVE (bare antibody names are excluded -- many T2D/MODY/MIDD work-ups cite them
+  // as NEGATIVE to rule T1D out, which must not trip this gate).
+  const t1d = /\btype[\s-]?1\s+diabet|\bT1DM?\b|insulin-dependent diabet|autoimmune diabet|(?:anti-?GAD(?:-?65)?|IA-?2|islet[\s-]?cell|ZnT8)[^.]{0,40}(?:positiv|elevat|detectab|\+)|(?:positiv|elevat|detectab)[^.]{0,40}(?:anti-?GAD|IA-?2|islet[\s-]?cell|ZnT8)/i.test(stem);
+  if (!t1d) return warns;
+  // Negation guard: a T2D/other stem that merely says "no history of type 1" must not fire.
+  const t1dNegated = /\b(?:no (?:history of |known )?|not |denies |without |rather than |excludes? )type[\s-]?1/i.test(stem);
+  if (t1dNegated) return warns;
+  // Suppress when the item is testing the HAZARD of these agents in T1D (euglycemic DKA,
+  // contraindication, discontinuation) rather than recommending them as therapy.
+  const hazardFraming = /euglyc[a-z]*emic (?:dka|ketoacidosis)|diabetic ketoacidosis|\bketoacidosis\b|contraindicat|\bnot (?:indicated|approved|recommended)\b|should not (?:be )?(?:use|receive|start|prescrib)|discontinue|stop (?:the|her|his) /i.test(stem + " || " + expl);
+  const FINERENONE = /finerenone/i;
+  const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|sotagliflozin|gliflozin|SGLT-?2/i;
+  const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-?1/i;
+  // H1: finerenone keyed in a T1D patient -- FIDELIO/FIGARO + KDIGO 2024 are T2D-specific.
+  if (FINERENONE.test(keyText)) {
+    warns.push("finerenone keyed in a Type 1 diabetes stem -- FIDELIO/FIGARO + KDIGO are T2D-specific; finerenone has no T1D indication/evidence. Verify key.");
+  }
+  // H2: SGLT2i keyed AS THERAPY in a T1D patient (not framed as the hazard) -- cardiorenal
+  // trials excluded T1D; euglycemic-DKA risk + no approved T1D glycemic indication.
+  if (SGLT2I.test(keyText) && !hazardFraming) {
+    warns.push("SGLT2i keyed as therapy in a Type 1 diabetes stem -- cardiorenal trials (DAPA-HF/EMPEROR/DAPA-CKD/CREDENCE) enrolled T2D/non-diabetic, not T1D; euglycemic-DKA risk + no approved T1D glycemic indication. Verify key.");
+  }
+  // H3: GLP-1 RA keyed in a T1D patient (not the hazard) -- indicated in T2D/obesity, not T1D.
+  if (GLP1.test(keyText) && !hazardFraming) {
+    warns.push("GLP-1 RA keyed in a Type 1 diabetes stem -- GLP-1 RAs are indicated in T2D/obesity, not T1D glycemic management. Verify key.");
+  }
+  return warns;
 }
 
 function flagCardiorenalMiskey(p) {
@@ -2425,6 +2476,8 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { const _tm = flagTopicMismatch(p); if (_tm.hardReject) { console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_topicMismatchRejected'); } if (_tm.warn) { console.warn('[warn] ' + _tm.reason); dropTally._warnTopicMismatch++; } } // PART 2d: topic-consistency guard (B2)
   // SGLT2i-deprioritization cardiorenal mis-key (HARD-REJECT — promoted from warn; H1 key-resolution fixed + weight/glycemia tie-break)
   { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { console.warn('[REJECT] cardiorenal mis-key :: ' + _crmk.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_cardiorenalRejected'); } }
+  // T1D cardiorenal/pharmacotherapy mis-key (warn-mode) -- non-blocking; promote to hard-reject after >=2 clean batches
+  { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) { dropTally._warnT1DCardiorenal++; for (const _w of _t1dcr) console.warn('[warn] T1D cardiorenal mis-key:', _w); } }
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
