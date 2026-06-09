@@ -2373,12 +2373,17 @@ function buildPrompt(level, topic) {
       {s:"NEXT STEP IN DIAGNOSTIC WORKUP given an incomplete picture", w:8}
     ];
   } else if (isStep3) {
+    // v7.9.0 — weights = USMLE Step 3 Physician Competency blueprint
+    // (Patient Care 30 / Medical Knowledge 20 / Interpersonal & Communication 20 /
+    //  Professionalism 15 / Practice-Based Learning 10 / Systems-Based Practice 5).
     qTypePool = [
-      {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
-      {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
-      {s:"MOST APPROPRIATE DISPOSITION OR TRANSITION OF CARE decision",w:20},
-      {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
-      {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
+      {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given comorbidities or facility constraints (Patient Care)",w:18},
+      {s:"MOST APPROPRIATE PHARMACOTHERAPY OR TREATMENT for the clinical scenario (Patient Care)",w:12},
+      {s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY of the condition or therapy (Medical Knowledge)",w:20},
+      {s:"MOST APPROPRIATE NEXT STEP IN PATIENT COUNSELING or shared decision-making (Interpersonal and Communication)",w:20},
+      {s:"MOST APPROPRIATE INFORMED CONSENT, ethical, or legal decision (Professionalism)",w:15},
+      {s:"INTERPRETATION OF STUDY DATA, a graph, or evidence to guide care (Practice-Based Learning)",w:10},
+      {s:"MOST APPROPRIATE DISPOSITION, TRANSITION OF CARE, or systems and cost decision (Systems-Based Practice)",w:5}
     ];
   } else if (isABIM_IM) {
     qTypePool = [
