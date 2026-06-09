@@ -1,4 +1,7 @@
 // bulk-generate.js — MedBoard Pro
+// v7.7.0 — Phase-2 cross-run concept-saturation (warn-mode, bulk-only): candidate stems+keys
+//          compared against the existing approved+pending bank, not just this batch.
+//          Banner reconciled from 7.5.x drift (the 7.6.0 guard stack shipped in cb4d40d).
 // v7.5.16 — lipid non-statin escalation = conventional ladder (ezetimibe → PCSK9i; bempedoic statin-intolerant branch only), 2026 ACC/AHA/PREVENT canon, LDL goal <55; AACE unseeded → 2025; interchangeable-agent flag tuned (warn-mode, precision+recall); parity with generate-mcq.js v7.5.16
 // ---------------------------------------------------------------
 // CHANGELOG (v7.5.15 — 2026-06-05):
@@ -1671,7 +1674,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0, _warnCrossRunDup: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
@@ -1924,6 +1927,27 @@ function flagGdmCoherence(p) {
   const stem = String(p.stem || "");
   if (/\b\d{1,2}-year-old man\b/i.test(stem)) return ['"Gestational Diabetes" topic but index patient is male -- topic/content mismatch'];
   if (!/(pregnan|gestation|gravid|postpartum|prenatal|obstetric|trimester|breastfeed)/i.test(stem)) return ['"Gestational Diabetes" topic but no pregnancy/postpartum marker -- likely topic drift'];
+  return [];
+}
+// Phase-2 (v7.7.0): cross-run concept-saturation — compare candidate vs the EXISTING
+// bank (approved+pending), not just this batch. WARN-MODE, bulk-only; non-blocking
+// until >=2 clean batches confirm true-positives, then promote to hard-reject.
+const _conceptBank = new Map(); // exam_level -> [{stemTok, stemBi, keyTok, head}] from the live bank
+function flagCrossRunSaturation(p) {
+  if (!p || !p.stem) return [];
+  const lvl = String(p.exam_level || "");
+  const prior = _conceptBank.get(lvl);
+  if (!prior || !prior.length) return [];
+  const fp = _b4Fingerprint(p.stem);
+  const keyTok = _conceptKeyTokens(_guardKeyText(p));
+  for (const e of prior) {
+    const tc = _b4Containment(fp.tok, e.stemTok), bc = _b4Containment(fp.bi, e.stemBi);
+    const stemSimilar = (tc >= B4_TOK_CONTAIN || bc >= B4_BI_CONTAIN);
+    const keySim = Math.max(_b4Containment(keyTok, e.keyTok), _b4Containment(e.keyTok, keyTok));
+    if (stemSimilar && keySim >= CONCEPT_KEY_CONTAIN) {
+      return ['stem+key match vs existing bank item (stemSim=' + Math.max(tc, bc).toFixed(2) + ', keySim=' + keySim.toFixed(2) + '): "' + String(e.head || '').slice(0, 70) + '"'];
+    }
+  }
   return [];
 }
 // --- END PERMANENT-FIX GUARDS ---
@@ -2550,6 +2574,7 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { const _ss = flagSlidingScaleInsulin(p); if (_ss.length) { dropTally._warnSlidingScale++; for (const _w of _ss) console.warn('[warn] sliding-scale insulin:', _w); } }
   { const _gd = flagGdmCoherence(p); if (_gd.length) { dropTally._warnGdmCoherence++; for (const _w of _gd) console.warn('[warn] GDM topic-coherence:', _w); } }
   { if (flagConceptSaturation(p)) { console.warn('[REJECT] concept-saturation (<=1/concept) :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_conceptSaturated'); } } // Layer 1: stem-AND-key dedup, <=1/concept
+  { const _xr = flagCrossRunSaturation(p); if (_xr.length) { dropTally._warnCrossRunDup++; for (const _w of _xr) console.warn('[warn] cross-run concept-saturation:', _w); } } // Phase-2: vs existing bank (warn-mode, bulk-only)
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
@@ -2662,6 +2687,37 @@ async function fetchTopicBudgets() {
   const atCap = [...budgets].filter(([, b]) => b === 0).map(([k]) => k.replace("\u0001", " / "));
   console.log(`🚦  Generation cap ON (ceiling ${GEN_CAP_CEILING}); ${atCap.length} topic(s) at/over cap → 0 new${atCap.length ? ": " + atCap.join("; ") : ""}.`);
   return budgets;
+}
+
+async function fetchConceptBank() {
+  // Phase-2 bank prefetch (parallels fetchTopicBudgets): load existing approved+pending
+  // stems/keys per exam_level so cross-run saturation can be detected. Fail-open: any
+  // fetch error leaves _conceptBank empty -> flagCrossRunSaturation is a no-op.
+  let rows = [];
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/mcqs?select=exam_level,stem,choices,correct_answer&status=in.(approved,pending_review)&limit=20000`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) { console.warn(`[xrun] concept-bank fetch failed (HTTP ${res.status}) — cross-run check disabled this run`); return 0; }
+    rows = await res.json();
+  } catch (e) {
+    console.warn(`[xrun] concept-bank fetch error (${e.message}) — cross-run check disabled this run`);
+    return 0;
+  }
+  let n = 0;
+  for (const r of rows) {
+    if (!r || !r.stem) continue;
+    const lvl = String(r.exam_level || "");
+    const fp = _b4Fingerprint(r.stem);
+    const keyTok = _conceptKeyTokens(_guardKeyText({ choices: r.choices, correct_answer: r.correct_answer }));
+    const arr = _conceptBank.get(lvl) || [];
+    arr.push({ stemTok: fp.tok, stemBi: fp.bi, keyTok, head: fp.head });
+    _conceptBank.set(lvl, arr);
+    n++;
+  }
+  console.log(`🔁  Cross-run concept-bank loaded: ${n} item(s) across ${_conceptBank.size} level(s) (warn-mode).`);
+  return n;
 }
 
 function buildWorkQueue(count, budgets = new Map()) {
@@ -2958,12 +3014,13 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.5.15)   ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.7.0)    ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
 
   const _budgets = await fetchTopicBudgets();
+  await fetchConceptBank(); // Phase-2: load existing-bank stems/keys for cross-run warn
   const queue   = buildWorkQueue(TARGET_COUNT, _budgets);
   const startMs = Date.now();
 
@@ -2999,6 +3056,7 @@ async function main() {
   console.log(`║  Metformin-eGFR warns: ${String(dropTally._warnMetforminEgfr).padEnd(24)}║`);
   console.log(`║  Sliding-scale warns: ${String(dropTally._warnSlidingScale).padEnd(25)}║`);
   console.log(`║  GDM-coherence warns: ${String(dropTally._warnGdmCoherence).padEnd(25)}║`);
+  console.log(`║  Cross-run dedup warns: ${String(dropTally._warnCrossRunDup).padEnd(23)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
 }
