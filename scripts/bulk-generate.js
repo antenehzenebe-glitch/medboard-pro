@@ -1,4 +1,5 @@
 // bulk-generate.js — MedBoard Pro
+// v7.8.0 — blueprint-proportional cap + blueprint-weighted (deficit) draw; restores pre-B3 weighting (bulk-only).
 // v7.7.0 — Phase-2 cross-run concept-saturation (warn-mode, bulk-only): candidate stems+keys
 //          compared against the existing approved+pending bank, not just this batch.
 //          Banner reconciled from 7.5.x drift (the 7.6.0 guard stack shipped in cb4d40d).
@@ -2653,6 +2654,39 @@ const GEN_CAP_EXEMPT_TOPICS = new Set(
   (process.env.GEN_CAP_EXEMPT || "Random -- All Specialties")
     .split("|").map(s => s.trim()).filter(Boolean)
 );
+// v7.8.0 — blueprint-proportional cap + blueprint-weighted draw. Per-level target bank
+// size sets each weighted topic's ceiling = round(weight / Sigma-weight * target); the draw
+// is then deficit-weighted so generation converges to blueprint proportions and corrects
+// existing skew. Restores the pre-B3 weighting the v7.5.9 uniform round-robin demoted.
+// Set GEN_BANK_TARGET (applies to all levels) or edit BANK_TARGET_BY_LEVEL. A level with no
+// positive target falls back to the flat GEN_CAP_CEILING with a blueprint-weighted draw.
+const BANK_TARGET_BY_LEVEL = {
+  // "ABIM Endocrinology": 0, "ABIM Internal Medicine": 0,
+  // "USMLE Step 1": 0, "USMLE Step 2 CK": 0, "USMLE Step 3": 0,
+};
+const GEN_BANK_TARGET = parseInt(process.env.GEN_BANK_TARGET || "0", 10);
+function bankTargetFor(level) {
+  if (Number.isFinite(GEN_BANK_TARGET) && GEN_BANK_TARGET > 0) return GEN_BANK_TARGET;
+  const t = BANK_TARGET_BY_LEVEL[level];
+  return (Number.isFinite(t) && t > 0) ? t : 0;
+}
+const _bpWeightSum = {};
+function _levelWeightSum(level) {
+  if (_bpWeightSum[level] == null) {
+    const ts = TOPIC_DISTRIBUTION[level] || [];
+    _bpWeightSum[level] = ts.reduce((s, t) => s + Math.max(0, t.weight || 0), 0) || 0;
+  }
+  return _bpWeightSum[level];
+}
+function _topicCeiling(level, weight) {
+  const target = bankTargetFor(level);
+  if (target > 0 && weight > 0) {
+    const sum = _levelWeightSum(level);
+    if (sum > 0) return Math.max(1, Math.round((weight / sum) * target));
+  }
+  return GEN_CAP_CEILING;
+}
+let GEN_PROPORTIONAL_ACTIVE = false;
 async function fetchTopicBudgets() {
   const budgets = new Map(); // "level\u0001topic" -> remaining slots; absent => uncapped
   if (!Number.isFinite(GEN_CAP_CEILING) || GEN_CAP_CEILING <= 0) {
@@ -2676,16 +2710,20 @@ async function fetchTopicBudgets() {
     const k = `${r.exam_level}\u0001${r.topic}`;
     counts.set(k, (counts.get(k) || 0) + 1);
   }
-  // Register a budget for EVERY known topic (incl. zero-count ones -> budget = ceiling).
-  const register = (level, topic) => {
+  // Register a budget for EVERY known topic. Weighted topics get a blueprint-proportional
+  // ceiling (weight/Sigma-weight * target) when a per-level target is set; otherwise the flat
+  // GEN_CAP_CEILING. Nutrition-only topics (no blueprint weight yet) keep the flat ceiling.
+  const register = (level, topic, weight = 0) => {
     if (GEN_CAP_EXEMPT_TOPICS.has(topic)) return; // uncapped
     const k = `${level}\u0001${topic}`;
-    if (!budgets.has(k)) budgets.set(k, Math.max(0, GEN_CAP_CEILING - (counts.get(k) || 0)));
+    if (budgets.has(k)) return;
+    if (bankTargetFor(level) > 0 && weight > 0) GEN_PROPORTIONAL_ACTIVE = true;
+    budgets.set(k, Math.max(0, _topicCeiling(level, weight) - (counts.get(k) || 0)));
   };
-  for (const [level, topics] of Object.entries(TOPIC_DISTRIBUTION)) for (const t of topics) register(level, t.topic);
+  for (const [level, topics] of Object.entries(TOPIC_DISTRIBUTION)) for (const t of topics) register(level, t.topic, Math.max(0, t.weight || 0));
   for (const [level, nlist]  of Object.entries(NUTRITION_BY_LEVEL))  for (const top of nlist) register(level, top);
   const atCap = [...budgets].filter(([, b]) => b === 0).map(([k]) => k.replace("\u0001", " / "));
-  console.log(`🚦  Generation cap ON (ceiling ${GEN_CAP_CEILING}); ${atCap.length} topic(s) at/over cap → 0 new${atCap.length ? ": " + atCap.join("; ") : ""}.`);
+  console.log(`🚦  Generation cap ${GEN_PROPORTIONAL_ACTIVE ? "ON (blueprint-proportional)" : `ON (flat ceiling ${GEN_CAP_CEILING})`}; ${atCap.length} topic(s) at/over cap → 0 new${atCap.length ? ": " + atCap.join("; ") : ""}.`);
   return budgets;
 }
 
@@ -2742,38 +2780,34 @@ function buildWorkQueue(count, budgets = new Map()) {
   const flat = [];
   for (const level of levels) {
     const topics = TOPIC_DISTRIBUTION[level] || [];
-    for (const t of topics) {
-      if (budgetLeft(level, t.topic) <= 0) continue; // B5: omit already-saturated topics
-      flat.push({ level, topic: t.topic, w: t.weight });
-    }
+    for (const t of topics) flat.push({ level, topic: t.topic, w: Math.max(0, t.weight || 0) });
   }
-  // v7.5.9 (B3) — draw WITHOUT replacement to kill intra-batch concept clustering.
-  // Shuffle distinct concepts and emit round-robin, reshuffling when exhausted;
-  // B5 budgets additionally drop a concept once its per-topic budget is spent.
   if (flat.length === 0) return queue;
-  function shuffleConcepts(arr) {
-    const a = arr.slice();
-    for (let k = a.length - 1; k > 0; k--) {
-      const j = Math.floor(Math.random() * (k + 1));
-      const tmp = a[k]; a[k] = a[j]; a[j] = tmp;
-    }
-    return a;
-  }
-  let pool = [];
+  // v7.8.0 — blueprint-faithful draw. Each slot picks a concept weighted by its remaining
+  // deficit when that level has a proportional cap (deficit = blueprint target - current),
+  // else by its raw blueprint weight. A concept's probability falls as it is emitted (budget
+  // shrinks), so it self-spreads (no intra-batch clustering -- the property the v7.5.9 uniform
+  // round-robin protected) AND converges to blueprint proportions, correcting existing skew.
   for (let i = 0; i < count; i++) {
-    if (pool.length === 0) {
-      pool = shuffleConcepts(flat).filter(it => budgetLeft(it.level, it.topic) > 0);
-      if (pool.length === 0) break;                 // every eligible topic hit its budget
+    const elig = []; let total = 0;
+    for (const it of flat) {
+      const bl = budgetLeft(it.level, it.topic);
+      if (bl <= 0) continue;
+      const lvlProp = bankTargetFor(it.level) > 0;
+      const demand = (lvlProp && Number.isFinite(bl)) ? bl : it.w;
+      if (demand <= 0) continue;
+      elig.push({ it, demand }); total += demand;
     }
-    const item = pool.shift();
-    // Preserve the nutrition-injection hook; respect the cap for injected topics too.
-    const nTopics = NUTRITION_BY_LEVEL[item.level];
+    if (!elig.length || total <= 0) break;
+    let r = Math.random() * total, chosen = elig[elig.length - 1].it;
+    for (const e of elig) { r -= e.demand; if (r < 0) { chosen = e.it; break; } }
+    const nTopics = NUTRITION_BY_LEVEL[chosen.level];
     if (nTopics && Math.random() < NUTRITION_INJECTION_RATE) {
       const randomNutrition = nTopics[Math.floor(Math.random() * nTopics.length)];
-      if (budgetLeft(item.level, randomNutrition) > 0) { queue.push({ level: item.level, topic: randomNutrition }); bump(item.level, randomNutrition); }
-      else if (budgetLeft(item.level, item.topic) > 0) { queue.push({ level: item.level, topic: item.topic }); bump(item.level, item.topic); }
+      if (budgetLeft(chosen.level, randomNutrition) > 0) { queue.push({ level: chosen.level, topic: randomNutrition }); bump(chosen.level, randomNutrition); }
+      else if (budgetLeft(chosen.level, chosen.topic) > 0) { queue.push({ level: chosen.level, topic: chosen.topic }); bump(chosen.level, chosen.topic); }
     } else {
-      if (budgetLeft(item.level, item.topic) > 0) { queue.push({ level: item.level, topic: item.topic }); bump(item.level, item.topic); }
+      if (budgetLeft(chosen.level, chosen.topic) > 0) { queue.push({ level: chosen.level, topic: chosen.topic }); bump(chosen.level, chosen.topic); }
     }
   }
   return queue;
@@ -3014,7 +3048,7 @@ async function runStandardMode(queue, silent = false) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════════════╗");
-  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.7.0)    ║");
+  console.log("║    MedBoard Pro — Bulk MCQ Generator (v7.8.0)    ║");
   console.log("╚══════════════════════════════════════════════════╝");
   console.log(`  Mode:         ${MODE === "batch" ? "Anthropic Batch API (50% discount)" : "Standard Concurrent"}`);
   console.log(`  Target count: ${TARGET_COUNT}`);
