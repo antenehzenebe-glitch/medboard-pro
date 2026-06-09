@@ -1841,6 +1841,45 @@ const INTERCHANGEABLE_AGENT_CLASSES = [
 // Mirrors flagInterchangeableAgents. Backtest 2026-06-06: recall 3/3 (ec94b12a, c6714248,
 // 12f5f085); approved-bank false positives 0 (H1) + 1 benign (H2). Keep warn-mode for >=2
 // batches; promote to hard-reject only after multi-batch precision/recall data.
+// --- PERMANENT-FIX GUARDS (clinical-correctness warns; parity) ---
+function _guardKeyText(p) {
+  if (!p) return "";
+  const co = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const ca = Array.isArray(p.choices) ? p.choices : (co ? Object.values(p.choices) : []);
+  const kr = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
+  if (kr == null) return "";
+  if (co && co[kr] != null) return String(co[kr]);
+  if (/^[A-E]$/i.test(String(kr))) { const i = String(kr).toUpperCase().charCodeAt(0) - 65; if (ca[i] != null) return String(ca[i]); }
+  return String(kr);
+}
+function flagMetforminEgfr(p) {
+  if (!p) return [];
+  const warns = [];
+  const stem = String(p.stem || ""), expl = String(p.explanation || "");
+  const m = expl.match(/eGFR\s*(?:of\s*)?(\d{2})[^.]{0,55}below the threshold of 30/i);
+  if (m && parseInt(m[1], 10) >= 30) warns.push('explanation calls eGFR ' + m[1] + ' "below the threshold of 30" (false; metformin cutoff is <30; 30-45 = continue dose-reduced)');
+  const stopMet = /(discontinu|stop)\w*[^.]{0,25}metformin|metformin[^.]{0,25}(discontinu|stop)/i.test(_guardKeyText(p));
+  const eg = stem.match(/eGFR\s*(?:of\s*)?(\d{2})\b/i);
+  if (stopMet && eg) { const v = parseInt(eg[1], 10); if (v >= 30 && v <= 45) warns.push('key discontinues metformin at eGFR ' + v + ' (30-45 = continue dose-reduced, not stop)'); }
+  return warns;
+}
+function flagSlidingScaleInsulin(p) {
+  if (!p) return [];
+  if (/sliding[\s-]scale/i.test(_guardKeyText(p))) {
+    const frail = /\b(dementia|elderly|nursing facility|long-term care|memory care|frail|cognitive impairment)\b/i.test(String(p.stem || "")) ? " (heightened: frail/elderly/dementia)" : "";
+    return ['keyed answer recommends sliding-scale insulin -- discouraged as monotherapy/transition' + frail];
+  }
+  return [];
+}
+function flagGdmCoherence(p) {
+  if (!p || !/gestational diabetes/i.test(String(p.topic || ""))) return [];
+  const stem = String(p.stem || "");
+  if (/\b\d{1,2}-year-old man\b/i.test(stem)) return ['"Gestational Diabetes" topic but index patient is male -- topic/content mismatch'];
+  if (!/(pregnan|gestation|gravid|postpartum|prenatal|obstetric|trimester|breastfeed)/i.test(stem)) return ['"Gestational Diabetes" topic but no pregnancy/postpartum marker -- likely topic drift'];
+  return [];
+}
+// --- END PERMANENT-FIX GUARDS ---
+
 function flagT1DCardiorenal(p) {
   if (!p) return [];
   const warns = [];
@@ -2576,6 +2615,9 @@ exports.handler = async function (event) {
     // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
     // cardiorenal mis-key now hard-reject gated upstream in isValid (PART 2 warn retired)
     { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) _t1dcr.forEach(_w => console.warn('[warn] T1D cardiorenal mis-key: ' + _w)); } // PART 2e: T1D cardiorenal/pharmacotherapy mis-key (warn-mode)
+    { const _ms = flagMetforminEgfr(p); if (_ms.length) _ms.forEach(_w => console.warn('[warn] metformin-eGFR: ' + _w)); }
+    { const _ss = flagSlidingScaleInsulin(p); if (_ss.length) _ss.forEach(_w => console.warn('[warn] sliding-scale insulin: ' + _w)); }
+    { const _gd = flagGdmCoherence(p); if (_gd.length) _gd.forEach(_w => console.warn('[warn] GDM topic-coherence: ' + _w)); }
     { const _tm = flagTopicMismatch(p); if (_tm.warn) console.warn('[warn] ' + _tm.reason); } // PART 2d: topic-consistency warn (B2); hard-reject gated upstream in isValid
 
     p.topic = pd.resolvedTopic;

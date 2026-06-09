@@ -1671,7 +1671,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
@@ -1859,6 +1859,74 @@ function flagSemanticDup(p) {
   _b4seen.set(lvl, prior);
   return { dup: bestHead !== null, score: best, against: bestHead };
 }
+
+// --- PERMANENT-FIX GUARDS (concept-saturation dedup + clinical warns) ---
+function _guardKeyText(p) {
+  if (!p) return "";
+  const co = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const ca = Array.isArray(p.choices) ? p.choices : (co ? Object.values(p.choices) : []);
+  const kr = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
+  if (kr == null) return "";
+  if (co && co[kr] != null) return String(co[kr]);
+  if (/^[A-E]$/i.test(String(kr))) { const i = String(kr).toUpperCase().charCodeAt(0) - 65; if (ca[i] != null) return String(ca[i]); }
+  return String(kr);
+}
+const CONCEPT_KEY_CONTAIN = 0.40;
+const _conceptSeen = new Map();
+const _CKEY_STOP = new Set(`a an the of to in on at by for with and or as is are was due start started initiate initiated begin given give add added discontinue discontinued stop stopped reduce reduced continue continued perform refer transition switch most appropriate next step management this patient her his their now agent current regimen dose daily mg units per day specifically formulated that than then which best explain explains failure impaired reduced inadequate increased decreased he she they it`.split(/\s+/));
+function _conceptKeyTokens(text) {
+  const out = new Set();
+  for (let w of String(text || "").toLowerCase().replace(/[^a-z0-9\u03b1-]+/g, " ").split(/\s+/)) {
+    w = w.replace(/^-+|-+$/g, "");
+    if (!w || _CKEY_STOP.has(w)) continue;
+    if (/^[a-z]+$/.test(w) && w.length <= 2) continue;
+    out.add(w);
+  }
+  return out;
+}
+function flagConceptSaturation(p) {
+  if (!p || !p.stem) return false;
+  const lvl = String(p.exam_level || "");
+  const fp = _b4Fingerprint(p.stem);
+  const keyTok = _conceptKeyTokens(_guardKeyText(p));
+  const prior = _conceptSeen.get(lvl) || [];
+  for (const e of prior) {
+    const tc = _b4Containment(fp.tok, e.stemTok), bc = _b4Containment(fp.bi, e.stemBi);
+    const stemSimilar = (tc >= B4_TOK_CONTAIN || bc >= B4_BI_CONTAIN);
+    const keySim = Math.max(_b4Containment(keyTok, e.keyTok), _b4Containment(e.keyTok, keyTok));
+    if (stemSimilar && keySim >= CONCEPT_KEY_CONTAIN) return true;
+  }
+  prior.push({ stemTok: fp.tok, stemBi: fp.bi, keyTok });
+  _conceptSeen.set(lvl, prior);
+  return false;
+}
+function flagMetforminEgfr(p) {
+  if (!p) return [];
+  const warns = [];
+  const stem = String(p.stem || ""), expl = String(p.explanation || "");
+  const m = expl.match(/eGFR\s*(?:of\s*)?(\d{2})[^.]{0,55}below the threshold of 30/i);
+  if (m && parseInt(m[1], 10) >= 30) warns.push('explanation calls eGFR ' + m[1] + ' "below the threshold of 30" (false; metformin cutoff is <30; 30-45 = continue dose-reduced)');
+  const stopMet = /(discontinu|stop)\w*[^.]{0,25}metformin|metformin[^.]{0,25}(discontinu|stop)/i.test(_guardKeyText(p));
+  const eg = stem.match(/eGFR\s*(?:of\s*)?(\d{2})\b/i);
+  if (stopMet && eg) { const v = parseInt(eg[1], 10); if (v >= 30 && v <= 45) warns.push('key discontinues metformin at eGFR ' + v + ' (30-45 = continue dose-reduced, not stop)'); }
+  return warns;
+}
+function flagSlidingScaleInsulin(p) {
+  if (!p) return [];
+  if (/sliding[\s-]scale/i.test(_guardKeyText(p))) {
+    const frail = /\b(dementia|elderly|nursing facility|long-term care|memory care|frail|cognitive impairment)\b/i.test(String(p.stem || "")) ? " (heightened: frail/elderly/dementia)" : "";
+    return ['keyed answer recommends sliding-scale insulin -- discouraged as monotherapy/transition' + frail];
+  }
+  return [];
+}
+function flagGdmCoherence(p) {
+  if (!p || !/gestational diabetes/i.test(String(p.topic || ""))) return [];
+  const stem = String(p.stem || "");
+  if (/\b\d{1,2}-year-old man\b/i.test(stem)) return ['"Gestational Diabetes" topic but index patient is male -- topic/content mismatch'];
+  if (!/(pregnan|gestation|gravid|postpartum|prenatal|obstetric|trimester|breastfeed)/i.test(stem)) return ['"Gestational Diabetes" topic but no pregnancy/postpartum marker -- likely topic drift'];
+  return [];
+}
+// --- END PERMANENT-FIX GUARDS ---
 
 function flagT1DCardiorenal(p) {
   if (!p) return [];
@@ -2478,6 +2546,10 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { console.warn('[REJECT] cardiorenal mis-key :: ' + _crmk.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_cardiorenalRejected'); } }
   // T1D cardiorenal/pharmacotherapy mis-key (warn-mode) -- non-blocking; promote to hard-reject after >=2 clean batches
   { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) { dropTally._warnT1DCardiorenal++; for (const _w of _t1dcr) console.warn('[warn] T1D cardiorenal mis-key:', _w); } }
+  { const _ms = flagMetforminEgfr(p); if (_ms.length) { dropTally._warnMetforminEgfr++; for (const _w of _ms) console.warn('[warn] metformin-eGFR:', _w); } }
+  { const _ss = flagSlidingScaleInsulin(p); if (_ss.length) { dropTally._warnSlidingScale++; for (const _w of _ss) console.warn('[warn] sliding-scale insulin:', _w); } }
+  { const _gd = flagGdmCoherence(p); if (_gd.length) { dropTally._warnGdmCoherence++; for (const _w of _gd) console.warn('[warn] GDM topic-coherence:', _w); } }
+  { if (flagConceptSaturation(p)) { console.warn('[REJECT] concept-saturation (<=1/concept) :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_conceptSaturated'); } } // Layer 1: stem-AND-key dedup, <=1/concept
 
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
@@ -2923,6 +2995,10 @@ async function main() {
   console.log(`║  Unseeded-citation warns: ${String(dropTally._warnUnseeded).padEnd(21)}║`);
   console.log(`║  Interchangeable-agent warns: ${String(dropTally._warnInterchange).padEnd(17)}║`);
   console.log(`║  Semantic near-dup warns: ${String(dropTally._warnSemanticDup).padEnd(21)}║`);
+  console.log(`║  Concept-saturation drops: ${String(dropTally._conceptSaturated).padEnd(20)}║`);
+  console.log(`║  Metformin-eGFR warns: ${String(dropTally._warnMetforminEgfr).padEnd(24)}║`);
+  console.log(`║  Sliding-scale warns: ${String(dropTally._warnSlidingScale).padEnd(25)}║`);
+  console.log(`║  GDM-coherence warns: ${String(dropTally._warnGdmCoherence).padEnd(25)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
 }
