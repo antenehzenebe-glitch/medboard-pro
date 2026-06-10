@@ -135,6 +135,8 @@ const FILTER_LEVEL = (process.env.BULK_LEVEL || getArg("--level", "")).trim() ||
 const FILTER_TOPIC = (process.env.BULK_TOPIC || getArg("--topic", "")).trim() || null;
 const MODE         = (process.env.BULK_MODE  || getArg("--mode", "batch")).trim();
 const CONCURRENCY  = parseInt(process.env.BULK_CONCURRENCY || getArg("--concurrency", "6"), 10);
+const VERIFY_PASS  = /^(1|true|on|yes)$/i.test(process.env.VERIFY_PASS || "");   // Layer-4a verify-pass (opt-in; ~doubles Claude calls)
+const VERIFY_MODEL = process.env.VERIFY_MODEL || "claude-sonnet-4-6";          // set to another model id for cross-model independence
 
 const VALID_LEVELS = ["ABIM Internal Medicine", "ABIM Endocrinology", "USMLE Step 1", "USMLE Step 2 CK", "USMLE Step 3"];
 
@@ -1773,7 +1775,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0, _warnCrossRunDup: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0, _warnCrossRunDup: 0, _warnVerifyMiskey: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
@@ -3073,6 +3075,43 @@ function extractJSONSimple(raw) {
 }
 
 // ─── STANDARD MODE ───────────────────────────────────────────────────────────
+// ── INDEPENDENT VERIFY-PASS (Layer 4a self-consistency; bulk-only, warn-mode, opt-in) ──
+// Blind second pass: re-answer the FINISHED item from stem + shuffled choices only (no
+// key, no explanation); disagreement => possible mis-key warn. The only general guard
+// against wrong-keyed items. Enable with VERIFY_PASS=1 (default OFF; ~doubles Claude
+// calls). Bulk-only: the live path can't afford a second round-trip in Netlify's 26s.
+const VERIFY_TOOL = {
+  name: "emit_answer",
+  description: "Emit the single best answer letter for the multiple-choice question.",
+  input_schema: { type: "object", properties: { answer: { type: "string", enum: ["A","B","C","D","E"] } }, required: ["answer"] }
+};
+async function verifyKeyConsistency(record) {
+  if (!record || !record.stem || !record.choices || !record.correct_answer) return null;
+  const letters = ["A","B","C","D","E"];
+  const lines = letters.filter(L => record.choices[L] != null).map(L => `${L}. ${record.choices[L]}`).join("\n");
+  const sys = "You are an independent board examiner. Using current clinical practice guidelines, choose the single best answer to the multiple-choice question. Do not explain. Call emit_answer exactly once with only the letter.";
+  const usr = `${record.stem}\n\n${lines}`;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: VERIFY_MODEL, max_tokens: 64, temperature: 0,
+        tools: [VERIFY_TOOL], tool_choice: { type: "tool", name: "emit_answer" },
+        system: sys, messages: [{ role: "user", content: usr }]
+      })
+    });
+    if (!res.ok) return null;                          // fail-open: never block on verifier error
+    const data = await res.json();
+    const tb = data.content?.find(b => b.type === "tool_use" && b.name === "emit_answer");
+    const ans = tb?.input?.answer;
+    if (!ans || !/^[A-E]$/.test(ans)) return null;
+    return { disagree: ans !== record.correct_answer, modelAnswer: ans, keyed: record.correct_answer };
+  } catch (e) {
+    return null;                                       // fail-open
+  }
+}
+
 async function runStandardMode(queue, silent = false) {
   if (!silent) console.log(`\n⚡  Running ${queue.length} questions with concurrency=${CONCURRENCY}...`);
   const results = [];
@@ -3151,6 +3190,22 @@ async function runStandardMode(queue, silent = false) {
     if (i + CONCURRENCY < queue.length) await sleep(2000);
   }
 
+  if (VERIFY_PASS && results.length) {
+    if (!silent) console.log(`\n\uD83D\uDD0E  Verify-pass (independent blind re-answer) on ${results.length} items...`);
+    for (let i = 0; i < results.length; i += CONCURRENCY) {
+      const win = results.slice(i, i + CONCURRENCY);
+      const checks = await Promise.allSettled(win.map(r => verifyKeyConsistency(r)));
+      checks.forEach((c, k) => {
+        if (c.status === "fulfilled" && c.value && c.value.disagree) {
+          dropTally._warnVerifyMiskey++;
+          const r = win[k];
+          console.warn(`[warn] verify-pass disagreement: keyed ${c.value.keyed}, independent answer ${c.value.modelAnswer} :: [${r.exam_level}] "${String(r.stem || "").slice(0, 80)}"`);
+        }
+      });
+      if (i + CONCURRENCY < results.length) await sleep(1500);
+    }
+  }
+
   if (!silent) console.log("");
   return results;
 }
@@ -3202,6 +3257,7 @@ async function main() {
   console.log(`║  Sliding-scale warns: ${String(dropTally._warnSlidingScale).padEnd(25)}║`);
   console.log(`║  GDM-coherence warns: ${String(dropTally._warnGdmCoherence).padEnd(25)}║`);
   console.log(`║  Cross-run dedup warns: ${String(dropTally._warnCrossRunDup).padEnd(23)}║`);
+  console.log(`║  Verify-pass disagreements: ${String(dropTally._warnVerifyMiskey).padEnd(19)}║`);
   console.log(`║  Time:        ${String(`${mins}m ${secs}s`).padEnd(33)}║`);
   console.log("╚══════════════════════════════════════════════════╝\n");
 }
