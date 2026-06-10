@@ -2284,7 +2284,7 @@ function rewriteExplanationLetters(explanation, letterMap) {
 async function saveMcqToSupabase(p, level, meta) {
   try {
     const payload = {
-      exam_level: level, topic: p.topic, stem: p.stem, choices: p.choices, correct_answer: p.correct,
+      id: p.id, exam_level: level, topic: p.topic, stem: p.stem, choices: p.choices, correct_answer: p.correct,
       explanation: p.explanation, specialty_group: deriveSpecialtyGroup(level, meta && meta.resolvedTopic),
       blueprint_tag: meta && meta.resolvedTopic ? meta.resolvedTopic : p.topic,
       generation_model: meta && meta.generationModel ? meta.generationModel : null,
@@ -2547,6 +2547,8 @@ exports.handler = async function (event) {
     const b = JSON.parse(event.body);
     if (b.warmup) return { statusCode: 200, body: "{}" };
     if (!b.level || !b.topic) return { statusCode: 400, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
+    if (!VALID_LEVELS.includes(b.level)) return { statusCode: 400, body: JSON.stringify({ error: "Invalid level." }) }; // S5: bound work to known levels
+    if (process.env.GENERATE_MCQ_SECRET && ((event.headers||{})["x-mbp-secret"] || "") !== process.env.GENERATE_MCQ_SECRET) return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) }; // S5: inert until GENERATE_MCQ_SECRET set
 
     const topicResult   = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
@@ -2650,6 +2652,7 @@ exports.handler = async function (event) {
     p.explanation = rewriteExplanationLetters(p.explanation, letterMap);
 
     // Kept as a fire-and-forget promise to prevent 502/504 Netlify execution timeouts
+    p.id = crypto.randomUUID(); // S5/logging: function-minted id returned to client + written by async insert (no await, no timeout regression)
     saveMcqToSupabase(p, b.level, { resolvedTopic: pd.resolvedTopic, generationModel }).catch(() => {});
     
     delete p.demographic_check;
