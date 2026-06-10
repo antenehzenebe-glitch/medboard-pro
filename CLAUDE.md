@@ -187,8 +187,10 @@ Generators at **v7.5.16** (2026-06-05; +ES-2012 citation allow-list, +`flagInter
 ### Lead funnel (Option A — LIVE May 30)
 `medboard-widget.js` v1.1 deployed: **email gate removed** — answering reveals the full explanation + "Start your free trial" CTA immediately. UTM tags intact. Email-capture machinery (`capture-lead.js`, `leads` schema) is **parked, not deleted**. Landing page picks this up automatically.
 
-### Security posture (closed May 16)
+### Security posture (key hygiene closed May 16; RLS hardening 2026-06-10)
 Opaque keys; JWT fallbacks stripped; leaked `service_role` JWT revoked. `sb_publishable_*` client-side; `sb_secret_*` local admin only.
+
+**Correction (2026-06-10):** the May-16 work was key hygiene only and never audited RLS. An RLS audit found and FIXED five anon-reachable holes (live + verified as the anon role, then committed to `supabase/migrations/`): **S1** `allow_anon_select USING(true)` exposed all rows incl. `correct_answer` -> dropped; `serve_next_mcq` made SECURITY DEFINER so funnel-only serving still works (clients read via the RPC only). **S2** `allow_anon_insert WITH CHECK(true)` + no status-forcing trigger let an anon insert a `status='approved'` (servable) row -> replaced with a pending_review-pinned policy (the live `generate-mcq` fallback, which omits status, still saves to the queue). **S3** `profiles` UPDATE had USING but no WITH CHECK -> any user could self-set `is_admin` and then edit/delete the bank; added a WITH CHECK pinning `is_admin`. **S4** `fetch_unseen_mcqs` (DEFINER, anon-callable) omitted the cueing gate -> added it + fixed search_path (was latent: 0 approved+flagged rows). **S6** revoked gratuitous TRUNCATE/DELETE/UPDATE grants from anon/authenticated. Advisor also caught a **DEFINER view** `v_approved_mcqs` (RLS-bypassing, exposed all 780 approved rows incl. keys to anon) -> client access revoked. Migrations 0001–0005 in `supabase/migrations/`. **The intended DEFINER warnings on `serve_next_mcq`/`fetch_unseen_mcqs` are by design (the funnel).** Still open (non-SQL): the public `generate-mcq` endpoint is unauthenticated (cost/queue-abuse — S5); Supabase Auth leaked-password protection is off (console toggle).
 
 -----
 
