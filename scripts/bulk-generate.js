@@ -2015,7 +2015,7 @@ function flagMetforminEgfr(p) {
 }
 function flagSlidingScaleInsulin(p) {
   if (!p) return [];
-  if (/sliding[\s-]scale/i.test(_guardKeyText(p))) {
+  if (/sliding[\s-]scale[^.]{0,40}insulin|insulin[^.]{0,40}sliding[\s-]scale/i.test(_guardKeyText(p))) {
     const frail = /\b(dementia|elderly|nursing facility|long-term care|memory care|frail|cognitive impairment)\b/i.test(String(p.stem || "")) ? " (heightened: frail/elderly/dementia)" : "";
     return ['keyed answer recommends sliding-scale insulin -- discouraged as monotherapy/transition' + frail];
   }
@@ -2103,16 +2103,22 @@ function flagT1DCardiorenal(p) {
 }
 
 function flagCardiorenalMiskey(p) {
-  if (!p) return [];
-  const warns = [];
+  // Returns { hard: [...], warn: [...] }.
+  // H1 (HARD): HFrEF stem + an SGLT2i offered + a GLP-1 RA keyed for the HF indication.
+  // H2 (WARN, v7.9.1 demoted from hard): SGLT2i<->hyperkalemia proximity. The bare
+  //   proximity regex CANNOT separate the error ("SGLT2i cause hyperkalemia") from the
+  //   correct teaching ("SGLT2i do NOT raise K+", "SGLT2i mitigate MRA hyperkalemia",
+  //   "hyperkalemia risk before establishing SGLT2i"), so as a hard-reject it silently
+  //   killed correct items. Now warn-only, and suppressed when the matched window
+  //   carries a negation / contrast / MRA-attribution token.
+  if (!p) return { hard: [], warn: [] };
+  const hard = [];
+  const warn = [];
   const stem = String(p.stem || "");
   const expl = String(p.explanation || "");
   const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
   const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
   const choicesText = choicesArr.join(" | ");
-  // Resolve the keyed answer's TEXT. At validation time the parsed object carries
-  // p.correct (the letter A-E); p.correct_answer is only attached later when the DB
-  // record is assembled. Prefer whichever is present so the H1 key check is live.
   const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
   let keyText = "";
   if (keyRef != null) {
@@ -2128,17 +2134,15 @@ function flagCardiorenalMiskey(p) {
   const hfref = /HFrEF|reduced ejection fraction|EF \b[1-3]\d\b|NYHA class (III|IV)/i.test(stem);
   const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
   const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-1/i;
-  // Tie-break: a GLP-1 RA can be the legitimate key in an HFrEF patient when the
-  // question is explicitly about glycemic efficacy or weight loss (not HF therapy),
-  // so H1 is suppressed for those lead-ins to avoid false hard-rejects.
   const weightGlycemicFocus = /\b(weight loss|weight reduction|lose weight|most weight|greatest weight|glycemic control|glucose-lowering|glucose lowering|hemoglobin a1c|hba1c|a1c reduction|greatest a1c|lower(?:ing)? (?:the )?a1c)\b/i.test(stem);
   if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText) && !weightGlycemicFocus) {
-    warns.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
+    hard.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
   }
-  if (/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i.test(expl)) {
-    warns.push("SGLT2i are K-neutral/lowering -- verify any hyperkalemia claim attributing risk to an SGLT2i.");
+  const _h2 = expl.match(/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i);
+  if (_h2 && !/not|without|neutral|lower|reduc|decreas|mitigat|attenuat|protect|unlike|whereas|in contrast|before|prior to|rather than|instead of|mra|mineralocorticoid|spironolactone|finerenone|eplerenone/i.test(_h2[0])) {
+    warn.push("SGLT2i are K-neutral/lowering -- verify any hyperkalemia claim attributing risk to an SGLT2i.");
   }
-  return warns;
+  return { hard, warn };
 }
 
 function flagInterchangeableAgents(p) {
@@ -2520,11 +2524,11 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
   } else if (level === "USMLE Step 2 CK") {
     _lr = "USMLE STEP 2 CK RULES (M3/M4 LEVEL — CLINICAL REASONING):\n- Vignette order: Age/Sex/Setting → CC → HPI → PMH → Meds/Soc/Fam → Vitals → Exam → Labs/Imaging.\n- Question type focus: most likely diagnosis, best initial diagnostic test, best initial management, most likely cause of an acute clinical finding.\n- Test PATTERN RECOGNITION of common conditions over rare ones — bread-and-butter conditions on medicine, surgery, peds, OB/GYN, psych, family medicine rotations.\n- Distractors are competing diagnoses on the differential — wrong but plausible to a clerkship student.\n- Settings: outpatient clinic, ED, inpatient ward, urgent care.\n- Bayesian reasoning expected: prior probability + new test result → posterior decision.";
   } else if (isStep3) {
-    _lr = "USMLE STEP 3 RULES (PGY-1 LEVEL — PRACTICE-READY PHYSICIAN):\n- Question type focus: management decisions, disposition (admit vs discharge, ICU vs floor), threshold decisions (treat vs observe), follow-up planning.\n- FORBIDDEN: 'What is the most likely diagnosis?' — diagnosis must be implied or stated in the stem.\n- Distractors should reflect real management forks where a PGY-1 might choose wrong (premature discharge, unnecessary admission, wrong tier of antibiotic, wrong agent in a stepped protocol).\n- Multi-system, complex patients are expected; address polypharmacy, comorbidity interactions, code status, goals of care where appropriate.\n- Public-health, ethics, and biostatistics integration acceptable when clinically relevant.";
+    _lr = "USMLE STEP 3 RULES (PGY-1 LEVEL — PRACTICE-READY PHYSICIAN):\n- Question type focus: management decisions, disposition (admit vs discharge, ICU vs floor), threshold decisions (treat vs observe), follow-up planning.\n- 'What is the most likely diagnosis?' is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items must center on management decisions, disposition, or threshold judgments.\n- Distractors should reflect real management forks where a PGY-1 might choose wrong (premature discharge, unnecessary admission, wrong tier of antibiotic, wrong agent in a stepped protocol).\n- Multi-system, complex patients are expected; address polypharmacy, comorbidity interactions, code status, goals of care where appropriate.\n- Public-health, ethics, and biostatistics integration acceptable when clinically relevant.";
   } else if (isABIM_IM) {
-    _lr = "ABIM INTERNAL MEDICINE RULES (BOARD-CERTIFYING INTERNIST LEVEL):\n- Question type focus: multi-system synthesis, complex comorbidities, drug-drug interactions, treatment failure or intolerance, borderline risk scores requiring judgment.\n- FORBIDDEN: 'What is the most likely diagnosis?' — synthesis questions require management-level lead-ins.\n- Distractors must be options a guideline-aware internist might actually choose; 'obviously wrong' distractors are unacceptable at this level.\n- Address: when to refer to subspecialty, when to initiate vs withhold treatment, how to adjust for comorbidities (CKD, HF, cirrhosis, frailty).";
+    _lr = "ABIM INTERNAL MEDICINE RULES (BOARD-CERTIFYING INTERNIST LEVEL):\n- Question type focus: multi-system synthesis, complex comorbidities, drug-drug interactions, treatment failure or intolerance, borderline risk scores requiring judgment.\n- 'What is the most likely diagnosis?' is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items require management-level lead-ins.\n- Distractors must be options a guideline-aware internist might actually choose; 'obviously wrong' distractors are unacceptable at this level.\n- Address: when to refer to subspecialty, when to initiate vs withhold treatment, how to adjust for comorbidities (CKD, HF, cirrhosis, frailty).";
   } else if (isABIM_Endo) {
-    _lr = "ABIM ENDOCRINOLOGY RULES (SUBSPECIALIST LEVEL):\n- Question type focus: atypical presentations, guideline-edge cases, complex diagnostic workups (CRH stimulation, IPSS, octreotide/68Ga-DOTATATE scan, genetic panels), therapy modification.\n- FORBIDDEN: 'What is the most likely diagnosis?' — the stem must test subspecialty management, complex diagnostic workup, or therapy modification.\n- Distractors must be options a subspecialty colleague might reasonably propose; items must discriminate between fellow-level and attending-level reasoning.\n- Address: dynamic testing protocols, surgical vs medical management, peri-procedural management (adrenalectomy, thyroidectomy), pregnancy considerations for endocrine disease.";
+    _lr = "ABIM ENDOCRINOLOGY RULES (SUBSPECIALIST LEVEL):\n- Question type focus: atypical presentations, guideline-edge cases, complex diagnostic workups (CRH stimulation, IPSS, octreotide/68Ga-DOTATATE scan, genetic panels), therapy modification.\n- 'What is the most likely diagnosis?' is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items must test subspecialty management, complex diagnostic workup, or therapy modification.\n- Distractors must be options a subspecialty colleague might reasonably propose; items must discriminate between fellow-level and attending-level reasoning.\n- Address: dynamic testing protocols, surgical vs medical management, peri-procedural management (adrenalectomy, thyroidectomy), pregnancy considerations for endocrine disease.";
   } else {
     _lr = "BOARD-STYLE RULES: Generalist synthesis level.";
   }
@@ -2671,7 +2675,7 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { const _sd = flagSemanticDup(p); if (_sd.dup) { console.warn(`⚠️  B4 semantic near-dup (sim=${_sd.score.toFixed(2)}) [${p.exam_level}] vs "${_sd.against}" :: "${String(p.stem||"").slice(0,80)}"`); dropTally._warnSemanticDup++; } } // PART 2c: intra-batch semantic near-dup flag (B4)
   { const _tm = flagTopicMismatch(p); if (_tm.hardReject) { console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_topicMismatchRejected'); } if (_tm.warn) { console.warn('[warn] ' + _tm.reason); dropTally._warnTopicMismatch++; } } // PART 2d: topic-consistency guard (B2)
   // SGLT2i-deprioritization cardiorenal mis-key (HARD-REJECT — promoted from warn; H1 key-resolution fixed + weight/glycemia tie-break)
-  { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) { console.warn('[REJECT] cardiorenal mis-key :: ' + _crmk.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_cardiorenalRejected'); } }
+  { const _crmk = flagCardiorenalMiskey(p); if (_crmk.hard.length) { console.warn('[REJECT] cardiorenal mis-key :: ' + _crmk.hard.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_cardiorenalRejected'); } if (_crmk.warn.length) { dropTally._warnCardiorenal += _crmk.warn.length; for (const _w of _crmk.warn) console.warn('[warn] cardiorenal:', _w); } }
   // T1D cardiorenal/pharmacotherapy mis-key (warn-mode) -- non-blocking; promote to hard-reject after >=2 clean batches
   { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) { dropTally._warnT1DCardiorenal++; for (const _w of _t1dcr) console.warn('[warn] T1D cardiorenal mis-key:', _w); } }
   { const _ms = flagMetforminEgfr(p); if (_ms.length) { dropTally._warnMetforminEgfr++; for (const _w of _ms) console.warn('[warn] metformin-eGFR:', _w); } }
@@ -3191,6 +3195,7 @@ async function main() {
   console.log(`║  Gen failures (both engines): ${String(dropTally._genFailed).padEnd(17)}║`);
   console.log(`║  Unseeded-citation warns: ${String(dropTally._warnUnseeded).padEnd(21)}║`);
   console.log(`║  Interchangeable-agent warns: ${String(dropTally._warnInterchange).padEnd(17)}║`);
+  console.log(`║  Cardiorenal H2 warns: ${String(dropTally._warnCardiorenal).padEnd(24)}║`);
   console.log(`║  Semantic near-dup warns: ${String(dropTally._warnSemanticDup).padEnd(21)}║`);
   console.log(`║  Concept-saturation drops: ${String(dropTally._conceptSaturated).padEnd(20)}║`);
   console.log(`║  Metformin-eGFR warns: ${String(dropTally._warnMetforminEgfr).padEnd(24)}║`);

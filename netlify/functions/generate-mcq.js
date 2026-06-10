@@ -1865,7 +1865,7 @@ function flagMetforminEgfr(p) {
 }
 function flagSlidingScaleInsulin(p) {
   if (!p) return [];
-  if (/sliding[\s-]scale/i.test(_guardKeyText(p))) {
+  if (/sliding[\s-]scale[^.]{0,40}insulin|insulin[^.]{0,40}sliding[\s-]scale/i.test(_guardKeyText(p))) {
     const frail = /\b(dementia|elderly|nursing facility|long-term care|memory care|frail|cognitive impairment)\b/i.test(String(p.stem || "")) ? " (heightened: frail/elderly/dementia)" : "";
     return ['keyed answer recommends sliding-scale insulin -- discouraged as monotherapy/transition' + frail];
   }
@@ -1932,16 +1932,22 @@ function flagT1DCardiorenal(p) {
 }
 
 function flagCardiorenalMiskey(p) {
-  if (!p) return [];
-  const warns = [];
+  // Returns { hard: [...], warn: [...] }.
+  // H1 (HARD): HFrEF stem + an SGLT2i offered + a GLP-1 RA keyed for the HF indication.
+  // H2 (WARN, v7.9.1 demoted from hard): SGLT2i<->hyperkalemia proximity. The bare
+  //   proximity regex CANNOT separate the error ("SGLT2i cause hyperkalemia") from the
+  //   correct teaching ("SGLT2i do NOT raise K+", "SGLT2i mitigate MRA hyperkalemia",
+  //   "hyperkalemia risk before establishing SGLT2i"), so as a hard-reject it silently
+  //   killed correct items. Now warn-only, and suppressed when the matched window
+  //   carries a negation / contrast / MRA-attribution token.
+  if (!p) return { hard: [], warn: [] };
+  const hard = [];
+  const warn = [];
   const stem = String(p.stem || "");
   const expl = String(p.explanation || "");
   const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
   const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
   const choicesText = choicesArr.join(" | ");
-  // Resolve the keyed answer's TEXT. At validation time the parsed object carries
-  // p.correct (the letter A-E); p.correct_answer is only attached later when the DB
-  // record is assembled. Prefer whichever is present so the H1 key check is live.
   const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
   let keyText = "";
   if (keyRef != null) {
@@ -1957,17 +1963,15 @@ function flagCardiorenalMiskey(p) {
   const hfref = /HFrEF|reduced ejection fraction|EF \b[1-3]\d\b|NYHA class (III|IV)/i.test(stem);
   const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
   const GLP1 = /semaglutide|dulaglutide|liraglutide|exenatide|tirzepatide|GLP-1/i;
-  // Tie-break: a GLP-1 RA can be the legitimate key in an HFrEF patient when the
-  // question is explicitly about glycemic efficacy or weight loss (not HF therapy),
-  // so H1 is suppressed for those lead-ins to avoid false hard-rejects.
   const weightGlycemicFocus = /\b(weight loss|weight reduction|lose weight|most weight|greatest weight|glycemic control|glucose-lowering|glucose lowering|hemoglobin a1c|hba1c|a1c reduction|greatest a1c|lower(?:ing)? (?:the )?a1c)\b/i.test(stem);
   if (hfref && SGLT2I.test(choicesText) && GLP1.test(keyText) && !weightGlycemicFocus) {
-    warns.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
+    hard.push("possible SGLT2i-deprioritization mis-key in HFrEF -- SGLT2i is Class I (EMPEROR-Reduced/DAPA-HF); verify key.");
   }
-  if (/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i.test(expl)) {
-    warns.push("SGLT2i are K-neutral/lowering -- verify any hyperkalemia claim attributing risk to an SGLT2i.");
+  const _h2 = expl.match(/SGLT2[^.]{0,60}hyperkalem|hyperkalem[^.]{0,60}SGLT2/i);
+  if (_h2 && !/not|without|neutral|lower|reduc|decreas|mitigat|attenuat|protect|unlike|whereas|in contrast|before|prior to|rather than|instead of|mra|mineralocorticoid|spironolactone|finerenone|eplerenone/i.test(_h2[0])) {
+    warn.push("SGLT2i are K-neutral/lowering -- verify any hyperkalemia claim attributing risk to an SGLT2i.");
   }
-  return warns;
+  return { hard, warn };
 }
 
 function flagInterchangeableAgents(p) {
@@ -2581,7 +2585,7 @@ exports.handler = async function (event) {
       const citationOk    = validateCitationYears(p);
       const phantomOk     = validateNoPhantomCitations(p);
       const topicOk       = (() => { const _tm = flagTopicMismatch(p); if (_tm.hardReject) console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return !_tm.hardReject; })(); // B2 hard gate (parity)
-      const cardiorenalOk = (() => { const _crmk = flagCardiorenalMiskey(p); if (_crmk.length) console.warn('[REJECT] cardiorenal mis-key: ' + _crmk.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return _crmk.length === 0; })(); // cardiorenal hard gate (parity, promoted from warn)
+      const cardiorenalOk = (() => { const _crmk = flagCardiorenalMiskey(p); if (_crmk.hard.length) console.warn('[REJECT] cardiorenal mis-key: ' + _crmk.hard.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return _crmk.hard.length === 0; })(); // cardiorenal hard gate (parity, promoted from warn)
       isValid = demoOk && consistencyOk && choicesOk && cueingFree
              && leadInOk && negFormOk && assocOk && vagueOk
              && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk
@@ -2605,7 +2609,7 @@ exports.handler = async function (event) {
                && validateSiteOfCare(p)
                && validateCitationYears(p)
                && validateNoPhantomCitations(p)
-               && !flagTopicMismatch(p).hardReject && flagCardiorenalMiskey(p).length === 0; // B2 + cardiorenal hard gates (parity)
+               && !flagTopicMismatch(p).hardReject && flagCardiorenalMiskey(p).hard.length === 0; // B2 + cardiorenal hard gates (parity)
       }
     }
 
@@ -2614,6 +2618,7 @@ exports.handler = async function (event) {
     { const _ia = flagInterchangeableAgents(p); if (_ia.length) _ia.forEach(n => console.warn(n)); } // PART 2b: interchangeable-agent soft-single-best flag (v7.5.14)
     // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
     // cardiorenal mis-key now hard-reject gated upstream in isValid (PART 2 warn retired)
+    { const _crmk = flagCardiorenalMiskey(p); if (_crmk.warn.length) _crmk.warn.forEach(_w => console.warn('[warn] cardiorenal: ' + _w)); } // H2 SGLT2i<->hyperkalemia warn (demoted from hard-reject, v7.9.1)
     { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) _t1dcr.forEach(_w => console.warn('[warn] T1D cardiorenal mis-key: ' + _w)); } // PART 2e: T1D cardiorenal/pharmacotherapy mis-key (warn-mode)
     { const _ms = flagMetforminEgfr(p); if (_ms.length) _ms.forEach(_w => console.warn('[warn] metformin-eGFR: ' + _w)); }
     { const _ss = flagSlidingScaleInsulin(p); if (_ss.length) _ss.forEach(_w => console.warn('[warn] sliding-scale insulin: ' + _w)); }
