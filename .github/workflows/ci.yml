@@ -1,0 +1,19 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Syntax check both generators
+        run: node --check scripts/bulk-generate.js && node --check netlify/functions/generate-mcq.js
+      - name: Parity check (shared guardrails + validators must be identical)
+        run: node test/check-parity.js
+      - name: Validator unit tests
+        run: node --test
