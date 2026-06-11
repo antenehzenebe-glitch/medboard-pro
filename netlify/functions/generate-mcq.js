@@ -2549,6 +2549,32 @@ exports.handler = async function (event) {
     if (!b.level || !b.topic) return { statusCode: 400, body: JSON.stringify({ error: "Request body must include 'level' and 'topic'." }) };
     if (!VALID_LEVELS.includes(b.level)) return { statusCode: 400, body: JSON.stringify({ error: "Invalid level." }) }; // S5: bound work to known levels
     if (process.env.GENERATE_MCQ_SECRET && ((event.headers||{})["x-mbp-secret"] || "") !== process.env.GENERATE_MCQ_SECRET) return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) }; // S5: inert until GENERATE_MCQ_SECRET set
+    // E (S5 defense-in-depth): cross-origin guard. Spoofable -> lenient: block only when an Origin/Referer
+    // is present AND foreign; absent header => allow (never break legit same-origin fetches).
+    {
+      const _eh = event.headers || {};
+      const _allow = (process.env.ALLOWED_ORIGIN_HOSTS || "medboardpro.org,www.medboardpro.org")
+        .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+      const _osrc = _eh.origin || _eh.referer || _eh.referrer || "";
+      let _host = "";
+      try { if (_osrc) _host = new URL(_osrc).hostname.toLowerCase(); } catch (e) {}
+      const _ok = !_host || _allow.indexOf(_host) !== -1 || _host.endsWith(".netlify.app");
+      if (!_ok) return { statusCode: 403, body: JSON.stringify({ error: "Forbidden" }) };
+    }
+    // B (S5): per-IP fixed-window rate limit via SECURITY DEFINER RPC. Fail-open on any error so a DB
+    // hiccup never takes down generation; caps single-source credit-burn / pending-flood abuse.
+    try {
+      const _rh = event.headers || {};
+      const _ip = ((_rh["x-nf-client-connection-ip"] || (_rh["x-forwarded-for"] || "").split(",")[0]) || "").trim();
+      if (_ip) {
+        const _rl = await fetch(SUPABASE_URL + "/rest/v1/rpc/check_and_bump_gen_rate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY },
+          body: JSON.stringify({ p_ip: _ip, p_limit: Number(process.env.GEN_RATE_LIMIT || 20), p_window_secs: Number(process.env.GEN_RATE_WINDOW_SECS || 3600) })
+        });
+        if (_rl.ok && (await _rl.json()) === false) return { statusCode: 429, body: JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }) };
+      }
+    } catch (e) { /* fail-open: never block generation on rate-limit infra error */ }
 
     const topicResult   = pickTopicForLevel(b.level, b.topic);
     const resolvedTopic = topicResult.topic;
