@@ -38,6 +38,10 @@ on:
         description: "Specific topic (leave blank for weighted distribution across the level)"
         required: false
         default: ""
+      ceiling:
+        description: "Per-topic depth target (GEN_CAP_CEILING). 8 = current default; raise to grow the bank."
+        required: false
+        default: "8"
       mode:
         description: "Generation mode"
         required: true
@@ -48,30 +52,23 @@ on:
           - batch
 
 jobs:
-  # ── SINGLE LEVEL ──────────────────────────────────────────────────────────────
   generate-single:
     name: "Generate — ${{ github.event.inputs.level }}"
     if: github.event.inputs.level != 'all'
     runs-on: ubuntu-latest
     timeout-minutes: 360
-
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
       - name: Show parameters
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  MedBoard Pro — Bulk MCQ Generator"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  Level:  ${{ github.event.inputs.level }}"
-          echo "  Count:  ${{ github.event.inputs.count }}"
-          echo "  Topic:  ${{ github.event.inputs.topic || 'Weighted distribution' }}"
-          echo "  Mode:   ${{ github.event.inputs.mode }}"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
+          echo "Level:  ${{ github.event.inputs.level }}"
+          echo "Count:  ${{ github.event.inputs.count }}"
+          echo "Topic:  ${{ github.event.inputs.topic || 'Weighted distribution' }}"
+          echo "Ceiling:${{ github.event.inputs.ceiling }}"
+          echo "Mode:   ${{ github.event.inputs.mode }}"
       - name: Run generator
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -81,27 +78,20 @@ jobs:
           BULK_COUNT:        ${{ github.event.inputs.count }}
           BULK_TOPIC:        ${{ github.event.inputs.topic }}
           BULK_MODE:         ${{ github.event.inputs.mode }}
+          GEN_CAP_CEILING:   ${{ github.event.inputs.ceiling }}
         run: node scripts/bulk-generate.js
-
       - name: Done
         if: success()
-        run: echo "✅  Done! Check your Supabase mcqs table for new rows."
-
+        run: echo "Done. Check Supabase mcqs table for new rows."
       - name: Failed
         if: failure()
-        run: |
-          echo "❌  Generation failed. Common causes:"
-          echo "    - ANTHROPIC_API_KEY secret not set"
-          echo "    - SUPABASE_URL or SUPABASE_ANON_KEY secret not set"
-          echo "    - Supabase RLS policy blocking INSERT"
+        run: echo "Generation failed. Check ANTHROPIC_API_KEY / SUPABASE_* secrets and RLS INSERT policy."
 
-  # ── ALL LEVELS IN PARALLEL ────────────────────────────────────────────────────
   generate-all:
     name: "Generate — ${{ matrix.level }}"
     if: github.event.inputs.level == 'all'
     runs-on: ubuntu-latest
     timeout-minutes: 360
-
     strategy:
       fail-fast: false
       matrix:
@@ -111,23 +101,11 @@ jobs:
           - "USMLE Step 1"
           - "USMLE Step 2 CK"
           - "USMLE Step 3"
-
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Show parameters
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  MedBoard Pro — Bulk MCQ Generator (ALL LEVELS)"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  Level:  ${{ matrix.level }}"
-          echo "  Count:  ${{ github.event.inputs.count }} per level"
-          echo "  Mode:   ${{ github.event.inputs.mode }}"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
       - name: Run generator
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -137,12 +115,11 @@ jobs:
           BULK_COUNT:        ${{ github.event.inputs.count }}
           BULK_MODE:         ${{ github.event.inputs.mode }}
           BULK_CONCURRENCY:  "3"
+          GEN_CAP_CEILING:   ${{ github.event.inputs.ceiling }}
         run: node scripts/bulk-generate.js
-
       - name: Done
         if: success()
-        run: echo "✅  ${{ matrix.level }} — complete!"
-
+        run: echo "${{ matrix.level }} complete."
       - name: Failed
         if: failure()
-        run: echo "❌  ${{ matrix.level }} — failed. Check logs above."
+        run: echo "${{ matrix.level }} failed. Check logs."
