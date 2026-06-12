@@ -2887,13 +2887,30 @@ async function fetchConceptBank() {
   return n;
 }
 
+// v7.9.3 — snap a forced --topic to its canonical TOPIC_DISTRIBUTION spelling so a
+// typo in the Actions topic box (case, missing paren, spacing) cannot fork the topic
+// tag and break per-(level,topic) cap accounting. Bulk-only.
+function canonicalizeTopic(level, topic) {
+  if (!topic) return topic;
+  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const cands = (TOPIC_DISTRIBUTION[level] || []).map(t => t.topic);
+  const exact = cands.find(c => c === topic);
+  if (exact) return exact;
+  const want = norm(topic);
+  const ci = cands.find(c => norm(c) === want);
+  if (ci) { console.warn(`[topic] normalized "${topic}" -> "${ci}"`); return ci; }
+  console.warn(`[topic] WARNING: "${topic}" not in ${level} blueprint; stored verbatim (cap accounting may not match).`);
+  return topic;
+}
+
 function buildWorkQueue(count, budgets = new Map()) {
   const levels = FILTER_LEVEL ? [FILTER_LEVEL] : Object.keys(TOPIC_DISTRIBUTION);
   const queue  = [];
 
   if (FILTER_TOPIC && FILTER_LEVEL) {
     // Explicit single-topic run bypasses the generation cap by design.
-    for (let i = 0; i < count; i++) queue.push({ level: FILTER_LEVEL, topic: FILTER_TOPIC });
+    const canonTopic = canonicalizeTopic(FILTER_LEVEL, FILTER_TOPIC);
+    for (let i = 0; i < count; i++) queue.push({ level: FILTER_LEVEL, topic: canonTopic });
     return queue;
   }
 
