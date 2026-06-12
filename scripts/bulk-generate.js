@@ -210,14 +210,14 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Cardiomyopathy and pericardial disease", weight: 1 },
     { topic: "Cardiovascular prevention and syncope", weight: 1 },
     { topic: "Type 2 Diagnosis and Management",   weight: 3 },
-    { topic: "Hypothyroidism and Hashimotos",     weight: 2 },
+    { topic: "Hypothyroidism and Hashimotos",     weight: 1 },
     { topic: "Adrenal disorders (IM)",            weight: 1 },
     { topic: "Osteoporosis and calcium-bone (IM)", weight: 1 },
     { topic: "Pituitary and SIADH (IM)",          weight: 1 },
-    { topic: "Diabetes complications and emergencies (IM)", weight: 2 },
+    { topic: "Diabetes complications and emergencies (IM)", weight: 1 },
     { topic: "IBD Crohns and UC",                 weight: 2 },
     { topic: "Cirrhosis",                         weight: 2 },
-    { topic: "Peptic ulcer disease, GERD, H. pylori", weight: 2 },
+    { topic: "Peptic ulcer disease, GERD, H. pylori", weight: 1 },
     { topic: "GI bleeding",                       weight: 1 },
     { topic: "Pancreatitis",                      weight: 1 },
     { topic: "Viral hepatitis and NAFLD",         weight: 1 },
@@ -231,7 +231,7 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Antimicrobial stewardship and resistance", weight: 1 },
     { topic: "Rheumatoid Arthritis",              weight: 2 },
     { topic: "SLE",                               weight: 2 },
-    { topic: "Crystal arthropathy (gout and CPPD)", weight: 2 },
+    { topic: "Crystal arthropathy (gout and CPPD)", weight: 1 },
     { topic: "Systemic vasculitis",               weight: 1 },
     { topic: "Spondyloarthropathy",               weight: 1 },
     { topic: "Osteoarthritis and mechanical back pain", weight: 1 },
@@ -278,6 +278,9 @@ const TOPIC_DISTRIBUTION = {
     { topic: "General internal medicine and patient safety", weight: 1 },
     { topic: "Acute vision loss, red eye, and retinopathy", weight: 1 },
     { topic: "ENT and oral-dental medicine",      weight: 1 },
+    // ── Clinical epidemiology / EBM (cross-content competency) — v7.9.2 ──
+    { topic: "Biostatistics and clinical epidemiology (IM)", weight: 2 },
+    { topic: "Interpretation of the medical literature (IM)", weight: 2 },
   ],
   "USMLE Step 1": [
     { topic: "Systemic Pathology and Pathophysiology",              weight: 24 },
@@ -295,7 +298,7 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Obstetrics and Gynecology",         weight: 5 },
     { topic: "Gestational Diabetes",              weight: 2 },
     { topic: "Prenatal care and obstetric complications (CK)", weight: 2 },
-    { topic: "Pediatrics and Congenital Issues",  weight: 8 },
+    { topic: "Pediatrics and Congenital Issues",  weight: 7 },
     { topic: "GI bleeding and peptic ulcer (CK)", weight: 3 },
     { topic: "Liver and biliary disease (CK)",    weight: 3 },
     { topic: "IBD and diarrheal disease (CK)",    weight: 2 },
@@ -306,7 +309,7 @@ const TOPIC_DISTRIBUTION = {
     { topic: "PE, pleural, and respiratory failure (CK)", weight: 3 },
     { topic: "Anemia and bleeding disorders (CK)", weight: 3 },
     { topic: "Common malignancies and oncologic emergencies (CK)", weight: 4 },
-    { topic: "Psychiatry and Substance Abuse",    weight: 7 },
+    { topic: "Psychiatry and Substance Abuse",    weight: 6 },
     { topic: "Acute Kidney Injury",               weight: 3 },
     { topic: "CKD, electrolytes, and acid-base (CK)", weight: 3 },
     { topic: "Type 2 Diagnosis and Management",   weight: 4 },
@@ -318,7 +321,7 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 4 },
     { topic: "Rheumatologic and musculoskeletal disease (CK)", weight: 4 },
     { topic: "Dermatology (CK)",                  weight: 3 },
-    { topic: "Biostatistics and epidemiology (CK)", weight: 1 },
+    { topic: "Biostatistics and epidemiology (CK)", weight: 3 },
   ],
   "USMLE Step 3": [
     // ── FIP — Foundations of Independent Practice (24/100) ───────────────────
@@ -2495,12 +2498,21 @@ function buildPrompt(level, topic) {
       {s:"MOST APPROPRIATE DISPOSITION, TRANSITION OF CARE, or systems and cost decision (Systems-Based Practice)",w:5}
     ];
   } else if (isABIM_IM) {
+    if (/biostat|clinical epidemiolog|medical literature/i.test(promptTopic)) {
+      qTypePool = [
+        {s:"INTERPRETATION OF STUDY DATA or a 2x2 table — sensitivity, specificity, PPV/NPV, or likelihood ratios to guide a clinical decision",w:35},
+        {s:"CALCULATION OR INTERPRETATION of an effect measure (RR, OR, ARR, RRR, NNT, NNH) or its confidence interval",w:30},
+        {s:"INTERPRETATION OF STUDY DESIGN, bias, confounding, or selection of the appropriate statistical test",w:20},
+        {s:"INTERPRETATION OF A SCREENING or diagnostic-accuracy scenario — pre-/post-test probability, lead-time/length-time bias",w:15}
+      ];
+    } else {
     qTypePool = [
       {s:"MOST APPROPRIATE NEXT TREATMENT STEP given organ dysfunction, intolerance, or comorbidity conflict",w:40},
       {s:"MOST APPROPRIATE MANAGEMENT when first-line therapy has failed or is contraindicated",w:35},
       {s:"MOST APPROPRIATE DRUG CHOICE given specific comorbidity profile (CKD, HF, DM, prior ASCVD)",w:20},
       {s:"MOST APPROPRIATE NEXT STEP when risk stratification tools yield borderline or conflicting results",w:5}
     ];
+    }
   } else if (isABIM_Endo) {
     qTypePool = [
       {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given an atypical or guideline-edge scenario",w:35},
