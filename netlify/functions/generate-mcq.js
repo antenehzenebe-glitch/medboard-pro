@@ -2045,10 +2045,11 @@ function validateChoiceCompleteness(p) {
 // happens to share a contraindication with the correct answer); items it flags
 // should be human-reviewed rather than silently discarded.
 function flagDrugCurrency(p) {
-  // v7.9.6 -- drug-currency guardrail. Returns { hard: [...], warn: [...] }.
+  // v7.9.8 -- drug-currency guardrail. Returns { hard: [...], warn: [...] }.
   // Stops the generation model from re-introducing superseded drugs / orderings.
-  // All three checks ship WARN-mode (push to warn[]); hard[] stays empty until a
-  // check is promoted after >=2 clean verify-pass batches (Check A first, ~0 FP backtested).
+  // Check A (superseded drug in keyed answer) is HARD-reject (promoted v7.9.7, ~0 FP
+  // backtested + clean vs live Endo bank). Checks B and C remain WARN-mode pending
+  // their own backtests; Check B's SGLT2i-exposure detector is negation-aware (v7.9.8).
   // Scope = the KEYED answer only (backtested: keyed-scope ~0 FP vs whole-item FP).
   if (!p) return { hard: [], warn: [] };
   const hard = [];
@@ -2094,7 +2095,15 @@ function flagDrugCurrency(p) {
   const initSglt2iInKey = /\b(start|initiate|add|begin|commence)\b(?:\s+\w+){0,3}\s+(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(keyText);
   const t2dCkd = /type 2 diabetes|T2DM|type 2 diabetic/i.test(stem)
     && /(CKD|chronic kidney disease|eGFR|albuminuria|UACR|urine albumin|proteinuria|diabetic (?:kidney|nephropathy))/i.test(stem);
-  const sglt2iNaive = !/(already (?:on|taking)|currently (?:on|taking)|maintained on|established on|continues?|receiving)\s+[^.]{0,40}(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(stem);
+  // v7.9.8 -- negation-aware SGLT2i-exposure detection (replaces brittle phrase list).
+  // "Current regimen: ...empagliflozin" / bare "on <SGLT2i>" => experienced; "not
+  // currently on an SGLT2 inhibitor" / "SGLT2i-naive" => naive. Fixes 2 FP + 1 FN from
+  // the live Endo backtest.
+  const _negSglt2i = /(SGLT2[\s-]?(?:inhibitor)?[\s-]?na[i\u00EF]ve)|(\b(?:not|never|without|denies|no)\b[^.]{0,30}(?:SGLT2|empagliflozin|dapagliflozin|canagliflozin|ertugliflozin))/i;
+  const _explicitNaive = _negSglt2i.test(stem);
+  const _stemNoNeg = stem.replace(/\b(?:not|never|without|denies|no)\b[^.]{0,30}(?:SGLT2|empagliflozin|dapagliflozin|canagliflozin|ertugliflozin)/ig, " ");
+  const _sglt2iExperienced = /(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(_stemNoNeg);
+  const sglt2iNaive = _explicitNaive || !_sglt2iExperienced;
   if (initMraInKey && !initSglt2iInKey && !SGLT2I.test(keyText) && SGLT2I.test(choicesText) && t2dCkd && sglt2iNaive) {
     warn.push("[B] MRA initiated as the keyed add-on in an SGLT2i-naive T2D + CKD/albuminuria stem with an SGLT2i offered -- SGLT2i is the first pillar; finerenone layers after SGLT2i. Verify key.");
   }
