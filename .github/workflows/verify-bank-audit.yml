@@ -1,0 +1,57 @@
+name: Verify-Pass Bank Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: "Exam level to audit (all = every servable level)"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "ABIM Endocrinology"
+          - "ABIM Internal Medicine"
+          - "USMLE Step 1"
+          - "USMLE Step 2 CK"
+          - "USMLE Step 3"
+      limit:
+        description: "Cap items for a pilot run (0 = whole bank)"
+        required: false
+        default: "50"
+      model:
+        description: "Verifier model id"
+        required: false
+        default: "claude-opus-4-8"
+      concurrency:
+        description: "Parallel verifier calls"
+        required: false
+        default: "6"
+
+jobs:
+  audit:
+    name: "Verify-pass bank audit"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Run bank audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          AUDIT_LEVEL:       ${{ github.event.inputs.level }}
+          AUDIT_LIMIT:       ${{ github.event.inputs.limit }}
+          VERIFY_MODEL:      ${{ github.event.inputs.model }}
+          AUDIT_CONCURRENCY: ${{ github.event.inputs.concurrency }}
+        run: node scripts/verify-bank-audit.js
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-bank-audit-report
+          path: verify-bank-audit-report.json
+          if-no-files-found: ignore
