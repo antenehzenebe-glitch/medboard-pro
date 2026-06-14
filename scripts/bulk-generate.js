@@ -1,4 +1,5 @@
 // bulk-generate.js — MedBoard Pro
+// v8.0.0 - Step 3 dist granularized 24->47 + selfVerify checks 6 (sequencing) & 7 (single-best); parity both generators.
 // v7.9.0 — blueprint-aligned TOPIC_DISTRIBUTION rebuild (5 levels sum to 100 = exam %) + per-level targets; nutrition injection retired (bulk-only).
 // v7.8.0 — blueprint-proportional cap + blueprint-weighted (deficit) draw; restores pre-B3 weighting (bulk-only).
 // v7.7.0 — Phase-2 cross-run concept-saturation (warn-mode, bulk-only): candidate stems+keys
@@ -355,31 +356,55 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Biostatistics and epidemiology (CK)", weight: 3 },
   ],
   "USMLE Step 3": [
-    // ── FIP — Foundations of Independent Practice (24/100) ───────────────────
-    { topic: "Biostatistics, Epidemiology and Population Health (S3-FIP)", weight: 9 },
-    { topic: "Interpretation of the Medical Literature (S3-FIP)", weight: 4 },
-    { topic: "Patient Safety, Medical Ethics, HIPAA Law, and End-of-Life Care", weight: 7 },
+    // v8.0.0 — granularized 24->47 to break archetype saturation. Bucket totals (FIP 24 / ACM 76) & weight sum (100) preserved.
+    // -- FIP - Foundations of Independent Practice (24/100) --------------------
+    { topic: "Study design and bias (S3-FIP)", weight: 2 },
+    { topic: "Diagnostic test statistics - sensitivity, specificity, PPV/NPV, LR (S3-FIP)", weight: 2 },
+    { topic: "Measures of association and effect - RR, OR, HR, ARR, NNT (S3-FIP)", weight: 2 },
+    { topic: "Screening - lead-time and length-time bias (S3-FIP)", weight: 2 },
+    { topic: "Confounding and causal inference (S3-FIP)", weight: 1 },
+    { topic: "Trial interpretation - RCT validity and results (S3-FIP)", weight: 2 },
+    { topic: "Survival analysis and time-to-event interpretation (S3-FIP)", weight: 2 },
+    { topic: "Medical ethics - capacity, consent, and surrogate decision-making", weight: 3 },
+    { topic: "End-of-life care, advance directives, and code-status consent", weight: 2 },
+    { topic: "Patient safety, error disclosure, and HIPAA", weight: 2 },
     { topic: "Systems-Based Practice and Quality Improvement (S3-FIP)", weight: 2 },
     { topic: "Communication and Interpersonal Skills (S3-FIP)", weight: 2 },
-    // ── ACM — Advanced Clinical Medicine (76/100) ────────────────────────────
-    { topic: "ACS STEMI NSTEMI",                  weight: 3 },
-    { topic: "Heart failure and chronic CV management (S3)", weight: 4 },
+    // -- ACM - Advanced Clinical Medicine (76/100) ----------------------------
+    { topic: "ACS STEMI NSTEMI", weight: 3 },
+    { topic: "Heart failure - GDMT optimization and device candidacy (S3)", weight: 2 },
+    { topic: "Heart failure - acute decompensation and volume management (S3)", weight: 2 },
     { topic: "Hypertension and CV prevention (S3)", weight: 3 },
-    { topic: "Type 2 Diagnosis and Management",   weight: 4 },
+    { topic: "Type 2 diabetes - pharmacologic selection and cardiorenal risk (S3)", weight: 2 },
+    { topic: "Type 2 diabetes - older-adult de-intensification and hypoglycemia (S3)", weight: 2 },
     { topic: "Chronic disease nutrition management", weight: 3 },
     { topic: "Thyroid and metabolic management (S3)", weight: 2 },
-    { topic: "Sepsis and Septic Shock",           weight: 3 },
-    { topic: "Outpatient and chronic infection management (S3)", weight: 7 },
-    { topic: "CKD",                               weight: 3 },
-    { topic: "AKI, electrolytes, and GU (S3)",    weight: 3 },
-    { topic: "Pulmonary Embolism",                weight: 3 },
+    { topic: "Sepsis and Septic Shock", weight: 3 },
+    { topic: "HIV management and antiretroviral resistance (S3)", weight: 2 },
+    { topic: "Prosthetic-joint infection and outpatient antibiotic therapy (S3)", weight: 2 },
+    { topic: "Chronic viral hepatitis and tuberculosis management (S3)", weight: 2 },
+    { topic: "Outpatient antibiotic stewardship and common infections (S3)", weight: 1 },
+    { topic: "CKD", weight: 3 },
+    { topic: "AKI, electrolytes, and GU (S3)", weight: 3 },
+    { topic: "Pulmonary Embolism", weight: 3 },
     { topic: "Asthma, COPD, and chronic pulmonary care (S3)", weight: 3 },
-    { topic: "GI and hepatobiliary management (S3)", weight: 7 },
-    { topic: "Psychiatry and Substance Abuse",    weight: 6 },
-    { topic: "Obstetrics and Gynecology",         weight: 5 },
-    { topic: "Hematology, oncology, and survivorship (S3)", weight: 6 },
-    { topic: "Neurologic disease management (S3)", weight: 4 },
-    { topic: "Geriatric and chronic disease management (S3)", weight: 4 },
+    { topic: "Inflammatory bowel disease (IBD) management (S3)", weight: 2 },
+    { topic: "Cirrhosis and portal hypertension complications (S3)", weight: 2 },
+    { topic: "Pancreaticobiliary and hepatobiliary disease (S3)", weight: 2 },
+    { topic: "Gastrointestinal bleeding and luminal disease (S3)", weight: 1 },
+    { topic: "Substance use disorders - opioid and alcohol (S3)", weight: 2 },
+    { topic: "Mood, anxiety, and psychiatric disorder management (S3)", weight: 2 },
+    { topic: "Psychiatric emergencies and safety (S3)", weight: 2 },
+    { topic: "Hypertensive disorders of pregnancy - obstetric management (S3)", weight: 2 },
+    { topic: "Antepartum and postpartum obstetric complications (S3)", weight: 2 },
+    { topic: "Gynecologic and contraceptive management (S3)", weight: 1 },
+    { topic: "Hematologic disorders - anemia, cytopenias, coagulation (S3)", weight: 2 },
+    { topic: "Oncologic management and treatment selection (S3)", weight: 2 },
+    { topic: "Oncologic survivorship and treatment complications (S3)", weight: 2 },
+    { topic: "Stroke and cerebrovascular management (S3)", weight: 2 },
+    { topic: "Seizure, headache, and neuromuscular management (S3)", weight: 2 },
+    { topic: "Geriatric polypharmacy and deprescribing (S3)", weight: 2 },
+    { topic: "Geriatric syndromes - falls, frailty, and cognition (S3)", weight: 2 },
     { topic: "Preventive care and health maintenance (S3)", weight: 3 },
   ],
 };
@@ -2764,7 +2789,9 @@ MANDATORY SELF-VERIFICATION — complete all 5 checks before calling emit_mcq:
 2. CORRECT ANSWER DEFENSIBILITY: Does your correct answer remain correct against current guidelines if a subspecialist challenges it?
 3. DISTRACTOR AUDIT: Would any distractor actually be chosen by a guideline-following clinician for THIS specific patient profile? If yes, reconsider — distractors must be wrong for a specific, statable reason.
 4. NUMERIC CONSISTENCY: Do all lab values in the explanation EXACTLY match the stem?
-5. CITATION ACCURACY: Did you cite a real trial with real data? Do not fabricate co-authoring organizations or joint guidelines.`;
+5. CITATION ACCURACY: Did you cite a real trial with real data? Do not fabricate co-authoring organizations or joint guidelines.
+6. SEQUENCING / FIRST-PILLAR: For T2D with albuminuric CKD (eGFR >=20) or HFrEF, an SGLT2 inhibitor is the FIRST pillar - do NOT key finerenone, a GLP-1 RA, or an MRA over an SGLT2i-naive patient (those layer AFTER an SGLT2i). For lipid lowering, escalate by the LDL gap to goal (ezetimibe -> PCSK9i; bempedoic acid only on the statin-intolerant branch). NEVER justify a ranking with a society-year guideline mandate you cannot verify (e.g., a drug-X-before-drug-Y rule that does not exist); if unsure, omit the citation and choose by magnitude of benefit.
+7. SINGLE-BEST UNIQUENESS: Re-read all five options as if blinded to your key. If a NON-keyed option is also guideline-correct or co-valid for THIS exact patient (e.g., two different GLP-1 RAs, an SGLT2i and an MRA both indicated, or two screening modalities both due), the item is INVALID - redesign the scenario or distractors so exactly one option is defensibly best.`;
 
   const userText = isStep1
   ? `Write 1 vignette on: ${promptTopic}.
