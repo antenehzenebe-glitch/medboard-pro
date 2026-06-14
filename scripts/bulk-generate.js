@@ -2261,7 +2261,7 @@ function flagDrugCurrency(p) {
   ];
   for (const d of SUPERSEDED_DRUGS) {
     if (d.pat.test(keyText)) {
-      warn.push("[A] keyed answer names a superseded/withdrawn drug (" + d.note + "); current standard: " + d.current + ". Verify key.");
+      hard.push("[A] keyed answer names a superseded/withdrawn drug (" + d.note + "); current standard: " + d.current + ". Verify key.");
     }
   }
 
