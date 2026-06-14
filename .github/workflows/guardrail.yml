@@ -1,0 +1,34 @@
+name: Drug-currency guardrail
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax-check both generators
+        run: |
+          node --check netlify/functions/generate-mcq.js
+          node --check scripts/bulk-generate.js
+
+      - name: Generator parity (flagDrugCurrency byte-identical)
+        run: |
+          awk '/^function flagDrugCurrency\(p\) \{/{f=1} f{print} f&&/^\}/{exit}' netlify/functions/generate-mcq.js > /tmp/a.js
+          awk '/^function flagDrugCurrency\(p\) \{/{f=1} f{print} f&&/^\}/{exit}' scripts/bulk-generate.js > /tmp/b.js
+          diff /tmp/a.js /tmp/b.js
+
+      - name: Check B regression (0 FP / 0 FN)
+        run: node scripts/test-drug-currency.js
