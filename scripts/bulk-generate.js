@@ -1784,7 +1784,7 @@ const CITATION_LOCK_ENFORCE = true; // set false for warn-only during initial ro
 const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "SSC", "ASPEN", "ATTD", "ASAS"]
   .sort((a, b) => b.length - a.length);
 
-const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0, _warnCrossRunDup: 0, _warnVerifyMiskey: 0 };
+const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0, _warnCrossRunDup: 0, _warnVerifyMiskey: 0, _warnDrugCurrency: 0, _drugCurrencyRejected: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
@@ -2225,6 +2225,73 @@ function validateChoiceCompleteness(p) {
 // (a pertinent negative may legitimately rule out a competing differential that
 // happens to share a contraindication with the correct answer); items it flags
 // should be human-reviewed rather than silently discarded.
+function flagDrugCurrency(p) {
+  // v7.9.6 -- drug-currency guardrail. Returns { hard: [...], warn: [...] }.
+  // Stops the generation model from re-introducing superseded drugs / orderings.
+  // All three checks ship WARN-mode (push to warn[]); hard[] stays empty until a
+  // check is promoted after >=2 clean verify-pass batches (Check A first, ~0 FP backtested).
+  // Scope = the KEYED answer only (backtested: keyed-scope ~0 FP vs whole-item FP).
+  if (!p) return { hard: [], warn: [] };
+  const hard = [];
+  const warn = [];
+  const stem = String(p.stem || "");
+  const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
+  const choicesText = choicesArr.join(" | ");
+  const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
+  let keyText = "";
+  if (keyRef != null) {
+    if (choicesObj && choicesObj[keyRef] != null) {
+      keyText = String(choicesObj[keyRef]);
+    } else if (/^[A-E]$/i.test(String(keyRef))) {
+      const _i = String(keyRef).toUpperCase().charCodeAt(0) - 65;
+      if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
+    } else {
+      keyText = String(keyRef);
+    }
+  }
+
+  // Check A -- superseded/withdrawn drug named in the KEYED answer. Extensible table;
+  // seed is the backtested entry only (rhPTH(1-84)/Natpara, withdrawn 2024). Add new
+  // rows only after each is FP-backtested against the live bank.
+  const SUPERSEDED_DRUGS = [
+    { pat: /\b(rhPTH\s*\(?\s*1\s*-\s*84\s*\)?|recombinant human PTH\s*\(?\s*1\s*-\s*84\s*\)?|Natpara)\b/i,
+      current: "palopegteriparatide (Yorvipath / TransCon PTH, FDA 2024)",
+      note: "rhPTH(1-84)/Natpara was withdrawn" }
+  ];
+  for (const d of SUPERSEDED_DRUGS) {
+    if (d.pat.test(keyText)) {
+      warn.push("[A] keyed answer names a superseded/withdrawn drug (" + d.note + "); current standard: " + d.current + ". Verify key.");
+    }
+  }
+
+  // Check B -- MRA initiated as the keyed add-on in an SGLT2i-naive T2D + CKD/albuminuria
+  // stem with an SGLT2i offered. SGLT2i is the first cardiorenal pillar; finerenone layers
+  // AFTER SGLT2i. Refined per backtest (FP 67d9d051 = "discontinue spironolactone + start
+  // dapagliflozin"): the initiation verb must BIND to the MRA, the key must not itself
+  // start/contain an SGLT2i, and the stem must be SGLT2i-naive.
+  const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
+  const initMraInKey   = /\b(start|initiate|add|begin|commence)\b(?:\s+\w+){0,3}\s+(finerenone|spironolactone|eplerenone)\b/i.test(keyText);
+  const initSglt2iInKey = /\b(start|initiate|add|begin|commence)\b(?:\s+\w+){0,3}\s+(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(keyText);
+  const t2dCkd = /type 2 diabetes|T2DM|type 2 diabetic/i.test(stem)
+    && /(CKD|chronic kidney disease|eGFR|albuminuria|UACR|urine albumin|proteinuria|diabetic (?:kidney|nephropathy))/i.test(stem);
+  const sglt2iNaive = !/(already (?:on|taking)|currently (?:on|taking)|maintained on|established on|continues?|receiving)\s+[^.]{0,40}(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(stem);
+  if (initMraInKey && !initSglt2iInKey && !SGLT2I.test(keyText) && SGLT2I.test(choicesText) && t2dCkd && sglt2iNaive) {
+    warn.push("[B] MRA initiated as the keyed add-on in an SGLT2i-naive T2D + CKD/albuminuria stem with an SGLT2i offered -- SGLT2i is the first pillar; finerenone layers after SGLT2i. Verify key.");
+  }
+
+  // Check C -- renally-cleared beta-blocker (atenolol) keyed at eGFR < 45 with propranolol
+  // offered. Atenolol accumulates in CKD; propranolol (hepatic clearance + blocks peripheral
+  // T4->T3) is preferred in thyrotoxicosis + renal impairment.
+  const eg = stem.match(/eGFR[^0-9]{0,6}(\d{1,3})/i);
+  const lowEgfr = eg ? parseInt(eg[1], 10) < 45 : false;
+  if (/\batenolol\b/i.test(keyText) && lowEgfr && /\bpropranolol\b/i.test(choicesText)) {
+    warn.push("[C] atenolol (renally cleared) keyed at eGFR " + eg[1] + " with propranolol offered -- atenolol accumulates in CKD; propranolol (hepatic + blocks peripheral T4->T3) is preferred. Verify key.");
+  }
+
+  return { hard, warn };
+}
+
 function detectAntiCueingViolation(p) {
   if (!p || !p.stem || !p.choices || !p.correct) return false;
 
@@ -2706,6 +2773,7 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { const _tm = flagTopicMismatch(p); if (_tm.hardReject) { console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_topicMismatchRejected'); } if (_tm.warn) { console.warn('[warn] ' + _tm.reason); dropTally._warnTopicMismatch++; } } // PART 2d: topic-consistency guard (B2)
   // SGLT2i-deprioritization cardiorenal mis-key (HARD-REJECT — promoted from warn; H1 key-resolution fixed + weight/glycemia tie-break)
   { const _crmk = flagCardiorenalMiskey(p); if (_crmk.hard.length) { console.warn('[REJECT] cardiorenal mis-key :: ' + _crmk.hard.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_cardiorenalRejected'); } if (_crmk.warn.length) { dropTally._warnCardiorenal += _crmk.warn.length; for (const _w of _crmk.warn) console.warn('[warn] cardiorenal:', _w); } }
+  { const _dc = flagDrugCurrency(p); if (_dc.hard.length) { console.warn('[REJECT] drug-currency :: ' + _dc.hard.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_drugCurrencyRejected'); } if (_dc.warn.length) { dropTally._warnDrugCurrency += _dc.warn.length; for (const _w of _dc.warn) console.warn('[warn] drug-currency:', _w); } } // v7.9.6 drug-currency guardrail (warn-mode; hard branch inert until promotion)
   // T1D cardiorenal/pharmacotherapy mis-key (warn-mode) -- non-blocking; promote to hard-reject after >=2 clean batches
   { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) { dropTally._warnT1DCardiorenal++; for (const _w of _t1dcr) console.warn('[warn] T1D cardiorenal mis-key:', _w); } }
   { const _ms = flagMetforminEgfr(p); if (_ms.length) { dropTally._warnMetforminEgfr++; for (const _w of _ms) console.warn('[warn] metformin-eGFR:', _w); } }
@@ -3296,6 +3364,7 @@ async function main() {
   console.log(`║  Unseeded-citation warns: ${String(dropTally._warnUnseeded).padEnd(21)}║`);
   console.log(`║  Interchangeable-agent warns: ${String(dropTally._warnInterchange).padEnd(17)}║`);
   console.log(`║  Cardiorenal H2 warns: ${String(dropTally._warnCardiorenal).padEnd(24)}║`);
+  console.log(`║  Drug-currency warns:  ${String(dropTally._warnDrugCurrency).padEnd(24)}║`);
   console.log(`║  Semantic near-dup warns: ${String(dropTally._warnSemanticDup).padEnd(21)}║`);
   console.log(`║  Concept-saturation drops: ${String(dropTally._conceptSaturated).padEnd(20)}║`);
   console.log(`║  Metformin-eGFR warns: ${String(dropTally._warnMetforminEgfr).padEnd(24)}║`);

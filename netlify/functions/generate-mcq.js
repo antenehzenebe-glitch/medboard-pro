@@ -2044,6 +2044,73 @@ function validateChoiceCompleteness(p) {
 // (a pertinent negative may legitimately rule out a competing differential that
 // happens to share a contraindication with the correct answer); items it flags
 // should be human-reviewed rather than silently discarded.
+function flagDrugCurrency(p) {
+  // v7.9.6 -- drug-currency guardrail. Returns { hard: [...], warn: [...] }.
+  // Stops the generation model from re-introducing superseded drugs / orderings.
+  // All three checks ship WARN-mode (push to warn[]); hard[] stays empty until a
+  // check is promoted after >=2 clean verify-pass batches (Check A first, ~0 FP backtested).
+  // Scope = the KEYED answer only (backtested: keyed-scope ~0 FP vs whole-item FP).
+  if (!p) return { hard: [], warn: [] };
+  const hard = [];
+  const warn = [];
+  const stem = String(p.stem || "");
+  const choicesObj = (p.choices && typeof p.choices === "object" && !Array.isArray(p.choices)) ? p.choices : null;
+  const choicesArr = Array.isArray(p.choices) ? p.choices : (choicesObj ? Object.values(p.choices) : []);
+  const choicesText = choicesArr.join(" | ");
+  const keyRef = (p.correct_answer != null) ? p.correct_answer : (p.correct != null ? p.correct : null);
+  let keyText = "";
+  if (keyRef != null) {
+    if (choicesObj && choicesObj[keyRef] != null) {
+      keyText = String(choicesObj[keyRef]);
+    } else if (/^[A-E]$/i.test(String(keyRef))) {
+      const _i = String(keyRef).toUpperCase().charCodeAt(0) - 65;
+      if (choicesArr[_i] != null) keyText = String(choicesArr[_i]);
+    } else {
+      keyText = String(keyRef);
+    }
+  }
+
+  // Check A -- superseded/withdrawn drug named in the KEYED answer. Extensible table;
+  // seed is the backtested entry only (rhPTH(1-84)/Natpara, withdrawn 2024). Add new
+  // rows only after each is FP-backtested against the live bank.
+  const SUPERSEDED_DRUGS = [
+    { pat: /\b(rhPTH\s*\(?\s*1\s*-\s*84\s*\)?|recombinant human PTH\s*\(?\s*1\s*-\s*84\s*\)?|Natpara)\b/i,
+      current: "palopegteriparatide (Yorvipath / TransCon PTH, FDA 2024)",
+      note: "rhPTH(1-84)/Natpara was withdrawn" }
+  ];
+  for (const d of SUPERSEDED_DRUGS) {
+    if (d.pat.test(keyText)) {
+      warn.push("[A] keyed answer names a superseded/withdrawn drug (" + d.note + "); current standard: " + d.current + ". Verify key.");
+    }
+  }
+
+  // Check B -- MRA initiated as the keyed add-on in an SGLT2i-naive T2D + CKD/albuminuria
+  // stem with an SGLT2i offered. SGLT2i is the first cardiorenal pillar; finerenone layers
+  // AFTER SGLT2i. Refined per backtest (FP 67d9d051 = "discontinue spironolactone + start
+  // dapagliflozin"): the initiation verb must BIND to the MRA, the key must not itself
+  // start/contain an SGLT2i, and the stem must be SGLT2i-naive.
+  const SGLT2I = /empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2/i;
+  const initMraInKey   = /\b(start|initiate|add|begin|commence)\b(?:\s+\w+){0,3}\s+(finerenone|spironolactone|eplerenone)\b/i.test(keyText);
+  const initSglt2iInKey = /\b(start|initiate|add|begin|commence)\b(?:\s+\w+){0,3}\s+(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(keyText);
+  const t2dCkd = /type 2 diabetes|T2DM|type 2 diabetic/i.test(stem)
+    && /(CKD|chronic kidney disease|eGFR|albuminuria|UACR|urine albumin|proteinuria|diabetic (?:kidney|nephropathy))/i.test(stem);
+  const sglt2iNaive = !/(already (?:on|taking)|currently (?:on|taking)|maintained on|established on|continues?|receiving)\s+[^.]{0,40}(empagliflozin|dapagliflozin|canagliflozin|ertugliflozin|SGLT2)/i.test(stem);
+  if (initMraInKey && !initSglt2iInKey && !SGLT2I.test(keyText) && SGLT2I.test(choicesText) && t2dCkd && sglt2iNaive) {
+    warn.push("[B] MRA initiated as the keyed add-on in an SGLT2i-naive T2D + CKD/albuminuria stem with an SGLT2i offered -- SGLT2i is the first pillar; finerenone layers after SGLT2i. Verify key.");
+  }
+
+  // Check C -- renally-cleared beta-blocker (atenolol) keyed at eGFR < 45 with propranolol
+  // offered. Atenolol accumulates in CKD; propranolol (hepatic clearance + blocks peripheral
+  // T4->T3) is preferred in thyrotoxicosis + renal impairment.
+  const eg = stem.match(/eGFR[^0-9]{0,6}(\d{1,3})/i);
+  const lowEgfr = eg ? parseInt(eg[1], 10) < 45 : false;
+  if (/\batenolol\b/i.test(keyText) && lowEgfr && /\bpropranolol\b/i.test(choicesText)) {
+    warn.push("[C] atenolol (renally cleared) keyed at eGFR " + eg[1] + " with propranolol offered -- atenolol accumulates in CKD; propranolol (hepatic + blocks peripheral T4->T3) is preferred. Verify key.");
+  }
+
+  return { hard, warn };
+}
+
 function detectAntiCueingViolation(p) {
   if (!p || !p.stem || !p.choices || !p.correct) return false;
 
@@ -2625,10 +2692,11 @@ exports.handler = async function (event) {
       const phantomOk     = validateNoPhantomCitations(p);
       const topicOk       = (() => { const _tm = flagTopicMismatch(p); if (_tm.hardReject) console.warn('[REJECT] ' + _tm.reason + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return !_tm.hardReject; })(); // B2 hard gate (parity)
       const cardiorenalOk = (() => { const _crmk = flagCardiorenalMiskey(p); if (_crmk.hard.length) console.warn('[REJECT] cardiorenal mis-key: ' + _crmk.hard.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return _crmk.hard.length === 0; })(); // cardiorenal hard gate (parity, promoted from warn)
+      const currencyOk    = (() => { const _dc = flagDrugCurrency(p); if (_dc.hard.length) console.warn('[REJECT] drug-currency: ' + _dc.hard.join('; ') + ' :: "' + String(p.stem||'').slice(0,80) + '"'); return _dc.hard.length === 0; })(); // v7.9.6 drug-currency hard gate (parity; inert while all checks warn-mode)
       isValid = demoOk && consistencyOk && choicesOk && cueingFree
              && leadInOk && negFormOk && assocOk && vagueOk
              && adjectivesOk && pejorativeOk && aotaOk && siteOfCareOk
-             && citationOk && phantomOk && topicOk && cardiorenalOk;
+             && citationOk && phantomOk && topicOk && cardiorenalOk && currencyOk;
 
       if (!isValid && attempts === 3) {
         const fbResult  = await callGemini(pd.systemText, pd.userText, pd.maxTokens);
@@ -2648,7 +2716,7 @@ exports.handler = async function (event) {
                && validateSiteOfCare(p)
                && validateCitationYears(p)
                && validateNoPhantomCitations(p)
-               && !flagTopicMismatch(p).hardReject && flagCardiorenalMiskey(p).hard.length === 0; // B2 + cardiorenal hard gates (parity)
+               && !flagTopicMismatch(p).hardReject && flagCardiorenalMiskey(p).hard.length === 0 && flagDrugCurrency(p).hard.length === 0; // B2 + cardiorenal + drug-currency hard gates (parity)
       }
     }
 
@@ -2658,6 +2726,7 @@ exports.handler = async function (event) {
     // SGLT2i-deprioritization cardiorenal mis-key (warn-mode) -- non-blocking
     // cardiorenal mis-key now hard-reject gated upstream in isValid (PART 2 warn retired)
     { const _crmk = flagCardiorenalMiskey(p); if (_crmk.warn.length) _crmk.warn.forEach(_w => console.warn('[warn] cardiorenal: ' + _w)); } // H2 SGLT2i<->hyperkalemia warn (demoted from hard-reject, v7.9.1)
+    { const _dc = flagDrugCurrency(p); if (_dc.warn.length) _dc.warn.forEach(_w => console.warn('[warn] drug-currency: ' + _w)); } // v7.9.6 drug-currency warn-mode (non-blocking)
     { const _t1dcr = flagT1DCardiorenal(p); if (_t1dcr.length) _t1dcr.forEach(_w => console.warn('[warn] T1D cardiorenal mis-key: ' + _w)); } // PART 2e: T1D cardiorenal/pharmacotherapy mis-key (warn-mode)
     { const _ms = flagMetforminEgfr(p); if (_ms.length) _ms.forEach(_w => console.warn('[warn] metformin-eGFR: ' + _w)); }
     { const _ss = flagSlidingScaleInsulin(p); if (_ss.length) _ss.forEach(_w => console.warn('[warn] sliding-scale insulin: ' + _w)); }
