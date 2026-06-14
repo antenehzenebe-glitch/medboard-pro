@@ -50,6 +50,18 @@ on:
         options:
           - standard
           - batch
+      verify_pass:
+        description: "Verify-pass mis-key detector (1=on, warn-only, ~2x cost)"
+        required: false
+        default: "0"
+        type: choice
+        options:
+          - "0"
+          - "1"
+      verify_model:
+        description: "Verifier model (blank=same; claude-opus-4-8=cross-model)"
+        required: false
+        default: ""
 
 jobs:
   generate-single:
@@ -79,6 +91,8 @@ jobs:
           BULK_TOPIC:        ${{ github.event.inputs.topic }}
           BULK_MODE:         ${{ github.event.inputs.mode }}
           GEN_CAP_CEILING:   ${{ github.event.inputs.ceiling }}
+          VERIFY_PASS:       ${{ github.event.inputs.verify_pass }}
+          VERIFY_MODEL:      ${{ github.event.inputs.verify_model }}
         run: node scripts/bulk-generate.js
       - name: Done
         if: success()
@@ -116,6 +130,8 @@ jobs:
           BULK_MODE:         ${{ github.event.inputs.mode }}
           BULK_CONCURRENCY:  "3"
           GEN_CAP_CEILING:   ${{ github.event.inputs.ceiling }}
+          VERIFY_PASS:       ${{ github.event.inputs.verify_pass }}
+          VERIFY_MODEL:      ${{ github.event.inputs.verify_model }}
         run: node scripts/bulk-generate.js
       - name: Done
         if: success()
