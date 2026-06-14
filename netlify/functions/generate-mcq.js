@@ -2340,6 +2340,15 @@ function buildPrompt(level, topic, isNutrition) {
       {s:"MOST APPROPRIATE PRACTICE-BASED LEARNING or quality-improvement response",w:4}
     ];
   } else if (isStep3) {
+    if (/biostat|epidemiolog|medical literature/i.test(promptTopic)) {
+      // v7.9.5 — Step 3 FIP biostat/lit: force EBM lead-ins (parity with bulk-generate.js)
+      qTypePool = [
+        {s:"INTERPRETATION OF STUDY DATA or a 2x2 table — sensitivity, specificity, PPV/NPV, or likelihood ratios to guide a clinical decision",w:30},
+        {s:"CALCULATION OR INTERPRETATION of an effect measure (RR, OR, ARR, RRR, NNT, NNH) or its confidence interval, including translating relative to absolute risk for shared decision-making",w:30},
+        {s:"INTERPRETATION OF STUDY DESIGN, bias, confounding, external validity/generalizability, or selection of the appropriate statistical test",w:20},
+        {s:"APPRAISAL OF A SCREENING or population-health program — pre-/post-test probability, lead-time/length-time bias, or critique of a screening recommendation",w:20}
+      ];
+    } else {
     qTypePool = [
       {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
       {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
@@ -2347,6 +2356,7 @@ function buildPrompt(level, topic, isNutrition) {
       {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
       {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
     ];
+    }
   } else if (isABIM_IM) {
     qTypePool = [
       {s:"MOST APPROPRIATE NEXT TREATMENT STEP given organ dysfunction, intolerance, or comorbidity conflict",w:40},

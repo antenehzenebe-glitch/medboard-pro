@@ -2486,6 +2486,15 @@ function buildPrompt(level, topic) {
       {s:"NEXT STEP IN DIAGNOSTIC WORKUP given an incomplete picture", w:8}
     ];
   } else if (isStep3) {
+    if (/biostat|epidemiolog|medical literature/i.test(promptTopic)) {
+      // v7.9.5 — Step 3 FIP biostat/lit: force EBM lead-ins (mirror of ABIM IM v7.9.2)
+      qTypePool = [
+        {s:"INTERPRETATION OF STUDY DATA or a 2x2 table — sensitivity, specificity, PPV/NPV, or likelihood ratios to guide a clinical decision",w:30},
+        {s:"CALCULATION OR INTERPRETATION of an effect measure (RR, OR, ARR, RRR, NNT, NNH) or its confidence interval, including translating relative to absolute risk for shared decision-making",w:30},
+        {s:"INTERPRETATION OF STUDY DESIGN, bias, confounding, external validity/generalizability, or selection of the appropriate statistical test",w:20},
+        {s:"APPRAISAL OF A SCREENING or population-health program — pre-/post-test probability, lead-time/length-time bias, or critique of a screening recommendation",w:20}
+      ];
+    } else {
     // v7.9.0 — weights = USMLE Step 3 Physician Competency blueprint
     // (Patient Care 30 / Medical Knowledge 20 / Interpersonal & Communication 20 /
     //  Professionalism 15 / Practice-Based Learning 10 / Systems-Based Practice 5).
@@ -2498,6 +2507,7 @@ function buildPrompt(level, topic) {
       {s:"INTERPRETATION OF STUDY DATA, a graph, or evidence to guide care (Practice-Based Learning)",w:10},
       {s:"MOST APPROPRIATE DISPOSITION, TRANSITION OF CARE, or systems and cost decision (Systems-Based Practice)",w:5}
     ];
+    }
   } else if (isABIM_IM) {
     if (/biostat|clinical epidemiolog|medical literature/i.test(promptTopic)) {
       qTypePool = [
