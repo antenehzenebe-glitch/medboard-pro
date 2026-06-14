@@ -1522,7 +1522,8 @@ const ALLOWED_LEAD_INS_BY_LEVEL = {
     "next_step_in_diagnostic_workup",
     "risk_of_future_adverse_event_or_complication",
     "informed_consent_or_ethical_decision",
-    "diagnostic_inference_atypical_presentation"
+    "diagnostic_inference_atypical_presentation",
+    "interpretation_of_data_or_literature"
   ]),
   "ABIM Internal Medicine": new Set([
     "next_step_in_management",
