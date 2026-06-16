@@ -2601,10 +2601,23 @@ function buildPrompt(level, topic) {
                     : isStep2CK ? 2600
                     : 2200;
   let qTypePool = [];
-  if (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
+  if (!isStep1 && (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent"))) {
     qTypePool = [{s:"most appropriate NEXT STEP IN PATIENT COUNSELING",w:40}, {s:"LEGAL OR ETHICAL REQUIREMENT",w:40}];
   } else if (isStep1) {
-    qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
+    if (promptTopic.includes("Behavioral") || promptTopic.includes("Ethics") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent")) {
+      // v8.0.2 - Step 1 behavioral-science branch. Was silently self-rejecting: the shared ethics
+      // pool tags informed_consent_or_ethical_decision, which is NOT in the Step 1 allow-list. Route
+      // behavioral/ethics topics to Step-1-character lead-ins (identify mechanism/stage/disorder,
+      // interpret data) - every option maps to an allow-listed Step 1 enum.
+      qTypePool = [
+        {s:"WHICH DEFENSE MECHANISM, DEVELOPMENTAL STAGE, or learning/conditioning principle is illustrated by the vignette",w:30},
+        {s:"MOST LIKELY behavioral or psychiatric DIAGNOSIS given the developmental or behavioral presentation",w:25},
+        {s:"UNDERLYING NEUROBIOLOGY OR MECHANISM of the behavior, sleep stage, or substance effect",w:20},
+        {s:"INTERPRETATION OF STUDY DATA, a 2x2 table, or a screening-test characteristic (sensitivity/specificity, PPV/NPV, bias, confounding)",w:25}
+      ];
+    } else {
+      qTypePool = [{s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY",w:40}, {s:"MECHANISM OF ACTION OR TOXICITY",w:30}];
+    }
     } else if (isStep2CK) {
     // v7.5.6 — Weights derived from USMLE Step 2 CK Physician Tasks/Competencies blueprint.
     qTypePool = [
