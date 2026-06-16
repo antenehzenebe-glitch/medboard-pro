@@ -1584,6 +1584,8 @@ const ALLOWED_LEAD_INS_BY_LEVEL = {
     "interpretation_of_data_or_literature"
   ]),
   "USMLE Step 3": new Set([
+    "underlying_mechanism_or_pathophysiology",
+    "mechanism_of_action_or_toxicity",
     "next_step_in_management",
     "mixed_management_with_comorbidity",
     "disposition_or_transition_of_care",
@@ -2496,12 +2498,20 @@ function buildPrompt(level, topic, isNutrition) {
         {s:"APPRAISAL OF A SCREENING or population-health program — pre-/post-test probability, lead-time/length-time bias, or critique of a screening recommendation",w:20}
       ];
     } else {
+    // v8.0.1 — Step 3 non-biostat qTypePool reproportioned to USMLE Step 3 Table 3
+    // (Physician Tasks/Competencies, FIP): Diagnosis family ~36 / Management family ~38 /
+    // Applying Foundational Science Concepts 12 (blueprint 11-12%) / Comm-Prof-Systems 14.
+    // EBM (Practice-Based Learning 11-13%) handled upstream by the topic-routed biostat branch.
     qTypePool = [
-      {s:"MOST APPROPRIATE MULTI-STEP MANAGEMENT given facility constraints or patient comorbidities",w:30},
-      {s:"NEXT BEST ACTION when initial management has failed or complications arise",w:25},
-      {s:"MOST APPROPRIATE DISPOSITION OR TRANSITION OF CARE decision",w:20},
-      {s:"MOST LIKELY COMPLICATION of current management and how to address it",w:15},
-      {s:"MOST APPROPRIATE INFORMED CONSENT or ethical decision in a complex clinical scenario",w:10}
+      {s:"NEXT STEP IN DIAGNOSTIC WORKUP or MOST ACCURATE DIAGNOSTIC TEST given an incomplete picture (Patient Care: Diagnosis)",w:18},
+      {s:"DIAGNOSTIC INFERENCE in an atypical or evolving presentation (Patient Care: Diagnosis)",w:10},
+      {s:"RISK OF A FUTURE ADVERSE EVENT, complication, or PROGNOSIS/OUTCOME (Patient Care: Prognosis)",w:8},
+      {s:"MOST APPROPRIATE NEXT STEP IN MANAGEMENT given comorbidities or facility constraints (Patient Care: Management)",w:18},
+      {s:"MOST APPROPRIATE PHARMACOTHERAPY for the clinical scenario (Patient Care: Management)",w:12},
+      {s:"MOST APPROPRIATE CLINICAL INTERVENTION or mixed management given comorbidities (Patient Care: Management)",w:8},
+      {s:"UNDERLYING MECHANISM OR PATHOPHYSIOLOGY of the condition or therapy, framed within a clinical vignette (Medical Knowledge: Applying Foundational Science Concepts)",w:12},
+      {s:"MOST APPROPRIATE DISPOSITION, TRANSITION OF CARE, or systems/cost decision (Systems-Based Practice)",w:8},
+      {s:"MOST APPROPRIATE INFORMED CONSENT, ethical, or counseling decision (Communication/Professionalism)",w:6}
     ];
     }
   } else if (isABIM_IM) {
