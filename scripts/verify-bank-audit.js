@@ -30,6 +30,11 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("SUPABASE_URL and SUPAB
 
 const fs = require("fs");
 
+// ── Diagnostics: capture WHY a verify call failed (fail-open still returns null,
+//    but we aggregate reasons so a dead run is never mistaken for a clean pass). ──
+const failReasons = new Map();
+function noteFail(reason) { failReasons.set(reason, (failReasons.get(reason) || 0) + 1); }
+
 // ── Verbatim copy of the generator's blind verifier (bulk-generate.js) ──
 const VERIFY_TOOL = {
   name: "emit_answer",
@@ -37,7 +42,7 @@ const VERIFY_TOOL = {
   input_schema: { type: "object", properties: { answer: { type: "string", enum: ["A","B","C","D","E"] } }, required: ["answer"] }
 };
 async function verifyKeyConsistency(record) {
-  if (!record || !record.stem || !record.choices || !record.correct_answer) return null;
+  if (!record || !record.stem || !record.choices || !record.correct_answer) { noteFail("bad-record-shape (missing stem/choices/correct_answer)"); return null; }
   const letters = ["A","B","C","D","E"];
   const lines = letters.filter(L => record.choices[L] != null).map(L => `${L}. ${record.choices[L]}`).join("\n");
   const sys = "You are an independent board examiner. Using current clinical practice guidelines, choose the single best answer to the multiple-choice question. Do not explain. Call emit_answer exactly once with only the letter.";
@@ -52,13 +57,18 @@ async function verifyKeyConsistency(record) {
         system: sys, messages: [{ role: "user", content: usr }]
       })
     });
-    if (!res.ok) return null;                          // fail-open
+    if (!res.ok) {                                     // fail-open, but record status
+      let body = ""; try { body = await res.text(); } catch {}
+      noteFail(`HTTP ${res.status} ${body.slice(0,200).replace(/\s+/g," ").trim()}`);
+      return null;
+    }
     const data = await res.json();
     const tb = data.content?.find(b => b.type === "tool_use" && b.name === "emit_answer");
     const ans = tb?.input?.answer;
-    if (!ans || !/^[A-E]$/.test(ans)) return null;
+    if (!ans || !/^[A-E]$/.test(ans)) { noteFail("no emit_answer tool_use / non-AE answer"); return null; }
     return { disagree: ans !== record.correct_answer, modelAnswer: ans, keyed: record.correct_answer };
   } catch (e) {
+    noteFail(`exception: ${(e && e.message) || String(e)}`);
     return null;                                       // fail-open
   }
 }
@@ -137,6 +147,13 @@ async function pool(items, n, worker) {
     }
   }
 
+  if (skipped) {
+    console.log("\n──────────────── SKIP REASONS (verifier could not answer) ────────────────");
+    for (const [reason, count] of [...failReasons.entries()].sort((a,b) => b[1]-a[1])) {
+      console.log(`  ${String(count).padStart(4)} × ${reason}`);
+    }
+  }
+
   console.log("\n──────────────── SUMMARY ────────────────");
   console.log(`  Audited:        ${results.length}`);
   console.log(`  Answered:       ${answered}`);
@@ -155,7 +172,13 @@ async function pool(items, n, worker) {
 
   const report = { generated_at: new Date().toISOString(), model: VERIFY_MODEL, scope: LEVEL_FILTER || "ALL",
                    limit: AUDIT_LIMIT || null, audited: results.length, answered, skipped,
-                   disagreements: disagreements.length, rate_pct: Number(rate.toFixed(2)), per_level: perLevel, items: disagreements };
+                   disagreements: disagreements.length, rate_pct: Number(rate.toFixed(2)),
+                   skip_reasons: Object.fromEntries(failReasons), per_level: perLevel, items: disagreements };
   fs.writeFileSync("verify-bank-audit-report.json", JSON.stringify(report, null, 2));
   console.log("\n  Full report written to verify-bank-audit-report.json");
+
+  if (answered === 0) {
+    console.error("\n⚠️  INVALID RUN — 0 items answered. Every verifier call failed (see SKIP REASONS). This is NOT a 0% FP result; the measurement is meaningless. Exiting non-zero so a dead run cannot be mistaken for a clean pass.");
+    process.exit(1);
+  }
 })().catch(e => { console.error("AUDIT FAILED:", e); process.exit(1); });
