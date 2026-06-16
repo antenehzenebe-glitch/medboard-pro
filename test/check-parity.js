@@ -1,6 +1,7 @@
 // check-parity.js — fail CI if the parity-locked blocks drift between the two
 // generators. Per CLAUDE.md, TOPIC_GUARDRAILS / GUIDELINE_MAP /
-// ALLOWED_GUIDELINE_CITATIONS / BANNED_CITATION_PATTERNS / INTERCHANGEABLE_AGENT_CLASSES
+// ALLOWED_GUIDELINE_CITATIONS / BANNED_CITATION_PATTERNS / INTERCHANGEABLE_AGENT_CLASSES /
+// ALLOWED_LEAD_INS_BY_LEVEL
 // and the shared validator functions must stay byte-identical across:
 //   scripts/bulk-generate.js  and  netlify/functions/generate-mcq.js
 const fs = require("fs");
@@ -39,6 +40,7 @@ const SHARED = [
   ["ALLOWED_GUIDELINE_CITATIONS",   /const\s+ALLOWED_GUIDELINE_CITATIONS\s*=/],
   ["BANNED_CITATION_PATTERNS",      /const\s+BANNED_CITATION_PATTERNS\s*=/],
   ["INTERCHANGEABLE_AGENT_CLASSES", /const\s+INTERCHANGEABLE_AGENT_CLASSES\s*=/],
+  ["ALLOWED_LEAD_INS_BY_LEVEL",     /const\s+ALLOWED_LEAD_INS_BY_LEVEL\s*=/],
   ["flagTopicMismatch",             /function\s+flagTopicMismatch\s*\(/],
   ["flagCardiorenalMiskey",         /function\s+flagCardiorenalMiskey\s*\(/],
   ["flagT1DCardiorenal",            /function\s+flagT1DCardiorenal\s*\(/],
