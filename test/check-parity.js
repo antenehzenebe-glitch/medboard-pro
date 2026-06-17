@@ -51,6 +51,7 @@ const SHARED = [
   ["flagMetforminEgfr",             /function\s+flagMetforminEgfr\s*\(/],
   ["flagSlidingScaleInsulin",       /function\s+flagSlidingScaleInsulin\s*\(/],
   ["flagGdmCoherence",              /function\s+flagGdmCoherence\s*\(/],
+  ["flagDrugCurrency",              /function\s+flagDrugCurrency\s*\(/],
 ];
 
 let failures = 0;
