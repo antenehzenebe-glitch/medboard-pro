@@ -1,0 +1,8 @@
+# MedBoard Pro — medboardpro.org
+# Board-review QBank: USMLE Step 1/2 CK/3, ABIM Internal Medicine & Endocrinology
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /.netlify/
+
+Sitemap: https://medboardpro.org/sitemap.xml
