@@ -1,7 +1,7 @@
 // check-parity.js — fail CI if the parity-locked blocks drift between the two
 // generators. Per CLAUDE.md, TOPIC_GUARDRAILS / GUIDELINE_MAP /
 // ALLOWED_GUIDELINE_CITATIONS / BANNED_CITATION_PATTERNS / INTERCHANGEABLE_AGENT_CLASSES /
-// ALLOWED_LEAD_INS_BY_LEVEL
+// ALLOWED_LEAD_INS_BY_LEVEL / maxTokens ladder
 // and the shared validator functions must stay byte-identical across:
 //   scripts/bulk-generate.js  and  netlify/functions/generate-mcq.js
 const fs = require("fs");
@@ -29,6 +29,19 @@ function extractBlock(src, anchorRe) {
   // normalize: strip line comments + collapse whitespace so a comment-only
   // difference (e.g. a section header) does not fail parity
   return src.slice(i, j)
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Like extractBlock, but for a non-braced expression terminated by the first
+// semicolon after the anchor (e.g. the `const maxTokens = … ;` ternary ladder).
+function extractExpr(src, anchorRe) {
+  const m = src.match(anchorRe);
+  if (!m) return null;
+  const semi = src.indexOf(";", m.index);
+  if (semi === -1) return null;
+  return src.slice(m.index, semi + 1)
     .replace(/\/\/[^\n]*/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -65,5 +78,24 @@ for (const [name, re] of SHARED) {
   if (b !== g) { console.error(`✗ ${name}: PARITY DRIFT between the two generators`); failures++; }
   else console.log(`✓ ${name}`);
 }
+
+// Block 18 — maxTokens ladder. It is a bare ternary (no braces), so extractBlock
+// cannot reach it; lock it with extractExpr instead. Guards the per-level token
+// budgets — notably Step 2 CK = 2800 — against silent one-sided drift.
+{
+  const re = /const\s+maxTokens\s*=/;
+  const b = extractExpr(BULK, re);
+  const g = extractExpr(GEN, re);
+  if (b === null || g === null) {
+    console.error(`✗ maxTokens ladder: not found in ${b === null ? "bulk-generate.js" : "generate-mcq.js"}`);
+    failures++;
+  } else if (b !== g) {
+    console.error(`✗ maxTokens ladder: PARITY DRIFT between the two generators`);
+    failures++;
+  } else {
+    console.log(`✓ maxTokens ladder`);
+  }
+}
+
 if (failures) { console.error(`\nPARITY CHECK FAILED: ${failures} block(s) drifted.`); process.exit(1); }
 console.log("\nParity OK — all shared blocks identical.");

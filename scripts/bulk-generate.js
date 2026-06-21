@@ -2597,8 +2597,7 @@ function buildPrompt(level, topic) {
   const isStep2CK   = level === "USMLE Step 2 CK";  // v7.5.6
 
   const maxTokens   = isABIM_Endo ? 3200
-                    : (isABIM_IM || isStep3) ? 2800
-                    : isStep2CK ? 2600
+                    : (isABIM_IM || isStep3 || isStep2CK) ? 2800
                     : 2200;
   let qTypePool = [];
   if (!isStep1 && (promptTopic.includes("Ethics") || promptTopic.includes("Behavioral") || promptTopic.includes("HIPAA") || promptTopic.includes("end-of-life") || promptTopic.includes("consent"))) {
