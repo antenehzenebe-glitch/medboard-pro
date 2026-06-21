@@ -2571,7 +2571,7 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 - AVOID management-style lead-ins — Step 1 tests UNDERSTANDING, not management decisions.
 - Distractors should target the most common student confusions (mechanistically adjacent enzymes/pathways/receptors).
 - Shorter stems acceptable (1–2 well-loaded sentences if the case turns on a single mechanism).
-- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette (forearm crush → median/ulnar injury; organophosphate → cholinergic crisis; classic Hashimoto panel), choose a less-stereotyped but equally valid presentation in the majority of items.`;
+- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette, choose a less-stereotyped but equally valid presentation in the majority of items. Do not reuse a near-identical opening sentence across items.`;
   } else if (level === "USMLE Step 2 CK") {
     levelRules = `USMLE STEP 2 CK RULES (M3/M4 LEVEL — CLINICAL REASONING):
 - Vignette order: Age/Sex/Setting → CC → HPI → PMH → Meds/Soc/Fam → Vitals → Exam → Labs/Imaging.
@@ -2579,26 +2579,30 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 - Test PATTERN RECOGNITION of common conditions over rare ones — bread-and-butter conditions seen on medicine, surgery, peds, OB/GYN, psych, family medicine rotations.
 - Distractors are competing diagnoses on the differential — wrong but plausible to a clerkship student.
 - Settings: outpatient clinic, ED, inpatient ward, urgent care.
-- Bayesian reasoning expected: prior probability + new test result → posterior decision.`;
+- Bayesian reasoning expected: prior probability + new test result → posterior decision.
+- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette, choose a less-stereotyped but equally valid presentation in the majority of items. Do not reuse a near-identical opening sentence across items.`;
   } else if (isStep3) {
     levelRules = `USMLE STEP 3 RULES (PGY-1 LEVEL — PRACTICE-READY PHYSICIAN):
 - Question type focus: management decisions, disposition (admit vs discharge, ICU vs floor), threshold decisions (treat vs observe), follow-up planning.
 - "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items must center on management decisions, disposition, or threshold judgments.
 - Distractors should reflect real management forks where a PGY-1 might choose wrong (premature discharge, unnecessary admission, wrong tier of antibiotic, wrong agent in a stepped protocol).
 - Multi-system, complex patients are expected; address polypharmacy, comorbidity interactions, code status, goals of care where appropriate.
-- Public-health, ethics, and biostatistics integration acceptable when clinically relevant.`;
+- Public-health, ethics, and biostatistics integration acceptable when clinically relevant.
+- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette, choose a less-stereotyped but equally valid presentation in the majority of items. Do not reuse a near-identical opening sentence across items.`;
   } else if (isABIM_IM) {
     levelRules = `ABIM INTERNAL MEDICINE RULES (BOARD-CERTIFYING INTERNIST LEVEL):
 - Question type focus: multi-system synthesis, complex comorbidities, drug-drug interactions, treatment failure or intolerance, borderline risk scores requiring judgment.
 - "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items require management-level lead-ins.
 - Distractors must be options a guideline-aware internist might actually choose; "obviously wrong" distractors are unacceptable at this level.
-- Address: when to refer to subspecialty, when to initiate vs withhold treatment, how to adjust for comorbidities (CKD, HF, cirrhosis, frailty).`;
+- Address: when to refer to subspecialty, when to initiate vs withhold treatment, how to adjust for comorbidities (CKD, HF, cirrhosis, frailty).
+- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette, choose a less-stereotyped but equally valid presentation in the majority of items. Do not reuse a near-identical opening sentence across items.`;
   } else if (isABIM_Endo) {
     levelRules = `ABIM ENDOCRINOLOGY RULES (SUBSPECIALIST LEVEL):
 - Question type focus: atypical presentations, guideline-edge cases, complex diagnostic workups (CRH stimulation, IPSS, octreotide/68Ga-DOTATATE scan, genetic panels), therapy modification.
 - "What is the most likely diagnosis?" is PERMITTED only at synthesis tier (~10-15% of pool); the majority of items must test subspecialty management, complex diagnostic workup, or therapy modification.
 - Distractors must be options a subspecialty colleague might reasonably propose; items must discriminate between fellow-level and attending-level reasoning.
-- Address: dynamic testing protocols, surgical vs medical management, peri-procedural management (adrenalectomy, thyroidectomy), pregnancy considerations for endocrine disease.`;
+- Address: dynamic testing protocols, surgical vs medical management, peri-procedural management (adrenalectomy, thyroidectomy), pregnancy considerations for endocrine disease.
+- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette, choose a less-stereotyped but equally valid presentation in the majority of items. Do not reuse a near-identical opening sentence across items.`;
   } else {
     levelRules = `BOARD-STYLE RULES: Generalist synthesis level.`;
   }

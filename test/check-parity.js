@@ -1,7 +1,7 @@
 // check-parity.js — fail CI if the parity-locked blocks drift between the two
 // generators. Per CLAUDE.md, TOPIC_GUARDRAILS / GUIDELINE_MAP /
 // ALLOWED_GUIDELINE_CITATIONS / BANNED_CITATION_PATTERNS / INTERCHANGEABLE_AGENT_CLASSES /
-// ALLOWED_LEAD_INS_BY_LEVEL / maxTokens ladder
+// ALLOWED_LEAD_INS_BY_LEVEL / maxTokens ladder / VIGNETTE DIVERSITY
 // and the shared validator functions must stay byte-identical across:
 //   scripts/bulk-generate.js  and  netlify/functions/generate-mcq.js
 const fs = require("fs");
@@ -94,6 +94,33 @@ for (const [name, re] of SHARED) {
     failures++;
   } else {
     console.log(`✓ maxTokens ladder`);
+  }
+}
+
+// Block 19 — VIGNETTE DIVERSITY constraint must appear in all five level blocks
+// of BOTH generators. levelRules uses a different encoding per file (backtick
+// template in generate-mcq.js vs escaped-newline string in bulk-generate.js), so a
+// byte-identical block compare is impossible; assert instead that the diversity
+// directive and the opening-sentence clause each appear the same number of times
+// (one per level = 5) in both files.
+{
+  const countOf = (src, needle) => src.split(needle).length - 1;
+  const diversityChecks = [
+    ["VIGNETTE DIVERSITY directive", "VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case"],
+    ["opening-sentence clause",      "Do not reuse a near-identical opening sentence across items"],
+  ];
+  for (const [label, needle] of diversityChecks) {
+    const b = countOf(BULK, needle);
+    const g = countOf(GEN, needle);
+    if (b !== g) {
+      console.error(`✗ diversity (${label}): one-sided drift — bulk=${b}, gen=${g}`);
+      failures++;
+    } else if (b < 5) {
+      console.error(`✗ diversity (${label}): expected >=5 (one per level), found ${b} in both`);
+      failures++;
+    } else {
+      console.log(`✓ diversity (${label}) — ${b}x in both`);
+    }
   }
 }
 
