@@ -2570,7 +2570,8 @@ STRICT VIGNETTE SYNTAX (NBME/ABIM STANDARD):
 - Acceptable lead-ins: "most likely cause", "best explanation for this finding", "mechanism most likely responsible".
 - AVOID management-style lead-ins — Step 1 tests UNDERSTANDING, not management decisions.
 - Distractors should target the most common student confusions (mechanistically adjacent enzymes/pathways/receptors).
-- Shorter stems acceptable (1–2 well-loaded sentences if the case turns on a single mechanism).`;
+- Shorter stems acceptable (1–2 well-loaded sentences if the case turns on a single mechanism).
+- VIGNETTE DIVERSITY: do not default to the single most stereotyped teaching case for the topic. Vary patient age across plausible bands, sex, occupation/setting, and the precipitating event. Where a topic has one canonical vignette (forearm crush → median/ulnar injury; organophosphate → cholinergic crisis; classic Hashimoto panel), choose a less-stereotyped but equally valid presentation in the majority of items.`;
   } else if (level === "USMLE Step 2 CK") {
     levelRules = `USMLE STEP 2 CK RULES (M3/M4 LEVEL — CLINICAL REASONING):
 - Vignette order: Age/Sex/Setting → CC → HPI → PMH → Meds/Soc/Fam → Vitals → Exam → Labs/Imaging.
