@@ -1407,6 +1407,36 @@ function pickSexForTopic(promptTopic) {
   return Math.random() > 0.5 ? "man" : "woman";
 }
 
+// v8.1.0 — demographic-variation seed (PARITY-LOCKED across both generators). Returns a
+// weighted age band + care setting injected into the prompt as a soft directive to break
+// the model's default age/setting clustering (e.g. the recurring "58-year-old, nephrology
+// clinic" template). The model keeps a plausibility override so topic-constrained ages
+// (pregnancy, pediatrics, geriatric syndromes) are preserved.
+function pickDemographicSeed() {
+  const ageBands = [
+    { s: "18-34", w: 18 },
+    { s: "35-49", w: 26 },
+    { s: "50-64", w: 30 },
+    { s: "65-79", w: 20 },
+    { s: "80-90", w: 6 },
+  ];
+  const settings = [
+    { s: "an outpatient clinic", w: 34 },
+    { s: "the emergency department", w: 18 },
+    { s: "an inpatient ward", w: 16 },
+    { s: "an intensive care unit", w: 8 },
+    { s: "an urgent care clinic", w: 10 },
+    { s: "a primary care office", w: 14 },
+  ];
+  const pick = (arr) => {
+    const total = arr.reduce((a, x) => a + x.w, 0);
+    let r = Math.random() * total;
+    for (const x of arr) { r -= x.w; if (r < 0) return x.s; }
+    return arr[arr.length - 1].s;
+  };
+  return { ageHint: pick(ageBands), setting: pick(settings) };
+}
+
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function pickWeighted(blueprint) {
@@ -2546,6 +2576,7 @@ function buildPrompt(level, topic, isNutrition) {
   }
   const promptQType = pickWeighted(qTypePool);
   const randomSex   = pickSexForTopic(promptTopic);
+  const _demo = pickDemographicSeed();
 
   const isUSMLE   = level.includes("USMLE");
   const maxTokens = isABIM_Endo ? 3200
@@ -2713,7 +2744,7 @@ ${selfVerification}
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
   : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
 - Lead-in asks for: ${promptQType}.
-- Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
+- Demographics & Setting: Patient is a ${randomSex}. Demographic variation target (apply unless clinically implausible for this topic): patient age in the ${_demo.ageHint} range; care setting = ${_demo.setting}. Choose a clinically plausible age within that range, and override the target only if the topic itself requires a specific age or setting.
 - Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing DIAGNOSIS on the differential. A pertinent negative MUST NOT clear a contraindication, side effect, or eligibility marker for the correct THERAPEUTIC choice (see Rule H — Anti-Cueing). DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
 - The stem MUST end with the interrogative sentence.
 

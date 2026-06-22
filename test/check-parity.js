@@ -65,6 +65,7 @@ const SHARED = [
   ["flagSlidingScaleInsulin",       /function\s+flagSlidingScaleInsulin\s*\(/],
   ["flagGdmCoherence",              /function\s+flagGdmCoherence\s*\(/],
   ["flagDrugCurrency",              /function\s+flagDrugCurrency\s*\(/],
+  ["pickDemographicSeed",          /function\s+pickDemographicSeed\s*\(/],
 ];
 
 let failures = 0;

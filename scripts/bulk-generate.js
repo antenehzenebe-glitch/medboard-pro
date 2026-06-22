@@ -1517,6 +1517,36 @@ function pickSexForTopic(promptTopic) {
   return Math.random() > 0.5 ? "man" : "woman";
 }
 
+// v8.1.0 — demographic-variation seed (PARITY-LOCKED across both generators). Returns a
+// weighted age band + care setting injected into the prompt as a soft directive to break
+// the model's default age/setting clustering (e.g. the recurring "58-year-old, nephrology
+// clinic" template). The model keeps a plausibility override so topic-constrained ages
+// (pregnancy, pediatrics, geriatric syndromes) are preserved.
+function pickDemographicSeed() {
+  const ageBands = [
+    { s: "18-34", w: 18 },
+    { s: "35-49", w: 26 },
+    { s: "50-64", w: 30 },
+    { s: "65-79", w: 20 },
+    { s: "80-90", w: 6 },
+  ];
+  const settings = [
+    { s: "an outpatient clinic", w: 34 },
+    { s: "the emergency department", w: 18 },
+    { s: "an inpatient ward", w: 16 },
+    { s: "an intensive care unit", w: 8 },
+    { s: "an urgent care clinic", w: 10 },
+    { s: "a primary care office", w: 14 },
+  ];
+  const pick = (arr) => {
+    const total = arr.reduce((a, x) => a + x.w, 0);
+    let r = Math.random() * total;
+    for (const x of arr) { r -= x.w; if (r < 0) return x.s; }
+    return arr[arr.length - 1].s;
+  };
+  return { ageHint: pick(ageBands), setting: pick(settings) };
+}
+
 function pickWeighted(blueprint) {
   const total = blueprint.reduce((acc, curr) => acc + curr.w, 0);
   let rand = Math.random() * total;
@@ -1844,6 +1874,17 @@ const WARN_GUIDELINE_TOKENS = ["USPSTF", "ACG", "AASLD", "AGA", "ASH", "IDSA", "
 
 const dropTally = { _genFailed: 0, _warnUnseeded: 0, _warnInterchange: 0, _warnCardiorenal: 0, _cardiorenalRejected: 0, _warnT1DCardiorenal: 0, _warnSemanticDup: 0, _warnTopicMismatch: 0, _topicMismatchRejected: 0, _conceptSaturated: 0, _warnMetforminEgfr: 0, _warnSlidingScale: 0, _warnGdmCoherence: 0, _warnCrossRunDup: 0, _warnVerifyMiskey: 0, _warnDrugCurrency: 0, _drugCurrencyRejected: 0 };
 function recordDrop(reason) { dropTally[reason] = (dropTally[reason] || 0) + 1; return null; }
+
+// v8.1.0 — per-run key-position balancer + opening-sentence dedup (bulk-only; the
+// single-question gen-mcq path has no run state to balance or dedup against).
+const _keyBalanceCounts = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+const _seenOpenings = new Set();
+function _openingKey(stem) {
+  if (!stem || typeof stem !== "string") return "";
+  const norm = stem.toLowerCase().replace(/[0-9]+/g, "#").replace(/[^a-z#]+/g, " ").trim();
+  const words = norm.split(/\s+/).filter(Boolean).slice(0, 12);
+  return words.length >= 6 ? words.join(" ") : "";
+}
 
 // --- Topic-consistency guard (B2): catch mis-topiced stems (male in gestational item, etc.) ---
 function flagTopicMismatch(p) {
@@ -2685,6 +2726,7 @@ function buildPrompt(level, topic) {
   }
   const promptQType = pickWeighted(qTypePool);
   const randomSex   = pickSexForTopic(promptTopic);
+  const _demo = pickDemographicSeed();
 
   const isUSMLE     = level.includes("USMLE");
   const systemRole  = isUSMLE ? "an NBME Senior Item Writer for the USMLE" : isABIM_Endo ? "an ABIM Endocrinology Fellowship Program Director" : "an ABIM Internal Medicine Board Question Writer";
@@ -2820,7 +2862,7 @@ ${selfVerification}
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
   : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
 - Lead-in asks for: ${promptQType}.
-- Demographics & Setting: Patient is a ${randomSex}. Select a clinically appropriate age and care setting.
+- Demographics & Setting: Patient is a ${randomSex}. Demographic variation target (apply unless clinically implausible for this topic): patient age in the ${_demo.ageHint} range; care setting = ${_demo.setting}. Choose a clinically plausible age within that range, and override the target only if the topic itself requires a specific age or setting.
 - Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing DIAGNOSIS on the differential. A pertinent negative MUST NOT clear a contraindication, side effect, or eligibility marker for the correct THERAPEUTIC choice (see Rule H — Anti-Cueing). DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
 - The stem MUST end with the interrogative sentence.
 
@@ -2866,21 +2908,40 @@ function processRawMcq(p, level, topic, resolvedTopic, generationModel = "unknow
   { if (flagConceptSaturation(p)) { console.warn('[REJECT] concept-saturation (<=1/concept) :: "' + String(p.stem||'').slice(0,80) + '"'); return recordDrop('_conceptSaturated'); } } // Layer 1: stem-AND-key dedup, <=1/concept
   { const _xr = flagCrossRunSaturation(p); if (_xr.length) { dropTally._warnCrossRunDup++; for (const _w of _xr) console.warn('[warn] cross-run concept-saturation:', _w); } } // Phase-2: vs existing bank (warn-mode, bulk-only)
 
+  // v8.1.0 — opening-sentence dedup (hard): drop near-identical openers within the run.
+  // Standard mode regenerates (null return -> 3-attempt retry loop); batch mode drops.
+  { const _ok = _openingKey(p.stem); if (_ok) { if (_seenOpenings.has(_ok)) { console.warn('[REJECT] opening-sentence near-dup :: "' + String(p.stem || "").slice(0, 80) + '"'); return recordDrop("openingDup"); } _seenOpenings.add(_ok); } }
   const letters      = ["A","B","C","D","E"];
   const correctIndex = letters.indexOf(p.correct);
   const optionsArray = letters
     .map((letter, i) => ({ originalLetter: letter, text: p.choices[letter], isCorrect: i === correctIndex }))
     .filter(opt => opt.text != null);
 
-  for (let i = optionsArray.length - 1; i > 0; i--) {
+  // v8.1.0 — key-position balancer (bulk-only): place the correct option in the run's
+  // least-used letter slot (ties random), then fill remaining slots with the shuffled
+  // distractors. Anti-cueing preserved (distractor order randomized); the keyed-letter
+  // distribution self-levels across the run instead of drifting (the C-skew fix).
+  const _slots = optionsArray.map((_, i) => letters[i]);
+  let _minN = Infinity;
+  for (const L of _slots) if ((_keyBalanceCounts[L] || 0) < _minN) _minN = _keyBalanceCounts[L] || 0;
+  const _least = _slots.filter(L => (_keyBalanceCounts[L] || 0) === _minN);
+  const _targetLetter = _least[Math.floor(Math.random() * _least.length)];
+  const _targetIdx = _slots.indexOf(_targetLetter);
+  const _correctOpt = optionsArray.find(o => o.isCorrect);
+  const _distractors = optionsArray.filter(o => !o.isCorrect);
+  for (let i = _distractors.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [optionsArray[i], optionsArray[j]] = [optionsArray[j], optionsArray[i]];
+    [_distractors[i], _distractors[j]] = [_distractors[j], _distractors[i]];
   }
+  const _ordered = [];
+  let _di = 0;
+  for (let i = 0; i < _slots.length; i++) _ordered[i] = (i === _targetIdx && _correctOpt) ? _correctOpt : _distractors[_di++];
+  if (_correctOpt) _keyBalanceCounts[_targetLetter] = (_keyBalanceCounts[_targetLetter] || 0) + 1;
 
   const shuffledChoices = {};
   const letterMap       = {};
   let newCorrectLetter  = "A";
-  optionsArray.forEach((item, index) => {
+  _ordered.forEach((item, index) => {
     const newLetter = letters[index];
     shuffledChoices[newLetter] = item.text;
     letterMap[item.originalLetter] = newLetter;
@@ -3066,6 +3127,24 @@ function canonicalizeTopic(level, topic) {
   return topic;
 }
 
+// v8.1.0 — per-run soft family cap (bulk-only): a gentle variance-smoother atop the
+// blueprint-proportional per-topic cap. When a clinical family (thyroid, diabetes, ...)
+// reaches ~FAMILY_CAP_FRAC of the run, its topics' draw weight is penalized (not
+// excluded -> no deadlock), nudging the single-run category mix toward the blueprint.
+// Tune/disable via FAMILY_CAP_FRAC (default 0.35; <=0 or >=1 disables).
+const FAMILY_CAP_FRAC = parseFloat(process.env.FAMILY_CAP_FRAC || "0.35");
+function _topicFamily(topic) {
+  const t = String(topic || "").toLowerCase();
+  if (/thyroid|graves|hashimoto|thyroiditis|hyperthyroid|hypothyroid|goiter|storm/.test(t)) return "thyroid";
+  if (/pituitar|acromegal|prolactin|sella|hypophys|diabetes insipidus/.test(t)) return "pituitary";
+  if (/diabet|glycem|glucose|\bdka\b|\bhhs\b|hypoglycem|sglt2|glp-1|insulin|\bcgm\b|aid system/.test(t)) return "diabetes";
+  if (/lipid|dyslipidem|cholesterol|statin|pcsk9|triglycerid/.test(t)) return "lipid";
+  if (/adrenal|cushing|addison|aldosteron|pheochromocytoma/.test(t)) return "adrenal";
+  if (/calc|\bbone\b|osteo|paget|parathyroid|vitamin d|mineral/.test(t)) return "bone-mineral";
+  if (/hypogonad|testosteron|klinefelter|gynecomastia|male reproduction|menstr|amenorrhea|pcos|ovari|fertil/.test(t)) return "reproductive";
+  return "other";
+}
+
 function buildWorkQueue(count, budgets = new Map()) {
   const levels = FILTER_LEVEL ? [FILTER_LEVEL] : Object.keys(TOPIC_DISTRIBUTION);
   const queue  = [];
@@ -3097,19 +3176,23 @@ function buildWorkQueue(count, budgets = new Map()) {
   // else by its raw blueprint weight. A concept's probability falls as it is emitted (budget
   // shrinks), so it self-spreads (no intra-batch clustering -- the property the v7.5.9 uniform
   // round-robin protected) AND converges to blueprint proportions, correcting existing skew.
+  const _familyCount = new Map();
+  const _FAMILY_RUN_CAP = (FAMILY_CAP_FRAC > 0 && FAMILY_CAP_FRAC < 1) ? Math.max(1, Math.ceil(FAMILY_CAP_FRAC * count)) : Infinity;
   for (let i = 0; i < count; i++) {
     const elig = []; let total = 0;
     for (const it of flat) {
       const bl = budgetLeft(it.level, it.topic);
       if (bl <= 0) continue;
       const lvlProp = bankTargetFor(it.level) > 0;
-      const demand = (lvlProp && Number.isFinite(bl)) ? bl : it.w;
+      let demand = (lvlProp && Number.isFinite(bl)) ? bl : it.w;
       if (demand <= 0) continue;
+      if (_FAMILY_RUN_CAP !== Infinity && (_familyCount.get(_topicFamily(it.topic)) || 0) >= _FAMILY_RUN_CAP) demand *= 0.15;
       elig.push({ it, demand }); total += demand;
     }
     if (!elig.length || total <= 0) break;
     let r = Math.random() * total, chosen = elig[elig.length - 1].it;
     for (const e of elig) { r -= e.demand; if (r < 0) { chosen = e.it; break; } }
+    { const _cf = _topicFamily(chosen.topic); _familyCount.set(_cf, (_familyCount.get(_cf) || 0) + 1); }
     const nTopics = NUTRITION_BY_LEVEL[chosen.level];
     if (nTopics && Math.random() < NUTRITION_INJECTION_RATE) {
       const randomNutrition = nTopics[Math.floor(Math.random() * nTopics.length)];
@@ -3217,6 +3300,7 @@ async function runBatchMode(queue) {
       } catch (e) {}
     }
   }
+  if (VERIFY_PASS) await verifyPassOver(allRecords, false);
   return allRecords;
 }
 
@@ -3309,6 +3393,26 @@ async function verifyKeyConsistency(record) {
   }
 }
 
+// v8.1.0 — verify-pass extracted into a shared helper so BOTH batch and standard modes
+// run the blind re-answer mis-key screen (previously standard-mode only; batch runs
+// silently skipped VERIFY_PASS).
+async function verifyPassOver(records, silent) {
+  if (!records || !records.length) return;
+  if (!silent) console.log(`\n\uD83D\uDD0E  Verify-pass (independent blind re-answer) on ${records.length} items...`);
+  for (let i = 0; i < records.length; i += CONCURRENCY) {
+    const win = records.slice(i, i + CONCURRENCY);
+    const checks = await Promise.allSettled(win.map(r => verifyKeyConsistency(r)));
+    checks.forEach((c, k) => {
+      if (c.status === "fulfilled" && c.value && c.value.disagree) {
+        dropTally._warnVerifyMiskey++;
+        const r = win[k];
+        console.warn(`[warn] verify-pass disagreement: keyed ${c.value.keyed}, independent answer ${c.value.modelAnswer} :: [${r.exam_level}] "${String(r.stem || "").slice(0, 80)}"`);
+      }
+    });
+    if (i + CONCURRENCY < records.length) await sleep(1500);
+  }
+}
+
 async function runStandardMode(queue, silent = false) {
   if (!silent) console.log(`\n⚡  Running ${queue.length} questions with concurrency=${CONCURRENCY}...`);
   const results = [];
@@ -3387,21 +3491,7 @@ async function runStandardMode(queue, silent = false) {
     if (i + CONCURRENCY < queue.length) await sleep(2000);
   }
 
-  if (VERIFY_PASS && results.length) {
-    if (!silent) console.log(`\n\uD83D\uDD0E  Verify-pass (independent blind re-answer) on ${results.length} items...`);
-    for (let i = 0; i < results.length; i += CONCURRENCY) {
-      const win = results.slice(i, i + CONCURRENCY);
-      const checks = await Promise.allSettled(win.map(r => verifyKeyConsistency(r)));
-      checks.forEach((c, k) => {
-        if (c.status === "fulfilled" && c.value && c.value.disagree) {
-          dropTally._warnVerifyMiskey++;
-          const r = win[k];
-          console.warn(`[warn] verify-pass disagreement: keyed ${c.value.keyed}, independent answer ${c.value.modelAnswer} :: [${r.exam_level}] "${String(r.stem || "").slice(0, 80)}"`);
-        }
-      });
-      if (i + CONCURRENCY < results.length) await sleep(1500);
-    }
-  }
+  if (VERIFY_PASS) await verifyPassOver(results, silent);
 
   if (!silent) console.log("");
   return results;
