@@ -24,9 +24,9 @@ Servable = `status='approved' AND cueing_flag IS NOT TRUE` (canonical). `mcqs` s
 ### Infrastructure (confirmed)
 - Repo `antenehzenebe-glitch/medboard-pro`, HEAD `1fadcf7`. Deployed by Dr. Z via Codespaces. Netlify auto-deploys `main`.
 - Supabase project `vhzeeskhvkujihuvddcc`. Active key = publishable `sb_publishable_BrMb59PYqV2W7DPbRe_L6g_7I2mqAt_`; legacy anon JWT **disabled**.
-- `npm run ci` = check (node --check both generators) + parity (15/15 blocks) + test (7/7 validator unit tests). CI workflow `ci.yml` live.
+- `npm run ci` = check (node --check both generators) + parity (20/20 blocks) + test (7/7 validator unit tests). CI workflow `ci.yml` live.
 - Migrations `0001`–`0006` version-controlled in `supabase/migrations/`. `0006_sec_gen_rate_limit.sql` = the S5 per-IP rate-limit RPC. Legacy root `supabase-migration.sql` = historical cueing_* migration.
-- Generators carry parity-locked `TOPIC_GUARDRAILS` / `integrityRules` / `ALLOWED_GUIDELINE_CITATIONS`. Bulk-only (not mirrored): B3 sampler, B4/`flagConceptSaturation` dedup, B5 generation cap, `VERIFY_PASS`, S5 handler guard.
+- Generators carry parity-locked `TOPIC_GUARDRAILS` / `integrityRules` / `ALLOWED_GUIDELINE_CITATIONS`. Bulk-only (not mirrored): B3 sampler, B4/`flagConceptSaturation` dedup, B5 generation cap, S5 handler guard, and the v8.1.0 controls — key-position balancer, opening-sentence dedup guard, soft per-run family cap (`FAMILY_CAP_FRAC`). As of v8.1.0, `VERIFY_PASS` runs in **both** batch and standard modes. The v8.1.0 `pickDemographicSeed()` prompt seed IS parity-mirrored (block #20).
 - `bulk-generate.yml` exposes `ceiling` (per-(level,topic) servable+pending depth target, default 8) and `mode` (`batch` = Anthropic Batch API, 50% off, ≤24 h SLA). `mode=batch` confirmed real (posts to `/v1/messages/batches` + polls).
 
 ### Security posture (verified)
@@ -52,6 +52,20 @@ Servable = `status='approved' AND cueing_flag IS NOT TRUE` (canonical). `mcqs` s
 - Emoji explanation format (🩺/🚫/💎), forward-only. `content_hash` dedupes exact stems only (semantic near-dups survive → manual/B4).
 - Supabase MCP: DDL/policy → `apply_migration`; reads/DO-blocks → `execute_sql` (multi-statement returns only the final result set). RLS attacker-role verification: `set_config('role','anon',true)` inside a DO block with `raise exception` to surface + abort.
 - GitHub MCP: reads reliable (`get_file_contents`, `list_commits`, `get_commit detail:full_patch`); **writes 403** (workflow paths + general repo writes). `search_code` lags after push — use commit diffs for immediate verification. All file mods go through Codespaces CLI.
+
+---
+
+### Generator distribution controls (v8.1.0 — HEAD `646c2de`, 2026-06-22)
+Five changes to curb distribution skew; CI parity **15→20 blocks**. Bulk-only unless noted.
+- **Key-position balancer** — the correct option is placed in the run's least-used A–E slot at the shuffle (NOT via the prompt: `processRawMcq` Fisher-Yates–reassigns the letter, so a prompt nudge is overwritten). Anti-cueing preserved. Killed the keyed-letter skew (local sim: worst-case spread 0/35 vs 14/35 pure-random).
+- **Demographic seed** (`pickDemographicSeed`) — weighted {age band, care setting} injected as a soft prompt directive; the **only** v8.1.0 piece mirrored to gen-mcq, parity-locked as **block #20**. Breaks the "58-year-old, nephrology clinic" clustering; model keeps a plausibility override (so pregnancy/peds/geriatric ages survive).
+- **Opening-sentence dedup guard** — normalize first ~12 words → run-level seen-set → collision drops in `processRawMcq`. Hard: regenerates via the standard-mode 3-attempt retry loop; drops (no regen) in batch. Catches twin openers the VIGNETTE-DIVERSITY prompt clause didn't.
+- **Soft per-run family cap** (`FAMILY_CAP_FRAC`, default 0.35) — gentle draw-weight penalty on an over-represented clinical family (thyroid/diabetes/…), layered atop the blueprint-proportional per-topic cap. A penalty, not an exclusion → no deadlock.
+- **`VERIFY_PASS` in batch mode** — extracted to `verifyPassOver()`, now called from **both** modes. Prior gap: batch runs (the Endo path) silently skipped the blind re-answer mis-key screen.
+
+Verified: commit `646c2de` stats byte-exact (+110/-20 bulk · +32/-1 gen · +1 parity, 3 files only, patch script not committed); Netlify prod deploy `ready` from `646c2de` (`generate-mcq` function live, nodejs22.x); local `node --check` both + parity 20/20 + 17-edit idempotency all green.
+
+> NOTE: the rest of this file is stale (last rolled forward 2026-06-11 / HEAD `1fadcf7`): the §1 bank table, HEAD, and the 06-20/21/22 sessions are not yet reflected. Full roll-forward pending.
 
 ---
 

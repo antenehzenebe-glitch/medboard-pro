@@ -25,7 +25,7 @@
 - `netlify/functions/generate-mcq.js` — live, user-facing
 - `scripts/bulk-generate.js` — GitHub Actions batch
 
-Bulk-only by design (do **not** mirror to gen-mcq): the B-series sampler (B3 spread, B4/concept-saturation dedup, B5 generation cap), `VERIFY_PASS`, and the S5 rate-limit/origin handler guard.
+Bulk-only by design (do **not** mirror to gen-mcq): the B-series sampler (B3 spread, B4/concept-saturation dedup, B5 generation cap), `VERIFY_PASS`, the S5 rate-limit/origin handler guard, and the **v8.1.0** distribution controls — the key-position balancer (correct option placed in the run's least-used letter slot at the shuffle, since the letter is shuffle-assigned and a prompt nudge would be overwritten), the opening-sentence dedup guard (hard; regenerates in standard mode, drops in batch), and the soft per-run family cap (`FAMILY_CAP_FRAC`, default 0.35). As of v8.1.0, `VERIFY_PASS` runs in **both** batch and standard modes (was standard-only). The one v8.1.0 piece that IS mirrored to gen-mcq is `pickDemographicSeed()` (weighted age-band + care-setting prompt seed) — parity-locked as block **#20**.
 
 ---
 
@@ -33,7 +33,7 @@ Bulk-only by design (do **not** mirror to gen-mcq): the B-series sampler (B3 spr
 
 ```bash
 npm run check     # node --check both generator files
-npm run parity    # test/check-parity.js — 15 parity-locked blocks (must be 15/15)
+npm run parity    # test/check-parity.js — 20 parity-locked blocks (must be 20/20)
 npm test          # node --test → test/validators.test.js (7/7)
 npm run ci        # check + parity + test — the gate. Run before EVERY commit.
 ```
