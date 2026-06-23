@@ -1434,7 +1434,10 @@ function pickDemographicSeed() {
     for (const x of arr) { r -= x.w; if (r < 0) return x.s; }
     return arr[arr.length - 1].s;
   };
-  return { ageHint: pick(ageBands), setting: pick(settings) };
+  const _band = pick(ageBands);
+  const [_lo, _hi] = _band.split("-").map(Number);
+  const ageExact = _lo + Math.floor(Math.random() * (_hi - _lo + 1));
+  return { ageHint: _band, ageExact, setting: pick(settings) };
 }
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -2744,7 +2747,7 @@ ${selfVerification}
 Emit the question by calling the emit_mcq tool. Set demographic_check to "confirmed ${randomSex}".`
   : `Construct a Tier 3 Board-style puzzle on: ${promptTopic}.
 - Lead-in asks for: ${promptQType}.
-- Demographics & Setting: Patient is a ${randomSex}. Demographic variation target (apply unless clinically implausible for this topic): patient age in the ${_demo.ageHint} range; care setting = ${_demo.setting}. Choose a clinically plausible age within that range, and override the target only if the topic itself requires a specific age or setting.
+- Demographics & Setting: The patient is a ${_demo.ageExact}-year-old ${randomSex} presenting to ${_demo.setting}. State this exact age and care setting verbatim in the stem, UNLESS the topic clinically requires a different age (pregnancy, pediatric, geriatric syndrome, or an age-defined screening scenario) — in which case choose a clinically appropriate age and disregard the seeded one.
 - Pertinent Negatives: Include 1-2 pertinent negatives ONLY if they help rule out a competing DIAGNOSIS on the differential. A pertinent negative MUST NOT clear a contraindication, side effect, or eligibility marker for the correct THERAPEUTIC choice (see Rule H — Anti-Cueing). DO NOT include sex-specific screening labs (B-hCG, PSA, menstrual history, prostate exam, pelvic exam, etc.) unless the case turns on them.
 - The stem MUST end with the interrogative sentence.
 
