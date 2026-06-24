@@ -2,11 +2,23 @@
   "name": "medboard-pro",
   "private": true,
   "version": "0.0.0",
-  "description": "AI-augmented medical board MCQ platform (no runtime deps; Node built-ins only).",
+  "description": "AI-augmented medical board MCQ platform.",
   "scripts": {
     "check": "node --check scripts/bulk-generate.js && node --check netlify/functions/generate-mcq.js",
     "parity": "node test/check-parity.js",
     "test": "node --test",
-    "ci": "npm run check && npm run parity && npm test"
+    "ci": "npm run check && npm run parity && npm test",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
   }
 }

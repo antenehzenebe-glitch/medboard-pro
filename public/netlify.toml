@@ -1,5 +1,0 @@
-[build]
-  publish = "public"
-
-[functions."generate-mcq"]
-  timeout = 26
