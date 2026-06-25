@@ -3052,7 +3052,7 @@ async function fetchTopicBudgets() {
   let rows = [];
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/mcqs?select=exam_level,topic&status=in.(approved,pending_review)&limit=20000`,
+      `${SUPABASE_URL}/rest/v1/mcqs?select=exam_level,topic,blueprint_tag&status=in.(approved,pending_review)&limit=20000`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) { console.warn(`[gen-cap] count fetch failed (HTTP ${res.status}) — cap disabled this run`); return budgets; }
@@ -3063,7 +3063,7 @@ async function fetchTopicBudgets() {
   }
   const counts = new Map();
   for (const r of rows) {
-    const k = `${r.exam_level}\u0001${r.topic}`;
+    const k = `${r.exam_level}\u0001${r.blueprint_tag || r.topic}`;
     counts.set(k, (counts.get(k) || 0) + 1);
   }
   // Register a budget for EVERY known topic. Weighted topics get a blueprint-proportional
