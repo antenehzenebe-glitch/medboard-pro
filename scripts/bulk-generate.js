@@ -3034,11 +3034,24 @@ function _levelWeightSum(level) {
   }
   return _bpWeightSum[level];
 }
+// v8.2.0 — bank expansion knobs. Target stays the blueprint SEED size; once a level is
+// seeded, GEN_EXPANSION_FACTOR (float >=1) grows every weighted topic's ceiling in the
+// same blueprint proportion (the deficit draw then fills the bank in balanced waves past
+// target — depth for repeated practice blocks / specialty / topic drills). GEN_MIN_PER_TOPIC
+// (int) is a per-topic floor so even low-weight buckets reach standalone topic-drill depth.
+// Defaults (1.0 / 0) are byte-identical to pre-8.2.0 behavior. Flat-ceiling nutrition topics
+// (no blueprint weight) are unaffected — they keep GEN_CAP_CEILING by design.
+const GEN_EXPANSION_FACTOR = parseFloat(process.env.GEN_EXPANSION_FACTOR || "1");
+const GEN_MIN_PER_TOPIC    = parseInt(process.env.GEN_MIN_PER_TOPIC || "0", 10);
 function _topicCeiling(level, weight) {
   const target = bankTargetFor(level);
   if (target > 0 && weight > 0) {
     const sum = _levelWeightSum(level);
-    if (sum > 0) return Math.max(1, Math.round((weight / sum) * target));
+    if (sum > 0) {
+      const factor = (Number.isFinite(GEN_EXPANSION_FACTOR) && GEN_EXPANSION_FACTOR > 0) ? GEN_EXPANSION_FACTOR : 1;
+      const floor  = (Number.isFinite(GEN_MIN_PER_TOPIC) && GEN_MIN_PER_TOPIC > 0) ? GEN_MIN_PER_TOPIC : 0;
+      return Math.max(1, Math.round((weight / sum) * target * factor), floor);
+    }
   }
   return GEN_CAP_CEILING;
 }
