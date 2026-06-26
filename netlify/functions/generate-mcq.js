@@ -1218,7 +1218,7 @@ const NUTRITION_INJECTION_RATE = 0.12;
 const NUTRITION_BY_LEVEL = {
   "USMLE Step 1": ["Vitamin D deficiency — rickets vs. osteomalacia", "Thiamine (B1) deficiency — Wernicke encephalopathy", "Vitamin B12 deficiency", "Refeeding syndrome pathophysiology", "Starvation biochemistry"],
   "USMLE Step 2 CK": ["Enteral vs parenteral nutrition indications", "Refeeding syndrome recognition", "Obesity pharmacotherapy", "Bariatric surgery outcomes", "Celiac disease management", "DASH/Mediterranean diet evidence"],
-  "USMLE Step 3": ["Chronic disease nutrition management", "Food insecurity screening", "ICU nutrition — ASPEN/ESPEN 2023", "Post-bariatric monitoring"],
+  "USMLE Step 3": ["Chronic disease nutrition management"],
   "ABIM Internal Medicine": ["Refeeding syndrome protocol", "TPN complications — IFALD", "Nutritional management of CKD/Cirrhosis", "Malabsorption workup", "Mediterranean diet PREDIMED evidence"],
   "ABIM Endocrinology": ["Medical nutrition therapy for T1DM/T2DM (ADA 2026)", "Nutritional causes of secondary osteoporosis", "Post-bariatric micronutrient protocol", "Ketogenic diet mechanisms", "Selenium/Zinc deficiency"]
 };
@@ -1357,6 +1357,7 @@ const TOPIC_DISTRIBUTION = {
     { topic: "Type 2 diabetes - pharmacologic selection and cardiorenal risk (S3)", weight: 2 },
     { topic: "Type 2 diabetes - older-adult de-intensification and hypoglycemia (S3)", weight: 2 },
     { topic: "Chronic disease nutrition management", weight: 3 },
+    { topic: "Clinical nutrition and micronutrient deficiencies (S3)", weight: 1 },
     { topic: "Thyroid and metabolic management (S3)", weight: 2 },
     { topic: "Sepsis and Septic Shock", weight: 3 },
     { topic: "HIV management and antiretroviral resistance (S3)", weight: 2 },
