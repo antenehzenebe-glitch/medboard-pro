@@ -62,6 +62,14 @@ on:
         description: "Verifier model (blank=same; claude-opus-4-8=cross-model)"
         required: false
         default: ""
+      gen_expansion_factor:
+        description: "Bank expansion factor (float >=1). 1=seed caps; >1 grows every weighted topic ceiling proportionally past the blueprint seed."
+        required: false
+        default: "1"
+      gen_min_per_topic:
+        description: "Floor: minimum items generated per weighted topic this run (0=off)."
+        required: false
+        default: "0"
 
 jobs:
   generate-single:
@@ -93,6 +101,8 @@ jobs:
           GEN_CAP_CEILING:   ${{ github.event.inputs.ceiling }}
           VERIFY_PASS:       ${{ github.event.inputs.verify_pass }}
           VERIFY_MODEL:      ${{ github.event.inputs.verify_model }}
+          GEN_EXPANSION_FACTOR: ${{ github.event.inputs.gen_expansion_factor }}
+          GEN_MIN_PER_TOPIC: ${{ github.event.inputs.gen_min_per_topic }}
         run: node scripts/bulk-generate.js
       - name: Done
         if: success()
@@ -132,6 +142,8 @@ jobs:
           GEN_CAP_CEILING:   ${{ github.event.inputs.ceiling }}
           VERIFY_PASS:       ${{ github.event.inputs.verify_pass }}
           VERIFY_MODEL:      ${{ github.event.inputs.verify_model }}
+          GEN_EXPANSION_FACTOR: ${{ github.event.inputs.gen_expansion_factor }}
+          GEN_MIN_PER_TOPIC: ${{ github.event.inputs.gen_min_per_topic }}
         run: node scripts/bulk-generate.js
       - name: Done
         if: success()
