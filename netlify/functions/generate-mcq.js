@@ -222,7 +222,8 @@ REQUIRED Tier 3+ angles:
 - Diagnosis: HbA1c ≥6.5%, FPG ≥126 mg/dL, OGTT 2h ≥200 mg/dL, or random ≥200 + symptoms. Confirm on repeat unless symptomatic.
 - Cardiorenal-driven add-on: SGLT2i if HF/CKD, GLP-1 RA if ASCVD/obesity (regardless of A1c).
 - SGLT2i (empagliflozin, dapagliflozin) are CLASS I for HFrEF (EMPEROR-Reduced, DAPA-HF) and are initiated/continued down to eGFR 20; reduced GLYCEMIC efficacy below eGFR 45 does NOT remove the HF/cardiorenal indication. In a T2D + HFrEF stem an SGLT2i is preferred over a GLP-1 RA for the HF indication; GLP-1 RAs reduce ASCVD events but do NOT reduce HF hospitalization.
-- SGLT2i are potassium-NEUTRAL to mildly K-LOWERING and do NOT cause/worsen hyperkalemia (an advantage over MRAs/finerenone). Do NOT key a GLP-1 RA over an SGLT2i in an HFrEF stem on the basis of a hyperkalemia or a sub-eGFR-45 glycemic argument.
+- SGLT2i are potassium-NEUTRAL to mildly K-LOWERING and do NOT cause/worsen hyperkalemia (an advantage over MRAs/finerenone). Do NOT key a GLP-1 RA over an SGLT2i in an HFrEF stem on ANY rationalization axis (hyperkalemia, sub-eGFR-45 glycemic inefficacy, frailty, weight, or hypoglycemia-avoidance); the HFrEF mortality/hospitalization benefit is decisive and GLP-1 RAs do NOT reduce HF hospitalization.
+- HF DOSE: when an SGLT2i is the keyed answer for the HF indication it MUST be at the trial-validated HF dose -- dapagliflozin 10 mg once daily (DAPA-HF) or empagliflozin 10 mg once daily (EMPEROR-Reduced). The dapagliflozin 5 mg glycemic starting dose is SUB-THERAPEUTIC for HFrEF; if a correctly-dosed SGLT2i option is present, a 5 mg or otherwise under-dosed SGLT2i is a DISTRACTOR, never the key.
 - Finerenone, the SGLT2i GLYCEMIC indication, and GLP-1 renal indications are T2D-SPECIFIC (do NOT extrapolate to T1D).
 - Metformin: avoid if eGFR <30. Reduce dose at eGFR 30-44.
 - Avoid: sulfonylureas in elderly with hypoglycemia; TZDs in NYHA III/IV.`,
