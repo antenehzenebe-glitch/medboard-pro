@@ -94,6 +94,7 @@
 const crypto = require("crypto");
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const CLAUDE_MODEL      = "claude-sonnet-5";
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 
 const SUPABASE_URL      = process.env.SUPABASE_URL;
@@ -2390,7 +2391,7 @@ async function callClaude(systemText, userText, maxTokens) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6", 
+        model: CLAUDE_MODEL, 
         max_tokens: maxTokens,
         temperature: 0.6,
         system: systemText,
@@ -2403,7 +2404,7 @@ async function callClaude(systemText, userText, maxTokens) {
     const data = await response.json();
     const toolUseBlock = data.content.find(b => b.type === "tool_use" && b.name === "emit_mcq");
     if (!toolUseBlock || !toolUseBlock.input) throw new Error("Claude response missing expected tool_use block.");
-    return { parsed: toolUseBlock.input, model: "claude-sonnet-4-6" };
+    return { parsed: toolUseBlock.input, model: CLAUDE_MODEL };
   }
 }
 

@@ -113,7 +113,7 @@
 const crypto = require("crypto");
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const BULK_CLAUDE_MODEL = "claude-sonnet-4-6";
+const BULK_CLAUDE_MODEL = "claude-sonnet-5";
 const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 const SUPABASE_URL      = process.env.SUPABASE_URL;
    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -137,7 +137,7 @@ const FILTER_TOPIC = (process.env.BULK_TOPIC || getArg("--topic", "")).trim() ||
 const MODE         = (process.env.BULK_MODE  || getArg("--mode", "batch")).trim();
 const CONCURRENCY  = parseInt(process.env.BULK_CONCURRENCY || getArg("--concurrency", "6"), 10);
 const VERIFY_PASS  = /^(1|true|on|yes)$/i.test(process.env.VERIFY_PASS || "");   // Layer-4a verify-pass (opt-in; ~doubles Claude calls)
-const VERIFY_MODEL = process.env.VERIFY_MODEL || "claude-sonnet-4-6";          // set to another model id for cross-model independence
+const VERIFY_MODEL = process.env.VERIFY_MODEL || "claude-sonnet-5";          // set to another model id for cross-model independence
 
 const VALID_LEVELS = ["ABIM Internal Medicine", "ABIM Endocrinology", "USMLE Step 1", "USMLE Step 2 CK", "USMLE Step 3"];
 
@@ -3243,7 +3243,7 @@ async function runBatchMode(queue) {
       return {
         custom_id: `mbp-${Date.now()}-${bi}-${idx}`,
         params: {
-          model: "claude-sonnet-4-6",
+          model: BULK_CLAUDE_MODEL,
           max_tokens: pd.maxTokens,
           system: pd.systemText,
           tools: [MCQ_TOOL],
@@ -3448,7 +3448,7 @@ async function runStandardMode(queue, silent = false) {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
-            model: "claude-sonnet-4-6",
+            model: BULK_CLAUDE_MODEL,
             max_tokens: pd.maxTokens,
             temperature: 0.6,
             system: pd.systemText,
